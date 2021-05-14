@@ -1,2 +1,2 @@
 # STRAUSS
-***S**uite of **T**ools and **R**esources for **A**strophysical **S**onification **S**tuff*
+***S**onification **T**ools and **R**esources for **A**strophysical **S**ound **S**ynthesis*
