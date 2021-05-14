@@ -1,2 +1,2 @@
 # STRAUSS
-Suite of Tools and Resources for Astrophysical Sonification Simulations
+##***S**uite of **T**ools and **R**esources for **A**strophysical **S**onification **S**tuff*
