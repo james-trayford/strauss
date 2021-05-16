@@ -6,9 +6,9 @@ import numpy as np
 class Stream:
     """ Stream object representing audio samples"""
     def __init__(self, length, samprate=44100):
-        # private variables we want to keep constant
-        self._samprate = samprate
-        self._nyqfrq = 0.5*self._samprate
+        # variables we want to keep constant
+        self.samprate = samprate
+        self._nyqfrq = 0.5*self.samprate
         self._nsamp_stream = int(samprate * length)
 
         # sample values initialised to 0 (silence)
@@ -62,17 +62,23 @@ class Stream:
 
         # finally, consolidate buffers to apply effect to stream
         self.consolidate_buffers()
+
+    def reset(self):
+        self.values *= 0.
+        if hasattr(self, "buffers"):
+            self.buffers.buffs_tile *= 0.
+            self.buffers.buffs_olap *= 0.        
         
 class Buffers: 
     def __init__(self, stream, bufflength=0.1):
-        nbuff = stream._samprate*bufflength
+        nbuff = stream.samprate*bufflength
         if nbuff < 20:
             Exception(f"Error: buffer length {nbuff} samples below "
                       "lower limit of 20, with specified bufflength "
-                      "{bufflength} seconds and sample rate {self._samprate} Hz")
+                      "{bufflength} seconds and sample rate {self.samprate} Hz")
 
         # force buffer length to an even number of samples
-        self._nsamp_halfbuff = int(stream._samprate*bufflength) // 2
+        self._nsamp_halfbuff = int(stream.samprate*bufflength) // 2
         self._nsamp_buff = 2 * self._nsamp_halfbuff
 
         # minimum number of tiled buffers to completely enclose stream 
