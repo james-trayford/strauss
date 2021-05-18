@@ -1,4 +1,5 @@
 import numpy as np
+import wavio
 
 # To Do
 # - implement filter Q-parameter mapping
@@ -63,7 +64,12 @@ class Stream:
         # finally, consolidate buffers to apply effect to stream
         self.consolidate_buffers()
 
+    def save_wav(self, filename):
+        """ save audio stream to wav file, specified by filename"""
+        wavio.write(filename, self.values, self.samprate, sampwidth=3) 
+        
     def reset(self):
+        """ zero audio stream and buffers if present """
         self.values *= 0.
         if hasattr(self, "buffers"):
             self.buffers.buffs_tile *= 0.
