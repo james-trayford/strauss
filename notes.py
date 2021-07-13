@@ -30,3 +30,8 @@ def parse_chord(chordname, rootoct=3):
     for n in notes:
         frqs.append(parse_note(n))
     return np.array(frqs)
+
+def chord_notes(chordname, rootoct=3):
+    chord = chrd.Chord(chordname)
+    notes = chord.components_with_pitch(int(rootoct))
+    return notes
