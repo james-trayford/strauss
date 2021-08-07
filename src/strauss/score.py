@@ -1,7 +1,7 @@
+from . import stream
+from . import notes
 import numpy as np
-import stream
 import pychord as chrd
-import notes
 import numbers
 import re
 

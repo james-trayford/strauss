@@ -1,6 +1,6 @@
+from . import stream
+from . import notes
 import numpy as np
-import stream
-import notes
 import glob
 import wavio
 from scipy.interpolate import interp1d

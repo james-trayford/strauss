@@ -1,5 +1,5 @@
-from channels import audio_channels
-from stream import Stream
+from .stream import Stream
+from .channels import audio_channels
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
