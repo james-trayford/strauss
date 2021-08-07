@@ -9,4 +9,18 @@
 
 ## Getting Started
 
-`__________`
+Make a copy of the *STRAUSS* repository via SSH
+
+`git clone git@github.com:james-trayford/strauss.git strauss`
+
+or HTTPS if you don't have SSH keys set up:
+
+`https://github.com/james-trayford/strauss.git`
+
+*STRAUSS* may then be installed using pip:
+
+```
+cd strauss
+pip install .
+```
+
