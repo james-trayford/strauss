@@ -20,5 +20,6 @@ or HTTPS if you don't have SSH keys set up,
 *STRAUSS* may then be installed using pip
 
 `cd strauss`
+
 `pip install .`
 
