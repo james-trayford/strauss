@@ -13,9 +13,9 @@ Make a copy of the *STRAUSS* repository via SSH,
 
 `git clone git@github.com:james-trayford/strauss.git strauss`
 
-or HTTPS if you don't have SSH keys set up,
+or HTTPS if you don't have ![SSH keys set up](https://docs.github.com/en/github/authenticating-to-github/connecting-to-github-with-ssh),
 
-`https://github.com/james-trayford/strauss.git`
+`git clone https://github.com/james-trayford/strauss.git strauss`
 
 *STRAUSS* may then be installed using pip
 
