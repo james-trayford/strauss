@@ -1,0 +1,13 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pychord",	
+    "scipy",
+    "tqdm",
+    "wavio",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
