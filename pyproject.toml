@@ -1,11 +1,12 @@
 [build-system]
 requires = [
-    "setuptools>=42",
+    "ffmpeg-python",
     "matplotlib",
     "numpy",
     "pandas",
     "pychord",	
     "scipy",
+    "setuptools>=42",
     "tqdm",
     "wavio",
     "wheel"
