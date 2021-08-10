@@ -33,6 +33,19 @@ def detuned_saw(samples, freqsamp, oscdets=[1,1.005,0.995]):
         signal += saw(freq, samples+freq*np.random.random())
     return signal
 
+def legacy_env(t, dur,a,d,s,r):
+    att = lambda t: t/a
+    dgrad = (1-s)/d
+    dec = lambda t: (a-t)*dgrad + 1
+    sus = lambda t: s
+    funcs = [att, dec, sus]
+    conds = [t<a,
+             np.logical_and(t>a, t<(d+a)),
+             t > (a+d)]
+    vol = np.piecewise(np.clip(t, 0, dur), conds, funcs)
+    rel = np.clip(np.exp((dur-t)/r),0, 1)
+    return vol * rel
+
 class Generator:
     pass
 
@@ -65,3 +78,15 @@ class Sampler(Generator):
                                           fill_value = (0.,0.),
                                           assume_sorted=True)
             self.samplens[note] = wavdat.size
+
+if __name__ == "__main__":
+    # test volume envelope
+    t = np.linspace(0.,11,500)
+    dur = 9
+    a = 1.4
+    d = 2
+    s = 0.7
+    r = 1
+    env = legacy_env(t, dur,a,d,s,r)
+    plt.plot(t, env)
+    plt.show()
