@@ -56,7 +56,7 @@ class Sonification:
                 values = sfunc(samps) * vol * panenv
                 self.out_channels[str(i)].values[tsamp:min(tsamp+samplen, Nsamp-1)] += values[:min(samplen, Nsamp-tsamp-1)]
         
-    def save_combined(fname):
+    def save_combined(self, fname, ffmpeg_output=False):
         """ Save rendered sonification as a combined multi-channel audio file """
         # setup list to house wav stream data 
         inputs = [None]*len(self.out_channels)
@@ -86,7 +86,7 @@ class Sonification:
             ff.filter(inputs, 'join', inputs=len(inputs), channel_layout=self.channels.setup)
             .output(fname)
             .overwrite_output()
-            .run(quiet=True)
+            .run(quiet=~ffmpeg_output)
         )
         
         print("Cleaning up...")
@@ -94,5 +94,3 @@ class Sonification:
             os.remove(f"./.TEMP_{c}.wav")
             
         print("Saved.")
-
-        
