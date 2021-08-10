@@ -3,6 +3,9 @@ from .channels import audio_channels
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import os
+import ffmpeg as ff
+import wavio as wav
 
 class Sonification:
     def __init__(self, score, sources, generator, audio_setup='stereo', samprate=44100):
@@ -52,8 +55,44 @@ class Sonification:
                 samps = np.arange(samplen)
                 values = sfunc(samps) * vol * panenv
                 self.out_channels[str(i)].values[tsamp:min(tsamp+samplen, Nsamp-1)] += values[:min(samplen, Nsamp-tsamp-1)]
-
-            
         
+    def save_combined(fname):
+        """ Save rendered sonification as a combined multi-channel audio file """
+        # setup list to house wav stream data 
+        inputs = [None]*len(self.out_channels)
+
+        # first pass - find max amplitude value to normalise output
+        vmax = 0.
+        for c in range(len(self.out_channels)):
+            vmax = max(
+                abs(self.out_channels[str(c)].values.max()),
+                abs(self.out_channels[str(c)].values.min()),
+                vmax
+            )
+            
+        print("Creating temporary .wav files...")
+        
+        for c in range(len(self.out_channels)):
+            tempfname = f"./.TEMP_{c}.wav"
+            wav.write(tempfname, 
+                      self.out_channels[str(c)].values,
+                      self.samprate, 
+                      scale = (-vmax,vmax),
+                      sampwidth=3)
+            inputs[self.channels.forder[c]] = ff.input(tempfname)
+            
+        print("Joning temporary .wav files...")
+        (
+            ff.filter(inputs, 'join', inputs=len(inputs), channel_layout=self.channels.setup)
+            .output(fname)
+            .overwrite_output()
+            .run(quiet=True)
+        )
+        
+        print("Cleaning up...")
+        for c in range(len(self.out_channels)):
+            os.remove(f"./.TEMP_{c}.wav")
+            
+        print("Saved.")
 
         

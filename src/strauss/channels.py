@@ -64,6 +64,11 @@ class audio_channels:
                              'SL', 'SR',
                              'AL', 'AR']
 
+        #ffmpeg channel orders to correctly save combined files
+        mono_forder = [0]
+        stereo_forder = [0,1]
+        fivepoint_forder = [1,2,0,3,4,5]
+        sevenpoint_forder = [1,2,0,3,4,5,6,7]
         
         self.setup = setup
 
@@ -77,16 +82,24 @@ class audio_channels:
             
         if setup == "mono":
             self.setup_channels(mono_phis, mono_types, mono_labels)
+            self.forder = mono_forder
         elif setup == "stereo":
             self.setup_channels(stereo_phis, stereo_types, stereo_labels)
+            self.forder = stereo_forder
         elif setup == "5.1":
             self.setup_channels(fivepoint_phis, fivepoint_types, fivepoint_labels)
+            self.forder = fivepoint_forder
         elif setup == "7.1":
             self.setup_channels(sevenpoint_phis, sevenpoint_types, sevenpoint_labels)
+            self.forder = sevenpoint_forder
         elif setup == "custom":
             self.setup_channels(custom_setup['phis'],
                                 custom_setup['types'],
                                 custom_setup['labels'])
+            if 'forder' in custom_setup:
+                self.forder = self.custom_setup['forder']
+            else:
+                self.forder = 'unknown'
         else:
             raise Exception(f"setup \"{setup}\" not understood")
             
