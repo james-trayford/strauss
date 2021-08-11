@@ -12,11 +12,11 @@ class mic:
         self.channel = channel
         
         if mic_type == "directional":
-            self.antenna = lambda a, b=np.pi: 0.5*(1+np.cos(a-phi)*np.cos(b))
+            self.antenna = lambda a, b=0.5*np.pi: 0.5*(1+np.cos(a-phi)*np.sin(b))
         elif mic_type == "omni":
-            self.antenna = lambda a, b=np.pi: a**0.
+            self.antenna = lambda a, b=0.5*np.pi: a**0.
         elif mic_type == "mute":
-            self.antenna = lambda a, b=np.pi: a*0.
+            self.antenna = lambda a, b=0.5*np.pi: a*0.
         else:
             raise Exception(f"Mic type \"{mic_type}\" unknown.")        
         
