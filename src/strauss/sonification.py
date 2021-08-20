@@ -31,14 +31,13 @@ class Sonification:
             self.out_channels[str(c)] = Stream(self.score.length, self.samprate)
 
     def render(self):
-
         cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
         cbin = np.clip(cbin-1, 0, self.score.nchords-1)
         pitchfrac = self.sources.mapping['pitch'].argsort()/self.sources.nevents
         Nsamp = self.out_channels['0'].values.size
+        lastsamp = Nsamp - 1
         Nchan = len(self.out_channels.keys())
         for event in tqdm(range(self.sources.nevents)):
-            # identify note
             t = self.sources.mapping['time'][event]
             tsamp = int(Nsamp * t)
             chord = self.score.note_sequence[cbin[event]]
@@ -46,15 +45,21 @@ class Sonification:
             pitch = pitchfrac[event]
             note = chord[int(pitch * nints)]
             sfunc = self.generator.samples[note]
-            vol   = self.sources.mapping['volume'][event]
+            phi     = self.sources.mapping['phi'][event] * 2 * np.pi
+            theta   = self.sources.mapping['theta'][event] * 2 * np.pi
+
+            sourcemap = {}
+            for k in self.sources.mapping.keys():
+                sourcemap[k] = self.sources.mapping[k][event]
+            sourcemap['note'] = note
+
+            sstream = self.generator.play(sourcemap)
+            playlen = sstream.values.size
+            truncdx = min(playlen, lastsamp-tsamp)
+            enddx   = truncdx + tsamp
             for i in range(Nchan):
-                samplen = self.generator.samplens[note] 
-                phi     = self.sources.mapping['phi'][event] * 2 * np.pi
-                theta   = self.sources.mapping['theta'][event] * 2 * np.pi
                 panenv = self.channels.mics[i].antenna(phi,theta)
-                samps = np.arange(samplen)
-                values = sfunc(samps) * vol * panenv
-                self.out_channels[str(i)].values[tsamp:min(tsamp+samplen, Nsamp-1)] += values[:min(samplen, Nsamp-tsamp-1)]
+                self.out_channels[str(i)].values[tsamp:enddx] += sstream.values[:truncdx]
         
     def save_combined(self, fname, ffmpeg_output=False):
         """ Save rendered sonification as a combined multi-channel audio file """

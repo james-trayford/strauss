@@ -1,5 +1,6 @@
 from . import stream
 from . import notes
+from . import presets
 import numpy as np
 import glob
 import wavio
@@ -47,13 +48,22 @@ def legacy_env(t, dur,a,d,s,r):
     return vol * rel
 
 class Generator:
-    pass
-
+    def __init__(self, params):
+        """universal generator initialisation"""
+        pass
+    
 class Synthesizer(Generator):
     pass
 
 class Sampler(Generator):
-    def __init__(self, sampfiles, params=None):
+    def __init__(self, sampfiles, params='sampler_default'):
+
+        # default sampler preset 
+        self.preset = presets.sampler.load_preset()
+        
+        # universal initialisation for generator objects:
+        super().__init__(params)
+
         if isinstance(sampfiles, dict):
             self.sampdict = sampfiles
         if isinstance(sampfiles, str):
@@ -63,7 +73,7 @@ class Sampler(Generator):
                 note = w.split('/')[-1].split('_')[-1].split('.')[0]
                 self.sampdict[note] = w
         self.load_samples()
-        
+
     def load_samples(self):
         self.samples = {}
         self.samplens = {}
@@ -79,6 +89,24 @@ class Sampler(Generator):
                                           assume_sorted=True)
             self.samplens[note] = wavdat.size
 
+    def play(self, mapping):
+        # TO DO: generator should know samplerate
+        samprate = 44100
+        samplefunc = self.samples[mapping['note']]
+        for p in self.preset.keys():
+            if p not in mapping:
+               mapping[p] = self.preset[p]
+        if mapping['note_length'] == 'sample':
+            nlength = self.samplens[mapping['note']]
+        else:
+            nlength = (mapping['note_length']+mapping['volume_envelope']['R'])*samprate
+        sstream = stream.Stream(nlength/samprate, samprate)
+        
+        # apply volume
+        sstream.values = samplefunc(sstream.samples) * mapping['volume']
+        return sstream
+
+            
 if __name__ == "__main__":
     # test volume envelope
     t = np.linspace(0.,11,500)
