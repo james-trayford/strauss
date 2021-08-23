@@ -1,5 +1,6 @@
 from .stream import Stream
 from .channels import audio_channels
+from .utilities import const_or_evo
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -30,36 +31,56 @@ class Sonification:
         for c in range(self.channels.Nmics):
             self.out_channels[str(c)] = Stream(self.score.length, self.samprate)
 
-    def render(self):
+    def render(self, downsamp=1):
+        
+        # first determine if time is provided, if not assume all start at zero
+        # and last the duration of sonification
+
+        if "time" not in self.sources.mapping:
+            self.sources.mapping['time'] = [0.] * self.sources.n_sources
+            self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources 
+
+        # index each chord
         cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
         cbin = np.clip(cbin-1, 0, self.score.nchords-1)
-        pitchfrac = self.sources.mapping['pitch'].argsort()/self.sources.nevents
+        pitchfrac = np.argsort(self.sources.mapping['pitch'])/self.sources.n_sources
+
+        # get some relevant numbers before iterating through sources
         Nsamp = self.out_channels['0'].values.size
         lastsamp = Nsamp - 1
         Nchan = len(self.out_channels.keys())
-        for event in tqdm(range(self.sources.nevents)):
+        indices = range(0,self.sources.n_sources, downsamp)
+
+        for event in tqdm(indices):
+
+            # index note properties
             t = self.sources.mapping['time'][event]
             tsamp = int(Nsamp * t)
             chord = self.score.note_sequence[cbin[event]]
             nints = self.score.nintervals[cbin[event]]
             pitch = pitchfrac[event]
             note = chord[int(pitch * nints)]
-            sfunc = self.generator.samples[note]
-            phi     = self.sources.mapping['phi'][event] * 2 * np.pi
-            theta   = self.sources.mapping['theta'][event] * 2 * np.pi
 
+            # make dictionary for feeding to play function with each notes properties
             sourcemap = {}
             for k in self.sources.mapping.keys():
                 sourcemap[k] = self.sources.mapping[k][event]
             sourcemap['note'] = note
 
+            # run generator to play each note
             sstream = self.generator.play(sourcemap)
             playlen = sstream.values.size
-            truncdx = min(playlen, lastsamp-tsamp)
-            enddx   = truncdx + tsamp
+            phi     = const_or_evo(self.sources.mapping['phi'][event], sstream.sampfracs) * 2 * np.pi
+            theta   = const_or_evo(self.sources.mapping['theta'][event], sstream.sampfracs) * np.pi
+
+            # compute sample indices for truncating notes overshooting sonification length
+            trunc_note = min(playlen, lastsamp-tsamp)
+            trunc_soni   = trunc_note + tsamp
+
+            # spatialise audio by computing relative volume in each speaker
             for i in range(Nchan):
                 panenv = self.channels.mics[i].antenna(phi,theta)
-                self.out_channels[str(i)].values[tsamp:enddx] += sstream.values[:truncdx]
+                self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
         
     def save_combined(self, fname, ffmpeg_output=False):
         """ Save rendered sonification as a combined multi-channel audio file """

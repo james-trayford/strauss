@@ -1,6 +1,8 @@
 from . import stream
 from . import notes
 from . import presets
+from . import utilities as utils
+from . import filters
 import numpy as np
 import glob
 import wavio
@@ -47,23 +49,41 @@ def legacy_env(t, dur,a,d,s,r):
     rel = np.clip(np.exp((dur-t)/r),0, 1)
     return vol * rel
 
+def forward_loopsamp(s, start, end):
+    delsamp = end-start
+    return np.piecewise(s, [s < start, s >= start],
+                        [lambda x: x, lambda x: (x-start)%(delsamp) + start])
+def forward_back_loopsamp(s, start, end):
+    delsamp = end-start
+    return np.piecewise(s, [s < start, s >= start],
+                        [lambda x: x, lambda x: end - abs((x-start)%(2*(delsamp)) - (delsamp))])
+
 class Generator:
-    def __init__(self, params):
+    def __init__(self, params, samprate):
         """universal generator initialisation"""
+        self.samprate = samprate
         pass
-    
+    def load_preset(self, preset):
+        self.preset = presets.sampler.load_preset(preset)
+    def modify_preset(self, parameters):
+        utils.nested_dict_reassign(self.preset, parameters)
+        
 class Synthesizer(Generator):
     pass
 
 class Sampler(Generator):
-    def __init__(self, sampfiles, params='sampler_default'):
+    def __init__(self, sampfiles, params=None, samprate=44100):
 
         # default sampler preset 
         self.preset = presets.sampler.load_preset()
         
         # universal initialisation for generator objects:
-        super().__init__(params)
+        super().__init__(params, samprate)
 
+        # modify or load preset if specified
+        if params:
+            self.preset = self.modify_preset(params)
+        
         if isinstance(sampfiles, dict):
             self.sampdict = sampfiles
         if isinstance(sampfiles, str):
@@ -81,6 +101,9 @@ class Sampler(Generator):
             wavobj = wavio.read(self.sampdict[note])
             # force to mono
             wavdat = wavobj.data.mean(axis=1)
+            # remove DC term 
+            dc = wavdat.mean()
+            wavdat -= dc
             wavdat /= abs(wavdat).max()
             samps = range(wavdat.size)
             self.samples[note] = interp1d(samps, wavdat,
@@ -89,23 +112,77 @@ class Sampler(Generator):
                                           assume_sorted=True)
             self.samplens[note] = wavdat.size
 
+    def forward_loopsamp(s, start, end):
+        delsamp = end-start
+        return np.piecewise(s, [s < start, s >= start],
+                        [lambda x: x, lambda x: (x-start)%(delsamp) + start])
+    def forward_back_loopsamp(s, start, end):
+        delsamp = end-start
+        return np.piecewise(s, [s < start, s >= start],
+                            [lambda x: x,
+                             lambda x: end - abs((x-start)%(2*(delsamp)) - (delsamp))])
+
     def play(self, mapping):
-        # TO DO: generator should know samplerate
+        # TO DO: Generator should know samplerate and audbuff
+        # TO DO: split this into common and generator-specific functions to minimise code duplication
         samprate = 44100
-        samplefunc = self.samples[mapping['note']]
+        audbuff = samprate/20.
+
         for p in self.preset.keys():
             if p not in mapping:
                mapping[p] = self.preset[p]
+
+        # sample to use
+        samplefunc = self.samples[mapping['note']]
+
+        # note length
         if mapping['note_length'] == 'sample':
             nlength = self.samplens[mapping['note']]
         else:
             nlength = (mapping['note_length']+mapping['volume_envelope']['R'])*samprate
-        sstream = stream.Stream(nlength/samprate, samprate)
-        
-        # apply volume
-        sstream.values = samplefunc(sstream.samples) * mapping['volume']
-        return sstream
 
+        # generator stream (TO DO: attribute of stream?)
+        sstream = stream.Stream(nlength/samprate, samprate)
+        sstream.get_sampfracs()
+
+        # sample looping if specified
+        if mapping['looping'] == 'off':
+            samples = sstream.samples
+        else:
+            startsamp = mapping['loop_start']*samprate
+            endsamp = mapping['loop_end']*samprate
+
+            # find clean loop points within an audible (< 20Hz) cycle
+            startsamp += np.argmin(samplefunc(np.arange(audbuff) + startsamp))
+            endsamp += np.argmin(samplefunc(np.arange(audbuff) + endsamp))
+
+            if mapping['looping'] == 'forwardback':
+                samples = forward_back_loopsamp(sstream.samples,
+                                                startsamp,
+                                                endsamp)
+            elif mapping['looping'] == 'forward':
+                samples = forward_loopsamp(sstream.samples,
+                                           startsamp,
+                                           endsamp)
+        # generate stream values
+        values = samplefunc(samples)
+
+        # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
+        sstream.values = values * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
+
+        # TO DO: filter envelope (specify as a cutoff array function? or filter twice?)
+
+        # filter stream
+        if mapping['filter'] == "on":
+            if hasattr(mapping['cutoff'], "__iter__"):
+                # if static cutoff, use minimum buffer count
+                sstream.bufferize(sstream.length/4)
+            else:
+                # 30 ms buffer (hardcoded for now)
+                sstream.bufferize(0.03)
+            sstream.filt_sweep(getattr(filters, mapping['filter_type']),
+                               utils.const_or_evo_func(mapping['cutoff']))
+        return sstream    
             
 if __name__ == "__main__":
     # test volume envelope
