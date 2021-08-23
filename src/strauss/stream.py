@@ -1,6 +1,6 @@
 import numpy as np
 import wavio
-
+import matplotlib.pyplot as plt
 # To Do
 # - implement filter Q-parameter mapping
 
@@ -8,6 +8,7 @@ class Stream:
     """ Stream object representing audio samples"""
     def __init__(self, length, samprate=44100):
         # variables we want to keep constant
+        self.length = length
         self.samprate = samprate
         self._nyqfrq = 0.5*self.samprate
         self._nsamp_stream = int(samprate * length)
@@ -29,14 +30,14 @@ class Stream:
         """ wrapper to reassign stream values to consolidated stream """
         self.values = self.buffers.to_stream()
         
-    def filt_sweep(self, ffunc, fmap, qmap=lambda x:x,
-                   flo=20, fhi=2e4, qlo=0.5, qhi=10):
+    def filt_sweep(self, ffunc, fmap, qmap=lambda x:x*0 + 0.1,
+                   flo=20, fhi=2.205e4, qlo=0.5, qhi=10):
         """
         ffunc: function that applies filter 
         fmap: mapping function representing filter cutoff sweep
         qmap: mapping function for a filters Q parameter, default: lambda:None
         flo: lowest frequency of sweep in Hz, default 20
-        fhi: highest frequency of sweep in Hz, default 20 kHz
+        fhi: highest frequency of sweep in Hz, default 2.205 kHz
         """
         if not hasattr(self, "buffers"):
             Exception("needs bufferized stream, please run 'bufferize' method first.")
@@ -52,7 +53,7 @@ class Stream:
         # of the nyquist frequency
         svals = pow(10., fmap(x)*(lfhi-lflo)+lflo)/self._nyqfrq
         qvals = (qmap(x)*(qhi-qlo)+qlo)
-        
+
         # loop over buffers, applying appropriate filtering to each 
         for i in range(buffers._nbuffs):
             i2 = 2*i
@@ -64,6 +65,9 @@ class Stream:
         # finally, consolidate buffers to apply effect to stream
         self.consolidate_buffers()
 
+    def get_sampfracs(self):
+        self.sampfracs = np.linspace(0, 1, self.values.size)
+        
     def save_wav(self, filename):
         """ save audio stream to wav file, specified by filename"""
         wavio.write(filename, self.values, self.samprate, sampwidth=3) 
