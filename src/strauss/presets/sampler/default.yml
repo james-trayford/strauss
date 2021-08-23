@@ -23,4 +23,8 @@ volume_envelope:
   R: 0
   level: 1
   
-  
+# Do we apply a filter, and if so specify the cutoff and filter type
+filter: "off"
+filter_type: "LPF1"
+cutoff: 1.
+
