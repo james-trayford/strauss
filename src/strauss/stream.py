@@ -37,7 +37,7 @@ class Stream:
         fmap: mapping function representing filter cutoff sweep
         qmap: mapping function for a filters Q parameter, default: lambda:None
         flo: lowest frequency of sweep in Hz, default 20
-        fhi: highest frequency of sweep in Hz, default 2.205 kHz
+        fhi: highest frequency of sweep in Hz, default 22.05 kHz
         """
         if not hasattr(self, "buffers"):
             Exception("needs bufferized stream, please run 'bufferize' method first.")
