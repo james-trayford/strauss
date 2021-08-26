@@ -109,7 +109,7 @@ class Synthesizer(Generator):
 
         # generate stream values
         values = self.generate(samples, mapping['note'])
-        print(values)
+
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
         sstream.values = values * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
 
