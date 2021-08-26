@@ -1,0 +1,50 @@
+# defaults for all synth parameters
+
+# preset name
+name: "default"
+
+# oscillator information
+oscillators:
+  # oscillator are denoted osc<n> with n=3 by default
+  #
+  # level: the intrinsic volume
+  #
+  # detune: the change in tuning as a percentage of the input frequency
+  #
+  # form: the waveform, choose from:
+  # ['saw', 'square', 'sine', 'tri']
+  #
+  osc1:
+    form: 'saw'
+    level: 1.
+    detune: 0.
+    phase: 0
+  osc2:
+    form: 'saw'
+    level: 0.5
+    detune: -2.
+    phase: 0.3
+  osc3:
+    form: 'saw'
+    level: 0.5
+    detune: 2.
+    phase: 0.6
+
+# Numerical note length in s
+note_length: 0.1
+
+# define the note volume envelope applied to the samples
+# A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
+volume_envelope:
+  A: 0
+  D: 0
+  S: 1
+  R: 0
+  level: 1
+  
+# Do we apply a filter, and if so specify the cutoff and filter type
+filter: "off"
+filter_type: "LPF1"
+cutoff: 1.
+
+  
