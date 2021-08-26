@@ -14,41 +14,6 @@ from scipy.interpolate import interp1d
 # - Functions here will generally be called from a "Score" class that is provided with the
 #   musical choices and uses these to generate sound, but can be interfaced with directly.
 
-def gen_chord(stream, chordname, rootoctv=3):
-    """ 
-    generate chord over entire stream given chord name and optional
-    octave of root note
-    """
-    frqs = notes.parse_chord(chordname, rootoctv)
-    frqsamp = frqs/stream.samprate 
-    for f in frqsamp:
-        stream.values += detuned_saw(stream.samples, f)
-    
-def detuned_saw(samples, freqsamp, oscdets=[1,1.005,0.995]):
-    """
-    Three oscillator sawtooth wave generator with slight detuning for
-    texture
-    """
-    saw = lambda freqsamp, samp: 1-((samples*(freqsamp)/2) % 2)
-    signal = np.zeros(samples.size)
-    for det in oscdets:
-        freq = freqsamp*det
-        signal += saw(freq, samples+freq*np.random.random())
-    return signal
-
-def legacy_env(t, dur,a,d,s,r):
-    att = lambda t: t/a
-    dgrad = (1-s)/d
-    dec = lambda t: (a-t)*dgrad + 1
-    sus = lambda t: s
-    funcs = [att, dec, sus]
-    conds = [t<a,
-             np.logical_and(t>a, t<(d+a)),
-             t > (a+d)]
-    vol = np.piecewise(np.clip(t, 0, dur), conds, funcs)
-    rel = np.clip(np.exp((dur-t)/r),0, 1)
-    return vol * rel
-
 def forward_loopsamp(s, start, end):
     delsamp = end-start
     return np.piecewise(s, [s < start, s >= start],
@@ -62,15 +27,105 @@ class Generator:
     def __init__(self, params, samprate):
         """universal generator initialisation"""
         self.samprate = samprate
-        pass
+
+        # samples per buffer (use 30Hz as minimum)
+        self.audbuff = self.samprate / 30.
+        
+        # modify or load preset if specified
+        if params:
+            self.preset = self.modify_preset(params)
+
     def load_preset(self, preset):
         self.preset = presets.sampler.load_preset(preset)
     def modify_preset(self, parameters):
         utils.nested_dict_reassign(self.preset, parameters)
         
 class Synthesizer(Generator):
-    pass
+    def __init__(self, params=None, samprate=44100):
 
+        # default synth preset 
+        self.preset = presets.synth.load_preset()
+        
+        # universal initialisation for generator objects:
+        super().__init__(params, samprate)
+
+        # set up the oscillator banks
+        self.setup_oscillators()
+
+    def setup_oscillators(self):
+        oscdict = self.preset['oscillators']
+        self.osclist = []
+        for osc in oscdict.keys():
+            lvl = oscdict[osc]['level']
+            det = oscdict[osc]['detune']
+            phase = oscdict[osc]['phase']
+            form = oscdict[osc]['form']
+            
+            snorm = self.samprate
+            fnorm = (1 + det/100.)
+            oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
+            self.osclist.append(oscf)
+        self.generate = self.combine_oscs
+
+    # ||||||||||||||||||||||||||||||||||||||||||||||||||
+    # OSC types 
+    # ||||||||||||||||||||||||||||||||||||||||||||||||||
+    def sine(self, s,f,p):
+        return np.sin(2*np.pi*(s*f+p))
+    def saw(self,s,f,p):
+        return (2*(s*f+p) +1) % 2 - 1
+    def square(self,s,f,p):
+        return np.sign(saw(s,f,p))
+    def tri(self,s,f,p):
+        return 1 - abs((4*(s*f+p) +1) % 4 - 2)
+            
+    def combine_oscs(self, s, f):
+        tot = 0.
+        if isinstance(f, str):
+            # we want a numerical frequency to generate tone
+            f = notes.parse_note(f)
+        for osc in self.osclist:
+            tot += osc(s,f)
+        return tot
+
+    def play(self, mapping):
+        # TO DO: Generator should know samplerate and audbuff
+        # TO DO: split this into common and generator-specific functions to minimise code duplication
+        # integrate the common tasks into generic generator functions  to avoid code duplication
+        # once main features 
+        samprate = self.samprate
+        audbuff = self.audbuff
+
+        for p in self.preset.keys():
+            if p not in mapping:
+               mapping[p] = self.preset[p]
+
+        nlength = (mapping['note_length']+mapping['volume_envelope']['R'])*samprate
+
+        # generator stream (TO DO: attribute of stream?)
+        sstream = stream.Stream(nlength/samprate, samprate)
+        samples = sstream.samples
+        sstream.get_sampfracs()
+
+        # generate stream values
+        values = self.generate(samples, mapping['note'])
+        print(values)
+        # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
+        sstream.values = values * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
+
+        # filter stream
+        if mapping['filter'] == "on":
+            if hasattr(mapping['cutoff'], "__iter__"):
+                # if static cutoff, use minimum buffer count
+                sstream.bufferize(sstream.length/4)
+            else:
+                # 30 ms buffer (hardcoded for now)
+                sstream.bufferize(0.03)
+            sstream.filt_sweep(getattr(filters, mapping['filter_type']),
+                               utils.const_or_evo_func(mapping['cutoff']))
+        return sstream    
+
+            
 class Sampler(Generator):
     def __init__(self, sampfiles, params=None, samprate=44100):
 
@@ -79,10 +134,6 @@ class Sampler(Generator):
         
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
-
-        # modify or load preset if specified
-        if params:
-            self.preset = self.modify_preset(params)
         
         if isinstance(sampfiles, dict):
             self.sampdict = sampfiles
@@ -125,8 +176,8 @@ class Sampler(Generator):
     def play(self, mapping):
         # TO DO: Generator should know samplerate and audbuff
         # TO DO: split this into common and generator-specific functions to minimise code duplication
-        samprate = 44100
-        audbuff = samprate/20.
+        samprate = self.samprate
+        audbuff = self.audbuff
 
         for p in self.preset.keys():
             if p not in mapping:
@@ -183,7 +234,43 @@ class Sampler(Generator):
             sstream.filt_sweep(getattr(filters, mapping['filter_type']),
                                utils.const_or_evo_func(mapping['cutoff']))
         return sstream    
-            
+
+def gen_chord(stream, chordname, rootoctv=3):
+    """ 
+    generate chord over entire stream given chord name and optional
+    octave of root note
+    """
+    frqs = notes.parse_chord(chordname, rootoctv)
+    frqsamp = frqs/stream.samprate 
+    for f in frqsamp:
+        stream.values += detuned_saw(stream.samples, f)
+    
+def detuned_saw(samples, freqsamp, oscdets=[1,1.005,0.995]):
+    """
+    Three oscillator sawtooth wave generator with slight detuning for
+    texture
+    """
+    saw = lambda freqsamp, samp: 1-((samples*(freqsamp)/2) % 2)
+    signal = np.zeros(samples.size)
+    for det in oscdets:
+        freq = freqsamp*det
+        signal += saw(freq, samples+freq*np.random.random())
+    return signal
+
+def legacy_env(t, dur,a,d,s,r):
+    att = lambda t: t/a
+    dgrad = (1-s)/d
+    dec = lambda t: (a-t)*dgrad + 1
+    sus = lambda t: s
+    funcs = [att, dec, sus]
+    conds = [t<a,
+             np.logical_and(t>a, t<(d+a)),
+             t > (a+d)]
+    vol = np.piecewise(np.clip(t, 0, dur), conds, funcs)
+    rel = np.clip(np.exp((dur-t)/r),0, 1)
+    return vol * rel
+
+    
 if __name__ == "__main__":
     # test volume envelope
     t = np.linspace(0.,11,500)
