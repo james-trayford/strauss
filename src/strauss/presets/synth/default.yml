@@ -36,11 +36,14 @@ note_length: 0.1
 # define the note volume envelope applied to the samples
 # A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
 volume_envelope:
-  A: 0
-  D: 0
-  S: 1
-  R: 0
-  level: 1
+  A: 0.
+  D: 0.
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1.
   
 # Do we apply a filter, and if so specify the cutoff and filter type
 filter: "off"

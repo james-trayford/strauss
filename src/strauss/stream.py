@@ -12,7 +12,7 @@ class Stream:
         self.samprate = samprate
         self._nyqfrq = 0.5*self.samprate
         self._nsamp_stream = int(samprate * length)
-
+        
         # sample values initialised to 0 (silence)
         self.values =  np.zeros(self._nsamp_stream)
 
@@ -21,6 +21,9 @@ class Stream:
         
         # sample numbers for indexing
         self.samples = np.arange(self._nsamp_stream, dtype=int)
+
+        # time at which each sample occurs
+        self.samptime = self.samples / self.samprate
         
     def bufferize(self, bufflength=0.1):
         """ wrapper to initialise Buffers subclass """

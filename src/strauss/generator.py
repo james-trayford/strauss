@@ -39,6 +39,50 @@ class Generator:
         self.preset = presets.sampler.load_preset(preset)
     def modify_preset(self, parameters):
         utils.nested_dict_reassign(self.preset, parameters)
+    def envelope(self, samp):
+        # TO DO: is it worth it to pre-set this in part if parameters don't change?
+        nlen=self.preset['note_length']
+        edict=self.preset['volume_envelope']
+        sampt = samp/self.samprate
+        
+        # read envelope params from dictionary
+        a = edict['A']
+        d = edict['D']
+        s = edict['S']
+        r = edict['R']
+        a_k = edict['Ac']
+        d_k = edict['Dc']
+        r_k = edict['Rc']
+        lvl = edict['level']
+
+        # handy time values
+        t1 = a 
+        t2 = a+d
+        t3 = nlen+r
+
+        # determine segments and envelope value when note turns off
+        a_seg = lambda t: 1-env_segment_curve(t, a, 1, -a_k)
+        d_seg = lambda t: s+env_segment_curve(t-t1, d, 1-s, d_k)
+        s_seg = lambda t: s
+
+        if t2 > nlen:
+            env_off = d_seg(nlen)
+        else:
+            env_off = s
+
+        r_seg = lambda t: env_segment_curve(t-nlen, r, env_off, r_k)
+
+        # conditionals to determine which segment a sample is in
+        a_cond = sampt < t1
+        d_cond = np.logical_and(sampt<min(t2,nlen), sampt>=t1)
+        s_cond = np.logical_and(sampt<nlen, sampt>=min(t2,nlen))
+        r_cond = sampt >= nlen
+
+        # compute envelope for each sample 
+        env =  np.piecewise(sampt,
+                            [a_cond, d_cond, s_cond, r_cond],
+                            [a_seg, d_seg, s_seg, r_seg])
+        return lvl*env
         
 class Synthesizer(Generator):
     def __init__(self, params=None, samprate=44100):
@@ -110,9 +154,12 @@ class Synthesizer(Generator):
         # generate stream values
         values = self.generate(samples, mapping['note'])
 
+        # get volume envelope
+        env = self.envelope(samples)
+        
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
-        sstream.values = values * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
-
+        sstream.values = values * env * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
+        
         # filter stream
         if mapping['filter'] == "on":
             if hasattr(mapping['cutoff'], "__iter__"):
@@ -124,7 +171,6 @@ class Synthesizer(Generator):
             sstream.filt_sweep(getattr(filters, mapping['filter_type']),
                                utils.const_or_evo_func(mapping['cutoff']))
         return sstream    
-
             
 class Sampler(Generator):
     def __init__(self, sampfiles, params=None, samprate=44100):
@@ -218,8 +264,11 @@ class Sampler(Generator):
         # generate stream values
         values = samplefunc(samples)
 
+        # get volume envelope
+        env = self.envelope(samples)
+        
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
-        sstream.values = values * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
+        sstream.values = values * env * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
 
         # TO DO: filter envelope (specify as a cutoff array function? or filter twice?)
 
@@ -257,6 +306,11 @@ def detuned_saw(samples, freqsamp, oscdets=[1,1.005,0.995]):
         signal += saw(freq, samples+freq*np.random.random())
     return signal
 
+def env_segment_curve(t, t1, y0, k):
+    """formula for segments of the generator.envelope function"""
+    return y0/(1 + (1-k)*t / ((k+1)*(t1-t)))
+
+
 def legacy_env(t, dur,a,d,s,r):
     att = lambda t: t/a
     dgrad = (1-s)/d
@@ -269,7 +323,6 @@ def legacy_env(t, dur,a,d,s,r):
     vol = np.piecewise(np.clip(t, 0, dur), conds, funcs)
     rel = np.clip(np.exp((dur-t)/r),0, 1)
     return vol * rel
-
     
 if __name__ == "__main__":
     # test volume envelope
