@@ -1,6 +1,6 @@
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo
+from .utilities import const_or_evo, nested_dict_idx_reassign
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -63,8 +63,9 @@ class Sonification:
 
             # make dictionary for feeding to play function with each notes properties
             sourcemap = {}
-            for k in self.sources.mapping.keys():
-                sourcemap[k] = self.sources.mapping[k][event]
+            # for k in self.sources.mapping.keys():
+            #     sourcemap[k] = self.soures.mapping[k][event]
+            nested_dict_idx_reassign(self.sources.mapping, sourcemap, event)
             sourcemap['note'] = note
 
             # run generator to play each note
