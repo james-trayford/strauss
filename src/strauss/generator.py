@@ -36,13 +36,13 @@ class Generator:
             self.preset = self.modify_preset(params)
 
     def load_preset(self, preset):
-        self.preset = presets.sampler.load_preset(preset)
+        self.preset = getattr(presets, self.gtype).load_preset(preset)
     def modify_preset(self, parameters):
         utils.nested_dict_reassign(parameters, self.preset)
-    def envelope(self, samp):
+    def envelope(self, samp, mapping):
         # TO DO: is it worth it to pre-set this in part if parameters don't change?
-        nlen=self.preset['note_length']
-        edict=self.preset['volume_envelope']
+        nlen=mapping['note_length']
+        edict=mapping['volume_envelope']
         
         # read envelope params from dictionary
         a = edict['A']
@@ -55,7 +55,7 @@ class Generator:
         lvl = edict['level']
 
         # effective input sample times, clipped to ensure always defined
-        sampt = np.clip(samp/self.samprate, 0, (nlen+r)*0.99999)
+        sampt = samp/self.samprate
         
         # handy time values
         t1 = a 
@@ -95,6 +95,7 @@ class Synthesizer(Generator):
 
         # default synth preset 
         self.preset = presets.synth.load_preset()
+        self.gtype = 'synth'
         
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
@@ -119,8 +120,14 @@ class Synthesizer(Generator):
             self.osclist.append(oscf)
         self.generate = self.combine_oscs
 
-    def modify_preset(self, parameters):
+    def modify_preset(self, parameters, clear_oscs=True):
         super().modify_preset(parameters)
+        if clear_oscs and ('oscillators' in parameters):
+            # if specifying new oscs, clear untouched
+            # oscs from previous preset 
+            for k in self.preset['oscillators'].keys():
+                if k not in parameters['oscillators']:
+                    del self.preset['oscillators'][k]
         self.setup_oscillators()
         
     # ||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -169,7 +176,7 @@ class Synthesizer(Generator):
         values = self.generate(samples, mapping['note'])
 
         # get volume envelope
-        env = self.envelope(samples)
+        env = self.envelope(samples, mapping)
         
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
         sstream.values = values * utils.const_or_evo(mapping['volume'], sstream.sampfracs) * env
@@ -191,6 +198,7 @@ class Sampler(Generator):
 
         # default sampler preset 
         self.preset = presets.sampler.load_preset()
+        self.gtype = 'synth'
         
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
@@ -279,7 +287,7 @@ class Sampler(Generator):
         values = samplefunc(samples)
 
         # get volume envelope
-        env = self.envelope(samples)
+        env = self.envelope(samples, mapping)
         
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
         sstream.values = values * env * utils.const_or_evo(mapping['volume'], sstream.sampfracs)

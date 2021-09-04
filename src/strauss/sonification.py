@@ -38,8 +38,8 @@ class Sonification:
 
         if "time" not in self.sources.mapping:
             self.sources.mapping['time'] = [0.] * self.sources.n_sources
-            self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources 
-
+            self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources
+            
         # index each chord
         cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
         cbin = np.clip(cbin-1, 0, self.score.nchords-1)
