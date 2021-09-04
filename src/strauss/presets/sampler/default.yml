@@ -3,6 +3,11 @@
 # preset name
 name: "default"
 
+# full description
+description: >-
+  Default preset for the sampler, basic setup with no looping, and
+  an on-off volume envelope.
+
 # Numerical note length in s or "sample" for the sample length or "none"
 # to last to the end of the 
 note_length: "sample"

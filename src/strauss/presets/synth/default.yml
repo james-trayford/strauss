@@ -3,6 +3,13 @@
 # preset name
 name: "default"
 
+# full description
+description: >-
+  Default preset for the synthesizer, using three saw wave oscillators,
+  two of which are detuned slightly higher and lower respectively, with
+  lower volumes. This gives a harmonically rich sound, suitable for
+  filtering, with detuned unison saws removing some harshness.
+
 # oscillator information
 oscillators:
   # oscillator are denoted osc<n> with n=3 by default
