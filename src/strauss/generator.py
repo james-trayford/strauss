@@ -38,12 +38,11 @@ class Generator:
     def load_preset(self, preset):
         self.preset = presets.sampler.load_preset(preset)
     def modify_preset(self, parameters):
-        utils.nested_dict_reassign(self.preset, parameters)
+        utils.nested_dict_reassign(parameters, self.preset)
     def envelope(self, samp):
         # TO DO: is it worth it to pre-set this in part if parameters don't change?
         nlen=self.preset['note_length']
         edict=self.preset['volume_envelope']
-        sampt = samp/self.samprate
         
         # read envelope params from dictionary
         a = edict['A']
@@ -55,6 +54,9 @@ class Generator:
         r_k = edict['Rc']
         lvl = edict['level']
 
+        # effective input sample times, clipped to ensure always defined
+        sampt = np.clip(samp/self.samprate, 0, (nlen+r)*0.99999)
+        
         # handy time values
         t1 = a 
         t2 = a+d
@@ -64,8 +66,11 @@ class Generator:
         a_seg = lambda t: 1-env_segment_curve(t, a, 1, -a_k)
         d_seg = lambda t: s+env_segment_curve(t-t1, d, 1-s, d_k)
         s_seg = lambda t: s
+        o_seg = lambda t: 0.
 
-        if t2 > nlen:
+        if nlen < t1:
+            env_off = a_seg(nlen)
+        elif nlen < t2:
             env_off = d_seg(nlen)
         else:
             env_off = s
@@ -77,11 +82,12 @@ class Generator:
         d_cond = np.logical_and(sampt<min(t2,nlen), sampt>=t1)
         s_cond = np.logical_and(sampt<nlen, sampt>=min(t2,nlen))
         r_cond = sampt >= nlen
+        o_cond = sampt >= t3
 
         # compute envelope for each sample 
         env =  np.piecewise(sampt,
-                            [a_cond, d_cond, s_cond, r_cond],
-                            [a_seg, d_seg, s_seg, r_seg])
+                            [a_cond, d_cond, s_cond, r_cond, o_cond],
+                            [a_seg, d_seg, s_seg, r_seg, o_seg])
         return lvl*env
         
 class Synthesizer(Generator):
@@ -104,13 +110,19 @@ class Synthesizer(Generator):
             det = oscdict[osc]['detune']
             phase = oscdict[osc]['phase']
             form = oscdict[osc]['form']
-            
             snorm = self.samprate
             fnorm = (1 + det/100.)
-            oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
+            if phase == 'random':
+                oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, np.random.random())
+            else:
+                oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
             self.osclist.append(oscf)
         self.generate = self.combine_oscs
 
+    def modify_preset(self, parameters):
+        super().modify_preset(parameters)
+        self.setup_oscillators()
+        
     # ||||||||||||||||||||||||||||||||||||||||||||||||||
     # OSC types 
     # ||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -140,10 +152,12 @@ class Synthesizer(Generator):
         samprate = self.samprate
         audbuff = self.audbuff
 
-        for p in self.preset.keys():
-            if p not in mapping:
-               mapping[p] = self.preset[p]
+        utils.nested_dict_fill(self.preset, mapping)
 
+        # for p in self.preset.keys():
+        #     if p not in mapping:
+        #        mapping[p] = self.preset[p]
+               
         nlength = (mapping['note_length']+mapping['volume_envelope']['R'])*samprate
 
         # generator stream (TO DO: attribute of stream?)
@@ -158,8 +172,8 @@ class Synthesizer(Generator):
         env = self.envelope(samples)
         
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
-        sstream.values = values * env * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
-        
+        sstream.values = values * utils.const_or_evo(mapping['volume'], sstream.sampfracs) * env
+
         # filter stream
         if mapping['filter'] == "on":
             if hasattr(mapping['cutoff'], "__iter__"):
@@ -231,7 +245,7 @@ class Sampler(Generator):
 
         # sample to use
         samplefunc = self.samples[mapping['note']]
-
+        
         # note length
         if mapping['note_length'] == 'sample':
             nlength = self.samplens[mapping['note']]
@@ -269,7 +283,7 @@ class Sampler(Generator):
         
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
         sstream.values = values * env * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
-
+        
         # TO DO: filter envelope (specify as a cutoff array function? or filter twice?)
 
         # filter stream
