@@ -26,14 +26,17 @@ class Source:
         self.mapping = {}
         self.mapping_evo = {}
         
-    def apply_mapping_functions(self, map_funcs=None, map_lims=None):
+    def apply_mapping_functions(self, map_funcs={}, map_lims={}):
         for key in self.mapped_quantities:
             rawvals = self.raw_mapping[key]
 
-            # apply mapping functions
-            mapvals = map_funcs[key](rawvals)
-
-            # scale mapped values within limits
+            # apply mapping functions if specified
+            if key in map_funcs:
+                mapvals = map_funcs[key](rawvals)
+            else:
+                mapvals = rawvals
+                
+            # scale mapped values within limits if specified
             lims = []
             for l in map_lims[key]:
                 if isinstance(l, str):
