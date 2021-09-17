@@ -1,4 +1,5 @@
-
+from functools import reduce
+import operator
 # a load of utility functions used by STRAUSS
 
 def nested_dict_reassign(fromdict, todict):
@@ -31,6 +32,21 @@ def nested_dict_idx_reassign(fromdict, todict, idx):
             # reassign todict value
             todict[k] = v[idx]
 
+def reassign_nested_item_from_keypath(dictionary, keypath, value):
+    """
+    dictionary: dict, dict object to reassign values of
+    keypath: str, 'a/b/c' corresponds to dict['a']['b']['c'] 
+    value: any, value to reassign dictionary value with
+    """
+    keylist = keypath.split('/')
+    get_item = lambda d, kl: reduce(operator.getitem, kl, d)
+    get_item(dictionary, keylist[:-1])[keylist[-1]] = value
+            
+def linear_to_nested_dict_reassign(fromdict, todict):
+    """iterate through a linear dictionary to reassign nested values
+    using keypaths (d1['a/b/c'] -> d2['a']['b']['c'], d1['a']->d2['a'])"""
+    for k, v in fromdict.items():
+        reassign_nested_item_from_keypath(todict, k, v)
             
 def const_or_evo_func(x):
     """if x is callable, return x, else provide a function that returns x"""
