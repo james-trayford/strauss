@@ -5,6 +5,7 @@ from . import utilities as utils
 from . import filters
 import numpy as np
 import glob
+import copy
 import wavio
 from scipy.interpolate import interp1d
 
@@ -39,10 +40,10 @@ class Generator:
         self.preset = getattr(presets, self.gtype).load_preset(preset)
     def modify_preset(self, parameters):
         utils.nested_dict_reassign(parameters, self.preset)
-    def envelope(self, samp, mapping):
+    def envelope(self, samp, params):
         # TO DO: is it worth it to pre-set this in part if parameters don't change?
-        nlen=mapping['note_length']
-        edict=mapping['volume_envelope']
+        nlen=params['note_length']
+        edict=params['volume_envelope']
         
         # read envelope params from dictionary
         a = edict['A']
@@ -159,13 +160,15 @@ class Synthesizer(Generator):
         samprate = self.samprate
         audbuff = self.audbuff
 
-        utils.nested_dict_fill(self.preset, mapping)
+        params = copy.deepcopy(self.preset)
+        utils.linear_to_nested_dict_reassign(mapping, params)
+        #utils.nested_dict_fill(self.preset, params)
 
         # for p in self.preset.keys():
-        #     if p not in mapping:
-        #        mapping[p] = self.preset[p]
+        #     if p not in params:
+        #        params[p] = self.preset[p]
                
-        nlength = (mapping['note_length']+mapping['volume_envelope']['R'])*samprate
+        nlength = (params['note_length']+params['volume_envelope']['R'])*samprate
 
         # generator stream (TO DO: attribute of stream?)
         sstream = stream.Stream(nlength/samprate, samprate)
@@ -173,24 +176,24 @@ class Synthesizer(Generator):
         sstream.get_sampfracs()
 
         # generate stream values
-        values = self.generate(samples, mapping['note'])
+        values = self.generate(samples, params['note'])
 
         # get volume envelope
-        env = self.envelope(samples, mapping)
+        env = self.envelope(samples, params)
         
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
-        sstream.values = values * utils.const_or_evo(mapping['volume'], sstream.sampfracs) * env
+        sstream.values = values * utils.const_or_evo(params['volume'], sstream.sampfracs) * env
 
         # filter stream
-        if mapping['filter'] == "on":
-            if hasattr(mapping['cutoff'], "__iter__"):
+        if params['filter'] == "on":
+            if hasattr(params['cutoff'], "__iter__"):
                 # if static cutoff, use minimum buffer count
                 sstream.bufferize(sstream.length/4)
             else:
                 # 30 ms buffer (hardcoded for now)
                 sstream.bufferize(0.03)
-            sstream.filt_sweep(getattr(filters, mapping['filter_type']),
-                               utils.const_or_evo_func(mapping['cutoff']))
+            sstream.filt_sweep(getattr(filters, params['filter_type']),
+                               utils.const_or_evo_func(params['cutoff']))
         return sstream    
             
 class Sampler(Generator):
@@ -247,39 +250,42 @@ class Sampler(Generator):
         samprate = self.samprate
         audbuff = self.audbuff
 
-        for p in self.preset.keys():
-            if p not in mapping:
-               mapping[p] = self.preset[p]
+        params = copy.deepcopy(self.preset)
+        utils.linear_to_nested_dict_reassign(mapping, params)
+        # for p in self.preset.keys():
+        #     if p not in mapping:
+        #        mapping[p] = self.preset[p]
 
         # sample to use
-        samplefunc = self.samples[mapping['note']]
+        samplefunc = self.samples[params['note']]
         
         # note length
-        if mapping['note_length'] == 'sample':
-            nlength = self.samplens[mapping['note']]
+        if params['note_length'] == 'sample':
+            nlength = self.samplens[params['note']]
+            params['note_length'] = nlength/samprate
         else:
-            nlength = (mapping['note_length']+mapping['volume_envelope']['R'])*samprate
+            nlength = (params['note_length']+params['volume_envelope']['R'])*samprate
 
         # generator stream (TO DO: attribute of stream?)
         sstream = stream.Stream(nlength/samprate, samprate)
         sstream.get_sampfracs()
 
         # sample looping if specified
-        if mapping['looping'] == 'off':
+        if params['looping'] == 'off':
             samples = sstream.samples
         else:
-            startsamp = mapping['loop_start']*samprate
-            endsamp = mapping['loop_end']*samprate
+            startsamp = params['loop_start']*samprate
+            endsamp = params['loop_end']*samprate
 
             # find clean loop points within an audible (< 20Hz) cycle
             startsamp += np.argmin(samplefunc(np.arange(audbuff) + startsamp))
             endsamp += np.argmin(samplefunc(np.arange(audbuff) + endsamp))
 
-            if mapping['looping'] == 'forwardback':
+            if params['looping'] == 'forwardback':
                 samples = forward_back_loopsamp(sstream.samples,
                                                 startsamp,
                                                 endsamp)
-            elif mapping['looping'] == 'forward':
+            elif params['looping'] == 'forward':
                 samples = forward_loopsamp(sstream.samples,
                                            startsamp,
                                            endsamp)
@@ -287,23 +293,23 @@ class Sampler(Generator):
         values = samplefunc(samples)
 
         # get volume envelope
-        env = self.envelope(samples, mapping)
+        env = self.envelope(samples, params)
         
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
-        sstream.values = values * env * utils.const_or_evo(mapping['volume'], sstream.sampfracs)
+        sstream.values = values * env * utils.const_or_evo(params['volume'], sstream.sampfracs)
         
         # TO DO: filter envelope (specify as a cutoff array function? or filter twice?)
 
         # filter stream
-        if mapping['filter'] == "on":
-            if hasattr(mapping['cutoff'], "__iter__"):
+        if params['filter'] == "on":
+            if hasattr(params['cutoff'], "__iter__"):
                 # if static cutoff, use minimum buffer count
                 sstream.bufferize(sstream.length/4)
             else:
                 # 30 ms buffer (hardcoded for now)
                 sstream.bufferize(0.03)
-            sstream.filt_sweep(getattr(filters, mapping['filter_type']),
-                               utils.const_or_evo_func(mapping['cutoff']))
+            sstream.filt_sweep(getattr(filters, params['filter_type']),
+                               utils.const_or_evo_func(params['cutoff']))
         return sstream    
 
 def gen_chord(stream, chordname, rootoctv=3):
