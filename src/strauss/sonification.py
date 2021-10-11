@@ -71,8 +71,14 @@ class Sonification:
             # run generator to play each note
             sstream = self.generator.play(sourcemap)
             playlen = sstream.values.size
-            phi     = const_or_evo(self.sources.mapping['phi'][event], sstream.sampfracs) * 2 * np.pi
-            theta   = const_or_evo(self.sources.mapping['theta'][event], sstream.sampfracs) * np.pi
+            if 'phi' in sourcemap:
+                phi     = const_or_evo(sourcemap['phi'], sstream.sampfracs) * 2 * np.pi
+            else:
+                phi     = const_or_evo(self.generator.preset['phi'], sstream.sampfracs) * 2 * np.pi
+            if 'theta' in sourcemap:
+                theta   = const_or_evo(sourcemap['theta'], sstream.sampfracs) * np.pi
+            else:
+                theta   = const_or_evo(self.generator.preset['theta'], sstream.sampfracs) * np.pi
 
             # compute sample indices for truncating notes overshooting sonification length
             trunc_note = min(playlen, lastsamp-tsamp)
