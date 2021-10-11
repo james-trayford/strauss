@@ -35,10 +35,16 @@ class Source:
                 mapvals = map_funcs[key](rawvals)
             else:
                 mapvals = rawvals
-                
-            # scale mapped values within limits if specified
+
+            # set parameter limits if specified
+            if key in map_lims:
+                vallims = map_lims[key]
+            else:
+                vallims = (0,1)
+
             lims = []
-            for l in map_lims[key]:
+            # scale mapped values within limits if specified
+            for l in vallims:
                 if isinstance(l, str):
                     # string values notate percentile limits
                     pc = float(l)
@@ -56,17 +62,18 @@ class Source:
             if hasattr(mapvals[0], "__iter__"):
                 self.mapping[key] = []
                 for i in range(self.n_sources):
-                    mapvals = (mapvals[i] - lims[0]) / np.diff(lims)
-                    self.mapping[key].append(np.clip(mapvals,0,1))
+                    scaledvals = (mapvals[i] - lims[0]) / np.diff(lims)
+                    self.mapping[key].append(np.clip(scaledvals,0,1))
             else:
-                mapvals = (mapvals - lims[0]) / np.diff(lims)
-                self.mapping[key] =  np.clip(mapvals, 0, 1)
+                scaledvals = (mapvals - lims[0]) / np.diff(lims)
+                self.mapping[key] =  np.clip(scaledvals, 0, 1)
                 
         # finally, iterate through sources and interpolate evo functions 
         for key in self.mapping:
             if key == "time_evo":
                 continue
             elif hasattr(self.mapping[key][0], "__iter__"):
+                print(key, self.mapping[key][0])
                 for i in range(self.n_sources):
                     x = self.mapping["time_evo"][i]
                     y = self.mapping[key][i]
@@ -101,7 +108,11 @@ class SingleObject(Source):
     def fromdict(self, datadict):
         for key in self.mapped_quantities:
             if key in datadict:
-                self.raw_mapping[key] = [datadict[key]]
+                d = datadict[key]
+                if (type(d) is not list) and (np.array(d).ndim <= 1):
+                    self.raw_mapping[key] = [d]
+                else:
+                    self.raw_mapping[key] = d
             else:
                 Exception(f"Mapped property {key} not in datadict.")
         self.n_sources = np.array(self.raw_mapping[key]).shape[0]
