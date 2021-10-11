@@ -36,3 +36,8 @@ filter: "off"
 filter_type: "LPF1"
 cutoff: 1.
 
+# Master Volume
+volume: 1.
+
+# Default pitch selection
+pitch: 1.
