@@ -106,12 +106,14 @@ class Buffers:
         # pad the stream up to an exact multiple of buffer sample length
         self.nsamp_padstream = self._nbuffs * self._nsamp_buff
         self.nsamp_pad = self.nsamp_padstream-stream._nsamp_stream
-
+        self.olap_pad = self.nsamp_pad-self._nsamp_halfbuff
+        self.olap_lim = min(stream._nsamp_stream, stream._nsamp_stream+self.olap_pad)
+        
         # construct tile and overlap buffer arrays
         self.buffs_tile = np.pad(stream.values, (0,self.nsamp_pad)
                                  ).reshape((self._nbuffs, self._nsamp_buff))
-        self.buffs_olap = np.pad(stream.values[self._nsamp_halfbuff:],
-                                 (0,max(0, self.nsamp_pad-self._nsamp_halfbuff))
+        self.buffs_olap = np.pad(stream.values[self._nsamp_halfbuff:self.olap_lim],
+                                 (0,max(0, self.olap_pad))
                                  ).reshape((self._nbuffs-1), self._nsamp_buff)
 
     def to_stream(self):
