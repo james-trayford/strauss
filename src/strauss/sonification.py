@@ -89,7 +89,7 @@ class Sonification:
                 panenv = self.channels.mics[i].antenna(phi,theta)
                 self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
         
-    def save_combined(self, fname, ffmpeg_output=False):
+    def save_combined(self, fname, ffmpeg_output=False, master_volume=1.):
         """ Save rendered sonification as a combined multi-channel audio file """
         # setup list to house wav stream data 
         inputs = [None]*len(self.out_channels)
@@ -101,7 +101,7 @@ class Sonification:
                 abs(self.out_channels[str(c)].values.max()),
                 abs(self.out_channels[str(c)].values.min()),
                 vmax
-            )
+            ) / master_volume
             
         print("Creating temporary .wav files...")
         
