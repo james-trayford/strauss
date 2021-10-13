@@ -23,3 +23,9 @@ or HTTPS if you don't have [SSH keys set up](https://docs.github.com/en/github/a
 
 `pip install .`
 
+For development purposes, you can instead use:
+
+`pip install -e .`
+
+where the `-e` option allows a local install, such that you can modify and run the source code on the fly without needing to reinstall each time. 
+
