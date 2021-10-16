@@ -92,7 +92,7 @@ class Generator:
         return lvl*env
         
 class Synthesizer(Generator):
-    def __init__(self, params=None, samprate=44100):
+    def __init__(self, params=None, samprate=48000):
 
         # default synth preset 
         self.preset = presets.synth.load_preset()
@@ -197,7 +197,7 @@ class Synthesizer(Generator):
         return sstream    
             
 class Sampler(Generator):
-    def __init__(self, sampfiles, params=None, samprate=44100):
+    def __init__(self, sampfiles, params=None, samprate=48000):
 
         # default sampler preset 
         self.preset = presets.sampler.load_preset()

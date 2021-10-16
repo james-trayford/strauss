@@ -9,7 +9,7 @@ import ffmpeg as ff
 import wavio as wav
 
 class Sonification:
-    def __init__(self, score, sources, generator, audio_setup='stereo', samprate=44100):
+    def __init__(self, score, sources, generator, audio_setup='stereo', samprate=48000):
 
         # sampling rate in Hz
         self.samprate = samprate
