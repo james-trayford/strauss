@@ -7,6 +7,8 @@ from tqdm import tqdm
 import os
 import ffmpeg as ff
 import wavio as wav
+import IPython.display as ipd
+from IPython.core.display import display
 
 class Sonification:
     def __init__(self, score, sources, generator, audio_setup='stereo', samprate=48000):
@@ -127,3 +129,26 @@ class Sonification:
             os.remove(f"./.TEMP_{c}.wav")
             
         print("Saved.")
+
+    def notebook_display(self):
+        """ plot the multi-channel waveform and embed player in the notebook (using the first two channels if more than 2 channels)"""
+        time = self.out_channels['0'].samples / self.out_channels['0'].samprate
+        for i in range(len(self.out_channels)):
+            plt.plot(time[::20], self.out_channels[str(i)].values[::20]-1.2*i, label=self.channels.labels[i])
+
+        plt.xlabel('Time (s)')
+        plt.ylabel('Relative Amplitude')
+        plt.legend(frameon=False, loc=5)
+        plt.xlim(-time[-1]*0.05,time[-1]*1.2)
+        for s in plt.gca().spines.values():
+            s.set_visible(False)
+        plt.gca().get_yaxis().set_visible(False)
+
+        if len(self.channels.labels) == 1:
+            # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
+            # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
+            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]).T
+        else:
+            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
+        plt.show()
+        display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
