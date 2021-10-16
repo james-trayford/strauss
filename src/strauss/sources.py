@@ -73,7 +73,7 @@ class Source:
             if key == "time_evo":
                 continue
             elif hasattr(self.mapping[key][0], "__iter__"):
-                print(key, self.mapping[key][0])
+                # print(key, self.mapping[key][0])
                 for i in range(self.n_sources):
                     x = self.mapping["time_evo"][i]
                     y = self.mapping[key][i]
