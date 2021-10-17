@@ -65,8 +65,8 @@ class Source:
                     scaledvals = (mapvals[i] - lims[0]) / np.diff(lims)
                     self.mapping[key].append(np.clip(scaledvals,0,1))
             else:
-                scaledvals = (mapvals - lims[0]) / np.diff(lims)
-                self.mapping[key] =  np.clip(scaledvals, 0, 1)
+                scaledvals = (np.array(mapvals) - lims[0]) / np.diff(lims)
+                self.mapping[key] =  list(np.clip(scaledvals, 0, 1))
                 
         # finally, iterate through sources and interpolate evo functions 
         for key in self.mapping:
