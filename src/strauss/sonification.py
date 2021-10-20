@@ -90,7 +90,34 @@ class Sonification:
             for i in range(Nchan):
                 panenv = self.channels.mics[i].antenna(phi,theta)
                 self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
+
+    def save_stereo(self, fname, master_volume=1.):
+        """ Save up to the first two channels of sonification as stereo"""
+
+        if len(self.out_channels) > 2:
+            print("Warning: sonification has > 2 channels, only first 2 will be used. See 'save_combined' method.")
         
+        # first pass - find max amplitude value to normalise output
+        # and concatenate channels to list
+        vmax = 0.
+        channels = []
+        for c in range(min(len(self.out_channels), 2)):
+            vmax = max(
+                abs(self.out_channels[str(c)].values.max()),
+                abs(self.out_channels[str(c)].values.min()),
+                vmax
+            ) / master_volume
+            channels.append(self.out_channels[str(c)].values)
+            
+        wav.write(fname, 
+                  np.column_stack(channels),
+                  self.samprate, 
+                  scale = (-vmax,vmax),
+                  sampwidth=3)
+            
+        print("Saved.")
+
+                
     def save_combined(self, fname, ffmpeg_output=False, master_volume=1.):
         """ Save rendered sonification as a combined multi-channel audio file """
         # setup list to house wav stream data 
