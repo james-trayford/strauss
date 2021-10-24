@@ -139,7 +139,7 @@ class Synthesizer(Generator):
     def saw(self,s,f,p):
         return (2*(s*f+p) +1) % 2 - 1
     def square(self,s,f,p):
-        return np.sign(saw(s,f,p))
+        return np.sign(self.saw(s,f,p))
     def tri(self,s,f,p):
         return 1 - abs((4*(s*f+p) +1) % 4 - 2)
             
@@ -174,12 +174,20 @@ class Synthesizer(Generator):
         sstream = stream.Stream(nlength/samprate, samprate)
         samples = sstream.samples
         sstream.get_sampfracs()
-
+        
+        if params['pitch_shift'] != 0:
+            prange = params['pitch_hi'] - params['pitch_lo']
+            pindex = (params['pitch_shift'](sstream.sampfracs)*prange - params['pitch_lo'])/12.
+            if callable(params['pitch_shift']):
+                samples = np.cumsum(pow(2., pindex))
+            else:
+                samples = samples * pow(2., pindex)
+            
         # generate stream values
         values = self.generate(samples, params['note'])
 
         # get volume envelope
-        env = self.envelope(samples, params)
+        env = self.envelope(sstream.samples, params)
         
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
         sstream.values = values * utils.const_or_evo(params['volume'], sstream.sampfracs) * env
@@ -270,6 +278,12 @@ class Sampler(Generator):
         sstream = stream.Stream(nlength/samprate, samprate)
         sstream.get_sampfracs()
 
+        if callable(params['pitch_shift']):
+            pshift = np.cumsum(params['pitch_shift'](sstream.sampfracs))
+            samples *= pow(2., pshift/12.)
+        else:
+            samples *= pow(2., params['pitch_shift']/12.)
+        
         # sample looping if specified
         if params['looping'] == 'off':
             samples = sstream.samples
@@ -289,6 +303,8 @@ class Sampler(Generator):
                 samples = forward_loopsamp(sstream.samples,
                                            startsamp,
                                            endsamp)
+        
+                
         # generate stream values
         values = samplefunc(samples)
 
