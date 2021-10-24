@@ -160,8 +160,17 @@ class Sonification:
     def notebook_display(self):
         """ plot the multi-channel waveform and embed player in the notebook (using the first two channels if more than 2 channels)"""
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
+
+        vmax = 0.
+        for c in range(len(self.out_channels)):
+            vmax = max(
+                abs(self.out_channels[str(c)].values.max()),
+                abs(self.out_channels[str(c)].values.min()),
+                vmax
+            ) * 1.05
+        
         for i in range(len(self.out_channels)):
-            plt.plot(time[::20], self.out_channels[str(i)].values[::20]-1.2*i, label=self.channels.labels[i])
+            plt.plot(time[::20], self.out_channels[str(i)].values[::20]+2*i*vmax, label=self.channels.labels[i])
 
         plt.xlabel('Time (s)')
         plt.ylabel('Relative Amplitude')

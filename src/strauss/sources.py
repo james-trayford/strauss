@@ -9,7 +9,8 @@ mappable = ['theta',
             'pitch',
             'time',
             'cutoff',
-            'time_evo']
+            'time_evo',
+            'pitch_shift']
 
 class Source:
     """ Generic source class """
