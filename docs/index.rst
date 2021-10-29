@@ -13,11 +13,12 @@ Strauss is a python toolkit for data *"sonification"* - the representation of da
 The code aims to make rich and evocative sonification straightforward, with a number of presets and examples enabling a quick start. At the same time, it is intended to be flexible enough to allow high level of control over the sonification and various expressive elements of sound and harmony if required.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    motivation
    start
    elements
+   examples
       
 Indices and tables
 ==================
