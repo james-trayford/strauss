@@ -45,7 +45,10 @@ class Sonification:
         # index each chord
         cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
         cbin = np.clip(cbin-1, 0, self.score.nchords-1)
-        pitchfrac = np.argsort(self.sources.mapping['pitch'])/self.sources.n_sources
+
+        # pitch rank of each event divided by the number of events
+        pitchfrac = np.empty_like(self.sources.mapping['pitch'])
+        pitchfrac[np.argsort(self.sources.mapping['pitch'])] = np.arange(self.sources.n_sources)/self.sources.n_sources
 
         # get some relevant numbers before iterating through sources
         Nsamp = self.out_channels['0'].values.size
@@ -62,7 +65,6 @@ class Sonification:
             nints = self.score.nintervals[cbin[event]]
             pitch = pitchfrac[event]
             note = chord[int(pitch * nints)]
-
             # make dictionary for feeding to play function with each notes properties
             sourcemap = {}
             # for k in self.sources.mapping.keys():
