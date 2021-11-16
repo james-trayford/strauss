@@ -1,5 +1,8 @@
-# relative imports of submodules
+"""STRAUSS (Sonification Tools and Resources for Astronomer Using Sound Synthesis)
 
+This module provides a toolkit for *sonification*, i.e. the representation of data using sound."""
+
+# relative imports of submodules
 from . import channels
 from . import filters
 from . import generator
@@ -9,3 +12,5 @@ from . import sonification
 from . import sources
 from . import stream
 from . import presets
+
+__version__ = "1.0.0"

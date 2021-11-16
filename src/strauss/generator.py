@@ -25,6 +25,7 @@ def forward_back_loopsamp(s, start, end):
                         [lambda x: x, lambda x: end - abs((x-start)%(2*(delsamp)) - (delsamp))])
 
 class Generator:
+    """Generic generator Class"""
     def __init__(self, params, samprate):
         """universal generator initialisation"""
         self.samprate = samprate
@@ -92,6 +93,7 @@ class Generator:
         return lvl*env
         
 class Synthesizer(Generator):
+    """Synthesizer generator class"""
     def __init__(self, params=None, samprate=48000):
 
         # default synth preset 
@@ -205,8 +207,8 @@ class Synthesizer(Generator):
         return sstream    
             
 class Sampler(Generator):
+    """Sampler generator class"""
     def __init__(self, sampfiles, params=None, samprate=48000):
-
         # default sampler preset 
         self.preset = presets.sampler.load_preset()
         self.gtype = 'synth'
@@ -277,7 +279,8 @@ class Sampler(Generator):
         # generator stream (TO DO: attribute of stream?)
         sstream = stream.Stream(nlength/samprate, samprate)
         sstream.get_sampfracs()
-
+        samples = sstream.samples.astype(float)
+        
         if callable(params['pitch_shift']):
             pshift = np.cumsum(params['pitch_shift'](sstream.sampfracs))
             samples *= pow(2., pshift/12.)
@@ -285,9 +288,7 @@ class Sampler(Generator):
             samples *= pow(2., params['pitch_shift']/12.)
         
         # sample looping if specified
-        if params['looping'] == 'off':
-            samples = sstream.samples
-        else:
+        if params['looping'] != 'off':
             startsamp = params['loop_start']*samprate
             endsamp = params['loop_end']*samprate
 
