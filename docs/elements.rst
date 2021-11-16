@@ -64,7 +64,8 @@ The :code:`Score` object is used to define any musical choices made for the soni
 Generator Class
 ***************
 
-*Text goes here*
+**Volume envelopes:**
+`
 
 `Synthesizer`
 '''''''''''''
