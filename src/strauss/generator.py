@@ -37,10 +37,22 @@ class Generator:
         if params:
             self.preset = self.modify_preset(params)
 
-    def load_preset(self, preset):
-        self.preset = getattr(presets, self.gtype).load_preset(preset)
-    def modify_preset(self, parameters):
+    def load_preset(self, preset='default'):
+        if not hasattr(self, preset):
+            self.preset = getattr(presets, self.gtype).load_preset('default')
+        if preset != 'default':
+            preset = getattr(presets, self.gtype).load_preset(preset)
+            self.modify_preset(preset)
+        
+    def modify_preset(self, parameters, cleargroup=[]):
         utils.nested_dict_reassign(parameters, self.preset)
+        for grp in cleargroup:
+            if grp in parameters:
+                for k in list(self.preset[grp].keys()):
+                    if k not in parameters[grp]:
+                        del self.preset[grp][k]
+        
+
     def envelope(self, samp, params):
         # TO DO: is it worth it to pre-set this in part if parameters don't change?
         nlen=params['note_length']
@@ -124,13 +136,10 @@ class Synthesizer(Generator):
         self.generate = self.combine_oscs
 
     def modify_preset(self, parameters, clear_oscs=True):
-        super().modify_preset(parameters)
-        if clear_oscs and ('oscillators' in parameters):
-            # if specifying new oscs, clear untouched
-            # oscs from previous preset 
-            for k in self.preset['oscillators'].keys():
-                if k not in parameters['oscillators']:
-                    del self.preset['oscillators'][k]
+        if clear_oscs:
+            super().modify_preset(parameters, ['oscillators'])
+        else:
+            super().modify_preset(parameters)
         self.setup_oscillators()
         
     # ||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -144,7 +153,9 @@ class Synthesizer(Generator):
         return np.sign(self.saw(s,f,p))
     def tri(self,s,f,p):
         return 1 - abs((4*(s*f+p) +1) % 4 - 2)
-            
+    def noise(self,s,f,p):
+        return np.random.random(np.array(s).size)*2-1
+    
     def combine_oscs(self, s, f):
         tot = 0.
         if isinstance(f, str):

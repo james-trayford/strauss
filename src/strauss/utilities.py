@@ -7,7 +7,7 @@ def nested_dict_reassign(fromdict, todict):
     for k, v in fromdict.items():
         if isinstance(v, dict):
             # recurse through nested dictionaries
-            nested_dict_reassign(todict[k], v)
+            nested_dict_reassign(v, todict[k])
         else:
             # reassign todict value
             todict[k] = v
