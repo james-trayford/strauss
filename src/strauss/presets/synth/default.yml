@@ -1,4 +1,6 @@
-# defaults for all synth parameters
+#
+# defaults for all synth parameters, mappable parameter ranges in ./parameter_ranges/default.yml
+#
 
 # preset name
 name: "default"
@@ -19,7 +21,7 @@ oscillators:
   # detune: the change in tuning as a percentage of the input frequency
   #
   # form: the waveform, choose from:
-  # ['saw', 'square', 'sine', 'tri']
+  # ['saw', 'square', 'sine', 'tri', 'noise']
   #
   osc1:
     form: 'saw'
