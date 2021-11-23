@@ -1,1 +1,2 @@
 include src/strauss/presets/*/*.yml
+include src/strauss/presets/*/*/*.yml
