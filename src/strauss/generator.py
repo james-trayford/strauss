@@ -40,6 +40,7 @@ class Generator:
     def load_preset(self, preset='default'):
         if not hasattr(self, preset):
             self.preset = getattr(presets, self.gtype).load_preset('default')
+            self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
         if preset != 'default':
             preset = getattr(presets, self.gtype).load_preset(preset)
             self.modify_preset(preset)
@@ -51,7 +52,11 @@ class Generator:
                 for k in list(self.preset[grp].keys()):
                     if k not in parameters[grp]:
                         del self.preset[grp][k]
-        
+
+    def preset_details(self, term="*"):
+        """ wrapper for preset_details function. lists the name and description
+        of built-in presets with names matching the search term."""
+        getattr(presets, self.gtype).preset_details(name=term)
 
     def envelope(self, samp, params):
         # TO DO: is it worth it to pre-set this in part if parameters don't change?
@@ -108,9 +113,10 @@ class Synthesizer(Generator):
     """Synthesizer generator class"""
     def __init__(self, params=None, samprate=48000):
 
-        # default synth preset 
-        self.preset = presets.synth.load_preset()
+        # default synth preset
         self.gtype = 'synth'
+        self.preset = getattr(presets, self.gtype).load_preset()
+        self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
         
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
@@ -220,9 +226,10 @@ class Synthesizer(Generator):
 class Sampler(Generator):
     """Sampler generator class"""
     def __init__(self, sampfiles, params=None, samprate=48000):
-        # default sampler preset 
-        self.preset = presets.sampler.load_preset()
-        self.gtype = 'synth'
+        # default sampler preset
+        self.gtype = 'sampler'
+        self.preset = getattr(presets, self.gtype).load_preset()
+        self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
         
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
@@ -255,11 +262,11 @@ class Sampler(Generator):
                                           assume_sorted=True)
             self.samplens[note] = wavdat.size
 
-    def forward_loopsamp(s, start, end):
+    def forward_loopsamp(self, s, start, end):
         delsamp = end-start
         return np.piecewise(s, [s < start, s >= start],
                         [lambda x: x, lambda x: (x-start)%(delsamp) + start])
-    def forward_back_loopsamp(s, start, end):
+    def forward_back_loopsamp(self, s, start, end):
         delsamp = end-start
         return np.piecewise(s, [s < start, s >= start],
                             [lambda x: x,
