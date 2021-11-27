@@ -8,6 +8,7 @@ import glob
 import copy
 import wavio
 from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
 
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object
@@ -58,10 +59,10 @@ class Generator:
         of built-in presets with names matching the search term."""
         getattr(presets, self.gtype).preset_details(name=term)
 
-    def envelope(self, samp, params):
+    def envelope(self, samp, params, etype='volume'):
         # TO DO: is it worth it to pre-set this in part if parameters don't change?
         nlen=params['note_length']
-        edict=params['volume_envelope']
+        edict=params[f'{etype}_envelope']
         
         # read envelope params from dictionary
         a = edict['A']
@@ -72,7 +73,7 @@ class Generator:
         d_k = edict['Dc']
         r_k = edict['Rc']
         lvl = edict['level']
-
+        
         # effective input sample times, clipped to ensure always defined
         sampt = samp/self.samprate
         
@@ -108,6 +109,55 @@ class Generator:
                             [a_cond, d_cond, s_cond, r_cond, o_cond],
                             [a_seg, d_seg, s_seg, r_seg, o_seg])
         return lvl*env
+
+    # ||||||||||||||||||||||||||||||||||||||||||||||||||
+    # OSC types 
+    # ||||||||||||||||||||||||||||||||||||||||||||||||||
+    def sine(self, s,f,p):
+        return np.sin(2*np.pi*(s*f+p))
+    def saw(self,s,f,p):
+        return (2*(s*f+p) +1) % 2 - 1
+    def square(self,s,f,p):
+        return np.sign(self.saw(s,f,p))
+    def tri(self,s,f,p):
+        return 1 - abs((4*(s*f+p) +1) % 4 - 2)
+    def noise(self,s,f,p):
+        return np.random.random(np.array(s).size)*2-1
+
+    def lfo(self, samp, sampfrac, params, ltype='pitch'):
+        """
+        Low Frequency oscillator (LFO)
+        """
+        env_dict = {}
+        lfo_key = f'{ltype}_lfo'
+        lfo_params = params[lfo_key]
+
+        
+        env_dict['note_length'] = params['note_length']
+        env_dict['lfo_envelope'] = lfo_params
+
+        freq = lfo_params['freq']/self.samprate
+        effsamp = samp.astype(float)
+        
+        if callable(lfo_params['freq_shift']):
+            findex = lfo_params['freq_shift'](sampfrac)
+            effsamp = np.cumsum(pow(2, findex))
+        elif lfo_params['freq_shift'] != 0:
+            effsamp *=  pow(2,lfo_params['freq_shift'])
+            
+        if callable(lfo_params['amount']):
+            amnt  = lfo_params['amount'](sampfrac)
+        else:
+            amnt = lfo_params['amount']
+
+        if lfo_params['phase'] == 'random':
+            phase = np.random.random()
+        else:
+            phase =lfo_params['phase']
+
+        osc = getattr(self,lfo_params['wave'])(effsamp, freq, phase)
+        env = self.envelope(samp, env_dict, 'lfo')
+        return amnt * env * osc
         
 class Synthesizer(Generator):
     """Synthesizer generator class"""
@@ -147,21 +197,7 @@ class Synthesizer(Generator):
         else:
             super().modify_preset(parameters)
         self.setup_oscillators()
-        
-    # ||||||||||||||||||||||||||||||||||||||||||||||||||
-    # OSC types 
-    # ||||||||||||||||||||||||||||||||||||||||||||||||||
-    def sine(self, s,f,p):
-        return np.sin(2*np.pi*(s*f+p))
-    def saw(self,s,f,p):
-        return (2*(s*f+p) +1) % 2 - 1
-    def square(self,s,f,p):
-        return np.sign(self.saw(s,f,p))
-    def tri(self,s,f,p):
-        return 1 - abs((4*(s*f+p) +1) % 4 - 2)
-    def noise(self,s,f,p):
-        return np.random.random(np.array(s).size)*2-1
-    
+            
     def combine_oscs(self, s, f):
         tot = 0.
         if isinstance(f, str):
@@ -193,20 +229,29 @@ class Synthesizer(Generator):
         sstream = stream.Stream(nlength/samprate, samprate)
         samples = sstream.samples
         sstream.get_sampfracs()
+
+        pindex  = np.zeros(samples.size)
+        if callable(params['pitch_shift']):
+            pindex += params['pitch_shift'](sstream.sampfracs)/12.
+        elif params['pitch_shift'] != 0:
+            pindex += params['pitch_shift']/12.
+        if params['pitch_lfo']['use']:
+            pindex += self.lfo(samples, sstream.sampfracs, params, 'pitch')/12.
+        if np.any(pindex):
+            samples = np.cumsum(pow(2., pindex))
+            # if callable(params['pitch_shift']):
+            #     samples = np.cumsum(pow(2., pindex))
+            # else:
+            #     samples = samples * pow(2., pindex)
         
-        if params['pitch_shift'] != 0:
-            prange = params['pitch_hi'] - params['pitch_lo']
-            pindex = (params['pitch_shift'](sstream.sampfracs)*prange - params['pitch_lo'])/12.
-            if callable(params['pitch_shift']):
-                samples = np.cumsum(pow(2., pindex))
-            else:
-                samples = samples * pow(2., pindex)
-            
         # generate stream values
         values = self.generate(samples, params['note'])
 
         # get volume envelope
         env = self.envelope(sstream.samples, params)
+        if params['volume_lfo']['use']:
+            env *= np.clip(1.-self.lfo(sstream.samples, sstream.sampfracs,
+                                       params, 'volume')*0.5, 0, 1)
         
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
         sstream.values = values * utils.const_or_evo(params['volume'], sstream.sampfracs) * env
@@ -298,12 +343,22 @@ class Sampler(Generator):
         sstream = stream.Stream(nlength/samprate, samprate)
         sstream.get_sampfracs()
         samples = sstream.samples.astype(float)
-        
+
+        pindex  = np.zeros(samples.size)
         if callable(params['pitch_shift']):
-            pshift = np.cumsum(params['pitch_shift'](sstream.sampfracs))
-            samples *= pow(2., pshift/12.)
-        else:
-            samples *= pow(2., params['pitch_shift']/12.)
+            pindex += params['pitch_shift'](sstream.sampfracs)/12.
+        elif params['pitch_shift'] != 0:
+            pindex += params['pitch_shift']/12.
+        if params['pitch_lfo']['use']:
+            pindex += self.lfo(samples, sstream.sampfracs, params, 'pitch')/12.
+        if np.any(pindex):
+            samples = np.cumsum(pow(2., pindex))
+        
+        # if callable(params['pitch_shift']):
+        #     pshift = np.cumsum(params['pitch_shift'](sstream.sampfracs))
+        #     samples *= pow(2., pshift/12.)
+        # else:
+        #     samples *= pow(2., params['pitch_shift']/12.)
         
         # sample looping if specified
         if params['looping'] != 'off':
@@ -315,11 +370,11 @@ class Sampler(Generator):
             endsamp += np.argmin(samplefunc(np.arange(audbuff) + endsamp))
 
             if params['looping'] == 'forwardback':
-                samples = forward_back_loopsamp(sstream.samples,
+                samples = forward_back_loopsamp(samples,#sstream.samples,
                                                 startsamp,
                                                 endsamp)
             elif params['looping'] == 'forward':
-                samples = forward_loopsamp(sstream.samples,
+                samples = forward_loopsamp(samples,#sstream.samples,
                                            startsamp,
                                            endsamp)
         
@@ -328,8 +383,10 @@ class Sampler(Generator):
         values = samplefunc(samples)
 
         # get volume envelope
-        env = self.envelope(samples, params)
-        
+        env = self.envelope(sstream.samples, params)
+        if params['volume_lfo']['use']:
+            env *= np.clip(1.-self.lfo(sstream.samples, sstream.sampfracs,
+                                       params, 'volume')*0.5, 0, 1)
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
         sstream.values = values * env * utils.const_or_evo(params['volume'], sstream.sampfracs)
         
@@ -385,6 +442,7 @@ def legacy_env(t, dur,a,d,s,r):
              t > (a+d)]
     vol = np.piecewise(np.clip(t, 0, dur), conds, funcs)
     rel = np.clip(np.exp((dur-t)/r),0, 1)
+    print(a,d,s,r)
     return vol * rel
     
 if __name__ == "__main__":
