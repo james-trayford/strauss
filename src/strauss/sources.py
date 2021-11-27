@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+from .utilities import rescale_values 
 
 mappable = ['theta',
             'phi',
@@ -10,7 +11,51 @@ mappable = ['theta',
             'time',
             'cutoff',
             'time_evo',
-            'pitch_shift']
+            'pitch_shift',
+            'volume_envelope/A',
+            'volume_envelope/D',
+            'volume_envelope/S',
+            'volume_envelope/R',
+            'volume_lfo/freq',
+            'volume_lfo/freq_shift',
+            'volume_lfo/amount',
+            'pitch_lfo/freq',
+            'pitch_lfo/freq_shift',
+            'pitch_lfo/amount']
+
+evo_able = ['theta',
+            'phi',
+            'volume',
+            'cutoff',
+            'time_evo',
+            'pitch_shift',
+            'volume_lfo/freq',
+            'volume_lfo/freq_shift',
+            'volume_lfo/amount',
+            'pitch_lfo/freq',
+            'pitch_lfo/freq_shift',
+            'pitch_lfo/amount']
+
+param_limits = [(0,1),#np.pi),
+                (0,1),#2*np.pi),
+                (0,1),
+                (0,1),
+                (0,1),
+                (0,1),
+                (0,1),
+                (0,24),
+                (1e-2, 10),
+                (1e-2, 10),
+                (0,1),
+                (1e-2, 10),
+                (1,12),
+                (0,3),
+                (0,2),
+                (1,12),
+                (0,3),
+                (0,1)]
+
+param_lim_dict = dict(zip(mappable, param_limits))
 
 class Source:
     """ Generic source class """
@@ -27,7 +72,7 @@ class Source:
         self.mapping = {}
         self.mapping_evo = {}
         
-    def apply_mapping_functions(self, map_funcs={}, map_lims={}):
+    def apply_mapping_functions(self, map_funcs={}, map_lims={}, param_lims={}):
         for key in self.mapped_quantities:
             rawvals = self.raw_mapping[key]
 
@@ -37,12 +82,18 @@ class Source:
             else:
                 mapvals = rawvals
 
-            # set parameter limits if specified
+            # set mapping limits if specified
             if key in map_lims:
                 vallims = map_lims[key]
             else:
                 vallims = (0,1)
 
+            # set parameter limits if specified
+            if key in param_lims:
+                plims = param_lims[key]
+            else:
+                plims = param_lim_dict[key]
+                
             lims = []
             # scale mapped values within limits if specified
             for l in vallims:
@@ -63,12 +114,12 @@ class Source:
             if hasattr(mapvals[0], "__iter__"):
                 self.mapping[key] = []
                 for i in range(self.n_sources):
-                    scaledvals = (mapvals[i] - lims[0]) / np.diff(lims)
-                    self.mapping[key].append(np.clip(scaledvals,0,1))
+                    scaledvals = rescale_values(mapvals[i], lims, plims)
+                    self.mapping[key].append(scaledvals)
             else:
-                scaledvals = (np.array(mapvals) - lims[0]) / np.diff(lims)
-                self.mapping[key] =  list(np.clip(scaledvals, 0, 1))
-                
+                scaledvals = rescale_values(np.array(mapvals), lims, plims)
+                self.mapping[key] =  list(scaledvals)
+            
         # finally, iterate through sources and interpolate evo functions 
         for key in self.mapping:
             if key == "time_evo":
@@ -76,6 +127,8 @@ class Source:
             elif hasattr(self.mapping[key][0], "__iter__"):
                 # print(key, self.mapping[key][0])
                 for i in range(self.n_sources):
+                    if key not in evo_able:
+                        raise Exception(f"Mapping error: Parameter \"{key}\" cannot be evolved.")
                     x = self.mapping["time_evo"][i]
                     y = self.mapping[key][i]
                     if key == "phi":

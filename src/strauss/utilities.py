@@ -1,5 +1,6 @@
 from functools import reduce
 import operator
+import numpy as np
 # a load of utility functions used by STRAUSS
 
 def nested_dict_reassign(fromdict, todict):
@@ -61,3 +62,10 @@ def const_or_evo(x,t):
         return x(t)
     else:
         return x
+
+def rescale_values(x, oldlims, newlims):
+    """ rescale x values to range limits such that 0-1 is mapped to limits[0]-limits[1] """
+    olo, ohi = oldlims
+    nlo, nhi = newlims
+    descale = np.clip((x - olo) / (ohi-olo), 0 , 1)
+    return (nhi-nlo)*descale + nlo
