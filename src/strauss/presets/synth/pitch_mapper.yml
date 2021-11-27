@@ -1,0 +1,23 @@
+# preset name
+name: "pitch_mapper"
+
+description: >-
+  preset for mapping pitch_shift for 1D data sonification. the single
+  triangle wave oscillator provides a balance between harmonic richness
+  and the harshness of the sound to allow clear audiability over a large
+  pitch range.
+  
+# oscillator information
+oscillators:
+  osc1:
+    form: 'tri'
+    level: 1.
+    detune: 0.
+    phase: 'random'
+
+# pitch range and default shift in semitones
+pitch_hi: 36
+pitch_lo: 0
+pitch_shift: 0.
+
+  

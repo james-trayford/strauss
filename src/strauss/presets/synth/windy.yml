@@ -1,0 +1,21 @@
+# preset name
+name: "windy"
+
+description: >-
+  Use a low-pass filtered white noise oscillator. Mapping the
+  filter cutoff leads to a 'windy' sound.
+  
+# oscillator information
+oscillators:
+  osc1:
+    form: 'noise'
+    level: 1.
+    detune: 0.
+    phase: 'random'
+
+    
+filter: "on"
+filter_type: "LPF1"
+cutoff: 0.3
+
+  
