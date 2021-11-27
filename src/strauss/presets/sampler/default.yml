@@ -12,7 +12,7 @@ description: >-
 # to last to the end of the 
 note_length: "sample"
 
-# "off" for no looping "forward" to loop forward "alternate" to loop back and forth
+# "off" for no looping "forward" to loop forward "forwardback" to loop back and forth
 looping: "off"
 # If looping, start and end point of loop in seconds.
 # If loop_end is longer than the sample, clip to end of the sample.
@@ -35,6 +35,40 @@ volume_envelope:
 filter: "off"
 filter_type: "LPF1"
 cutoff: 1.
+
+# or 'vibrato'
+pitch_lfo:
+  use: off
+  wave: 'saw'
+  amount: 0.5
+  freq: 4
+  freq_shift: 0
+  phase: 'random'
+  A: 0.3
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
+
+# or 'tremolo'
+volume_lfo:
+  use: off
+  wave: 'sine'
+  amount: 0.5
+  freq: 2
+  freq_shift: 0
+  phase: 'random'
+  A: 0.3
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
 
 # Master Volume
 volume: 1.

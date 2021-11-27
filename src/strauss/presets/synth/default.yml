@@ -46,7 +46,7 @@ note_length: 0.1
 # A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
 volume_envelope:
   A: 0.
-  D: 0.
+  D: 0.1
   S: 1.
   R: 0.
   Ac: 0.
@@ -59,6 +59,41 @@ filter: "off"
 filter_type: "LPF1"
 cutoff: 1.
 
+# or 'vibrato'
+pitch_lfo:
+  use: off
+  wave: 'sine'
+  amount: 0.5
+  freq: 3
+  freq_shift: 0
+  phase: 'random'
+  A: 0.
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
+
+# or 'tremolo'
+volume_lfo:
+  use: off
+  wave: 'sine'
+  amount: 0.5
+  freq: 3
+  freq_shift: 0
+  phase: 'random'
+  A: 0.
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
+
+
 # Master volume
 volume: 1.
 
@@ -70,6 +105,7 @@ phi: 0.
 theta: 0
 
 # pitch range and default shift in semitones
-pitch_hi: 36
+pitch_hi: 0.1
 pitch_lo: 0
 pitch_shift: 0.
+
