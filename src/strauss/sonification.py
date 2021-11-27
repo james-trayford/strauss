@@ -46,7 +46,7 @@ class Sonification:
         cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
         cbin = np.clip(cbin-1, 0, self.score.nchords-1)
 
-        # pitch rank of each event divided by the number of events
+        # pitch rank of each source divided by the number of sources
         pitchfrac = np.empty_like(self.sources.mapping['pitch'])
         pitchfrac[np.argsort(self.sources.mapping['pitch'])] = np.arange(self.sources.n_sources)/self.sources.n_sources
 
@@ -56,20 +56,20 @@ class Sonification:
         Nchan = len(self.out_channels.keys())
         indices = range(0,self.sources.n_sources, downsamp)
 
-        for event in tqdm(indices):
+        for source in tqdm(indices):
 
             # index note properties
-            t = self.sources.mapping['time'][event]
+            t = self.sources.mapping['time'][source]
             tsamp = int(Nsamp * t)
-            chord = self.score.note_sequence[cbin[event]]
-            nints = self.score.nintervals[cbin[event]]
-            pitch = pitchfrac[event]
+            chord = self.score.note_sequence[cbin[source]]
+            nints = self.score.nintervals[cbin[source]]
+            pitch = pitchfrac[source]
             note = chord[int(pitch * nints)]
             # make dictionary for feeding to play function with each notes properties
             sourcemap = {}
             # for k in self.sources.mapping.keys():
-            #     sourcemap[k] = self.soures.mapping[k][event]
-            nested_dict_idx_reassign(self.sources.mapping, sourcemap, event)
+            #     sourcemap[k] = self.soures.mapping[k][source]
+            nested_dict_idx_reassign(self.sources.mapping, sourcemap, source)
             sourcemap['note'] = note
 
             # run generator to play each note

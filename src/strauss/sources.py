@@ -143,7 +143,7 @@ class Source:
                     self.mapping[key][i] = interp1d(x,y, bounds_error=False,
                                                     fill_value=(y[0],y[-1]))
             
-class MultiEvents(Source):
+class Events(Source):
     def fromfile(self, datafile, mapdict):
         data = np.genfromtxt(datafile)
         for key in self.mapped_quantities:
@@ -158,7 +158,7 @@ class MultiEvents(Source):
                 Exception(f"Mapped property {key} not in datadict.")
         self.n_sources = datadict[key].shape[0]
  
-class SingleObject(Source):
+class Objects(Source):
     def fromdict(self, datadict):
         for key in self.mapped_quantities:
             if key in datadict:
