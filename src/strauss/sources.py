@@ -1,3 +1,25 @@
+""" The 'Sources' submodule: representing data as sound sources.
+
+This submodule deals with the mapping of input datasets to the parameters
+controlling sound in the eventual sonification.   
+
+Attributes:
+   mappable (list(str)): List of strings indicating possible
+	sonification parameters to which data can be mapped.
+   evolvable (list(str)): List of strings indicating the subset of
+	`mappable` parameters that can be evolved continuosly for an
+	individual Source.
+   param_limits (list(tuple)): List of tuples indicating the default
+	numerical ranges bounding corresponding mappable parameter
+	(e.g. 0-1 for volume).
+   param_lim_dict (dict): Dictionary combining `mappable` (keys) and 
+	`param_limits` (items).
+
+Todo:
+    * Store mappable, evolvable and parameter ranges in YAML files (cleaner). 
+    * Specialised Event and Object child classes (eg. spectralisation).
+"""
+
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
@@ -23,18 +45,18 @@ mappable = ['theta',
             'pitch_lfo/freq_shift',
             'pitch_lfo/amount']
 
-evo_able = ['theta',
-            'phi',
-            'volume',
-            'cutoff',
-            'time_evo',
-            'pitch_shift',
-            'volume_lfo/freq',
-            'volume_lfo/freq_shift',
-            'volume_lfo/amount',
-            'pitch_lfo/freq',
-            'pitch_lfo/freq_shift',
-            'pitch_lfo/amount']
+evolvable = ['theta',
+             'phi',
+             'volume',
+             'cutoff',
+             'time_evo',
+             'pitch_shift',
+             'volume_lfo/freq',
+             'volume_lfo/freq_shift',
+             'volume_lfo/amount',
+             'pitch_lfo/freq',
+             'pitch_lfo/freq_shift',
+             'pitch_lfo/amount']
 
 param_limits = [(0,1),#np.pi),
                 (0,1),#2*np.pi),
@@ -58,7 +80,22 @@ param_limits = [(0,1),#np.pi),
 param_lim_dict = dict(zip(mappable, param_limits))
 
 class Source:
-    """ Generic source class """
+    """ Generic source class defining common methods/attributes
+    
+    `Source` and its child classes represent the input data, and its
+    mapping to sonification parameters.
+
+    Note:
+	`Source` isn't used directly, instead use child classes
+    	`Events` or `Object`.
+
+    Args:
+    	mapped_quantities (list(str)): The subset of parameters to which data will be mapped.
+
+    Raises:
+    	UnrecognisedProperty: if `mapped_quantities` entry not in `mappable`. 
+
+    """
     def __init__(self, mapped_quantities):
         # check these are all mappable parameters
         for q in mapped_quantities:
@@ -73,6 +110,12 @@ class Source:
         self.mapping_evo = {}
         
     def apply_mapping_functions(self, map_funcs={}, map_lims={}, param_lims={}):
+        """ Taking input data and mapping to parameters.
+
+        This function does the bulk of the work for `Source` classes,
+        taking input data and applying ∆
+        
+        """
         for key in self.mapped_quantities:
             rawvals = self.raw_mapping[key]
 
@@ -127,7 +170,7 @@ class Source:
             elif hasattr(self.mapping[key][0], "__iter__"):
                 # print(key, self.mapping[key][0])
                 for i in range(self.n_sources):
-                    if key not in evo_able:
+                    if key not in evolvable:
                         raise Exception(f"Mapping error: Parameter \"{key}\" cannot be evolved.")
                     x = self.mapping["time_evo"][i]
                     y = self.mapping[key][i]
