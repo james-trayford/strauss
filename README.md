@@ -9,6 +9,8 @@
 
 ## Getting Started
 
+Access the [full documentation here](https://strauss.readthedocs.io/) *(under construction!)*
+
 Make a copy of the *STRAUSS* repository via SSH,
 
 `git clone git@github.com:james-trayford/strauss.git strauss`
