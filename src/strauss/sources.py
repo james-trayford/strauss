@@ -87,10 +87,11 @@ class Source:
 
     Note:
 	`Source` isn't used directly, instead use child classes
-    	`Events` or `Object`.
+    	`Events` or `Objects`.
 
     Args:
-    	mapped_quantities (list(str)): The subset of parameters to which data will be mapped.
+    	mapped_quantities (:obj:`list(str)`): The subset of parameters to
+    	   which data will be mapped. 
 
     Raises:
     	UnrecognisedProperty: if `mapped_quantities` entry not in `mappable`. 
@@ -113,7 +114,22 @@ class Source:
         """ Taking input data and mapping to parameters.
 
         This function does the bulk of the work for `Source` classes,
-        taking input data and applying ∆
+        taking each input data variable and applying the mapping
+        function (x' = x by default), descaling by the x' upper and
+        lower limits and rescaling to the sonification parameter
+        limits. These values are stored for non-evolving parameters,
+        while for evolving properties are converted to interpolation
+        functions. 
+
+        Args:
+    	   map_funcs (:obj:`dict`, optional): dict of conversion functions (x -> x')  
+           map_lims (:obj:`dict`, optional): dict of tuples limiting converted values. 
+           param_lims (:obj:`dict`, optional): range limiting sound parameter values.
+
+        Note:
+           There is special behaviour for the `phi` and `theta`
+           parameters, to ensure shortest angular distance when
+           interpolating across the 0-2pi and 0-pi boundaries.
         
         """
         for key in self.mapped_quantities:
@@ -187,6 +203,10 @@ class Source:
                                                     fill_value=(y[0],y[-1]))
             
 class Events(Source):
+    """ Represent data as time-discrete events.
+
+    Child class of `Events` 
+    """
     def fromfile(self, datafile, mapdict):
         data = np.genfromtxt(datafile)
         for key in self.mapped_quantities:
@@ -202,6 +222,11 @@ class Events(Source):
         self.n_sources = datadict[key].shape[0]
  
 class Objects(Source):
+    """ Represent data as time-continuous objects.
+    
+    Child class of `Source`, which supports time-evolving properties 
+
+    """
     def fromdict(self, datadict):
         for key in self.mapped_quantities:
             if key in datadict:
@@ -215,5 +240,5 @@ class Objects(Source):
         self.n_sources = np.array(self.raw_mapping[key]).shape[0]
 
 class UnrecognisedProperty(Exception):
-    "Error raised when trying to map unrecognised quantities"
+    "Error raised when trying to map unrecognised parameters"
     pass
