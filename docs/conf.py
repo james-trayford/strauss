@@ -63,4 +63,4 @@ html_theme = 'alabaster'
 html_static_path = ['_static']
 
 # enable markdown
-extensions.append('myst_parser')
+#extensions.append('myst_parser')
