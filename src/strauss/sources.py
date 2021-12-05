@@ -1,18 +1,18 @@
-""" The 'Sources' submodule: representing data as sound sources.
+""" The :obj:`sources` submodule: representing data as sound sources.
 
 This submodule deals with the mapping of input datasets to the parameters
 controlling sound in the eventual sonification.   
 
 Attributes:
-   mappable (list(str)): List of strings indicating possible
+   mappable (:obj:`list(str)`): List of strings indicating possible
 	sonification parameters to which data can be mapped.
-   evolvable (list(str)): List of strings indicating the subset of
+   evolvable (:obj:`list(str)`): List of strings indicating the subset of
 	`mappable` parameters that can be evolved continuosly for an
 	individual Source.
-   param_limits (list(tuple)): List of tuples indicating the default
+   param_limits (:obj:`list(tuple)`): List of tuples indicating the default
 	numerical ranges bounding corresponding mappable parameter
 	(e.g. 0-1 for volume).
-   param_lim_dict (dict): Dictionary combining `mappable` (keys) and 
+   param_lim_dict (:obj:`dict`): Dictionary combining `mappable` (keys) and 
 	`param_limits` (items).
 
 Todo:
@@ -122,9 +122,26 @@ class Source:
         functions. 
 
         Args:
-    	   map_funcs (:obj:`dict`, optional): dict of conversion functions (x -> x')  
-           map_lims (:obj:`dict`, optional): dict of tuples limiting converted values. 
-           param_lims (:obj:`dict`, optional): range limiting sound parameter values.
+    	   map_funcs (:obj:`dict`, optional): dict with keys that must be
+        	a subset self.mapped_quantities. Entries are then
+        	function-like objects for converting input data
+        	(e.g. taking log of a data set). If not provided,
+        	each conversion function is assumed to be  f(x) = x.  
+           map_lims (:obj:`dict`, optional): dict with keys that must be
+        	a subset self.mapped_quantities. Entries are
+        	tuples indicating the lower (index 0) and upper (index
+        	1) limits on the converted input data
+        	values. numerical values indicate absolute limits,
+        	while strings indicate percentiles
+        	[e.g. ('10','95')]. converted data values are clipped
+        	to these limits. If not provided, (0,1) is assumed.
+           param_lims (:obj:`dict`, optional): dict with keys that
+        	must be a subset self.mapped_quantities. Entries are
+        	tuples indicating the lower (index 0) and upper (index
+        	1) limits of the mapped sonification parameters. The
+        	map_lims ranges are resaled to these ranges to give
+        	the parameter values. If not provided, the default
+        	param_lim_dict values are taken.
 
         Note:
            There is special behaviour for the `phi` and `theta`
@@ -205,15 +222,33 @@ class Source:
 class Events(Source):
     """ Represent data as time-discrete events.
 
-    Child class of `Events` 
+    Child class of `Source`, for `Event`-type sources. Each `Event` is
+    discrete in `time` with single data values mapped to each
+    sonification parameter. 
     """
-    def fromfile(self, datafile, mapdict):
+    def fromfile(self, datafile, coldict):
+        """Take input data from ASCII file
+
+        Args:
+          datafile (:obj:`str`): path to input data file
+          coldict (:obj:`dict`): keys are self.mapped_values, with
+        	entries integer indexes for their corresponding column.
+        """
         data = np.genfromtxt(datafile)
         for key in self.mapped_quantities:
-            self.raw_mapping[key] = data[:,mapdict[key]] 
+            self.raw_mapping[key] = data[:,coldict[key]] 
         self.n_sources = data.shape[0]
         
     def fromdict(self, datadict):
+        """Take input data from dictionary
+	
+        Args:
+          datadict (:obj:`dict`): keys are self.mapped_values, with
+        	entries corresponding to the input data. Multiple
+        	sources are provided as :obj:`lists`, with data for
+       		each source corresponding to the values. Single
+        	sources can be represented as single values.
+        """
         for key in self.mapped_quantities:
             if key in datadict:
                 self.raw_mapping[key] = datadict[key]
@@ -224,10 +259,26 @@ class Events(Source):
 class Objects(Source):
     """ Represent data as time-continuous objects.
     
-    Child class of `Source`, which supports time-evolving properties 
+    Child class of `Source`. In addition to supporting single values
+    for each parameter (see `Events` class), objects also support
+    time evolution for `evolvable` parameters, given a `time-evo`
+    mapping.
 
+    Todo:
+    	* implement :obj:`fromfile` method
     """
     def fromdict(self, datadict):
+        """ Take input data from dictionary
+	
+        Args:
+          datadict (:obj:`dict`): keys are self.mapped_values, with
+        	entries corresponding to the input data. Multiple
+        	sources are provided as either :obj:`lists` or 2D
+        	:obj:`numpy.array` objects, with each source
+        	corresponding to the entries or columns respectively.
+        	Single sources can be represented as single values or
+        	1D :obj:`numpy.array` (for evolving parameters). 
+        """
         for key in self.mapped_quantities:
             if key in datadict:
                 d = datadict[key]
