@@ -1,10 +1,46 @@
+""" :obj:`channels` submodule representing the output audio channels.
+
+This submodule defines objects relevant to the output audio channels,
+including the :obj:`audio_channels` which defines arrays of microphone
+objects that are channeled to different speakers in the sonification
+output.
+
+Todo:
+  * Allow microphones to have a :obj:`theta` as well as :obj:`phi`
+    value, to place them anywhere on a sphere around a listener.
+  * parameterise the :obj:`"soundsphere"` standard setup, for VR
+    applications (in development).
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 import sys
 
 class mic:
-    """microphone object"""
+    """Microphone / sound detector object
+
+    This class represents a microphone, or sound-detector,
+    corresponding to a particular output channel for audio
+    spatialisation in the sonicfication.
+
+    Args: 
+      phi (:obj:`float`): Angular position of the microphone on the
+    	horizontal plane, from 0 to 2pi with 0.5 pi being to the left
+    	and 1.5 pi being to the right. 
+      mic_type (:obj:`str`): Type of microphone, choose from
+    	:obj:`"directional"` (collects using a cardioid antenna pattern),
+    	:obj:`"omni"` (collects sound from all directions equally) and
+    	:obj:`"mute"` (collects no sound useful for e.g. muting
+    	auxillary channels)
+      label (:obj:`str`): A label for the mic
+      channel (:obj:`int`) The index of the channel, corresponding to
+    	channel ordering in the output (starting from 0 e.g. stereo
+    	L=0, R=1) 
+
+    Raises:
+      Exception: if mic_type not in allowed options
+    """
     def __init__(self, phi, mic_type="directional", label="C", channel=1):
         self.phi = phi
         self.mic_type = mic_type
@@ -21,10 +57,33 @@ class mic:
             raise Exception(f"Mic type \"{mic_type}\" unknown.")        
         
 class audio_channels:
-    """audio channels object"""
+    """Representing output audio channels.
+
+    Data object representing the output channels of the sonification
+    for preset common audio setups, or a custom setup. Stores an array
+    of :obj:`mic` objects for each output channel.
+    
+    Args:
+      setup (:obj:`str`): Type of audio setup. Supported options are
+        :obj:`"mono"`, :obj:`"stereo"`, :obj:`"5p1"` and
+        :obj:`"7p1"`, or :obj:`"custom"`. 
+      custom_setup (:obj:`dict`): Dictionary defining a customised
+    	audio setup, containing keys for :obj:`"phis"`, :obj:`"types"`
+    	and :obj:`"labels"`, containing lists parametrising the first
+    	three arguments of the :class:`mic` object, respectively
+    	in the order of their channel index. Also optionally an forder
+    	list to unscramble any channel order scrambling done by ffmpeg
+    	processing in the sonification sae routines (this may need to
+    	be found empirically, awaiting better multichannel save
+    	routine).
+
+    Raises:
+	Exception: If custom requested but no parameters provided, or
+    	custom parameters provided without requesting a custom setup.ç∂
+
+    """
 
     def __init__(self, setup="stereo", custom_setup={}):
-        """initialise mic_array object"""
 
         ##############################################
         # Channel properties for preset audio setups
@@ -104,7 +163,21 @@ class audio_channels:
             raise Exception(f"setup \"{setup}\" not understood")
             
     def setup_channels(self, phis, types, labels):
-        """initialise audio channel setup for lists of properties"""
+        """initialise audio channel setup for lists of properties
+
+        Subroutine for setting up the audio_channels as arrays of
+        :obj:`mic` objects, setting the :obj:`self.mics` list
+        attribute to the :obj:`audio_channels`
+
+        Args:
+          phis (:obj:`list(float)`): list of :obj:`phi` values for
+        	:obj:`mic` object
+          types (:obj:`list(float)`): list of :obj:`mic_types` values
+          	for :obj:`mic` object.
+          labels (:obj:`list(float)`): list of :obj:`label` values for
+          	:obj:`mic` object
+
+        """
         self.phis = phis
         self.types = types
         self.labels = labels
@@ -120,7 +193,16 @@ class audio_channels:
             self.mics.append(microphone)
 
     def plot_antenna(self):
-        """plot antennae patterns for chosen audio setup"""
+        """Plot antennae patterns for chosen audio setup
+
+        Make a :obj:`matplotlib` figure object, representing a radial
+        plot demonstrating the antennae patterns of each channel
+
+        Returns:
+          fig (:obj:`matplotlib.pyplot.figure`): figure object that
+          can be shown or saved using the standard :obj:`matplotlib`
+          routines. 
+        """
 
         plot_phis = np.linspace(0, 2*np.pi, 100)
         normalised_volume = 0.*plot_phis
