@@ -79,7 +79,7 @@ class audio_channels:
 
     Raises:
 	Exception: If custom requested but no parameters provided, or
-    	custom parameters provided without requesting a custom setup.ç∂
+    	  custom parameters provided without requesting a custom setup.
 
     """
 
