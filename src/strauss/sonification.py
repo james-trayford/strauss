@@ -1,3 +1,18 @@
+""" :obj:`sonification`: generate sonification, combining submodules.
+
+This Submodule handles the combining of all the constituent
+subroutines into  a single :obj:`sonification` object that can then
+render and output/save the resultant sonification. This handles
+feeding of information between :obj:`strauss` modules, including
+taking the :obj:`sources` mapping, applying any musical constraints
+from :obj:`score` running the :obj:`generators` to make sound and
+combining them into the output channels for the overall spatialised
+sonificiation.
+
+Todo:
+  * Delegate more musical process to the :obj:`score` module
+"""
+
 from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign
@@ -11,6 +26,32 @@ import IPython.display as ipd
 from IPython.core.display import display
 
 class Sonification:
+    """Representing the overall sonification
+
+    This class combines the data sources, musical score constraints
+    and generator together to generate and render the ultimate
+    sonification for saving or playing in the :obj:`jupyter-notebook`
+    environment 
+
+    Args:
+      score (:class:`~strauss.score.Score`): Sonification :obj:`Score`
+    	object 
+      sources (:class:`~strauss.sources.Source`): Sonification
+    	:obj:`Sources` child object (:class:`~strauss.sources.Events`
+    	or :class:`~strauss.sources.Objects`)  
+      generator (:class:`~strauss.generator.Generator`): Sonification
+    	:obj:`Generator` child object
+    	(:class:`~strauss.generator.Synthesizer` or
+    	:class:`~strauss.generator.Sampler`)
+      audio_setup (:obj:`str`) The requested audio setup preset to
+    	pass to :class:`~strauss.channels.audio_channels`
+      samprate (:obj:`int`) Integer sample rate in samples per second
+        (Hz), typically :obj:`44100` or :obj:`48000` for most audio
+    	applications. 
+
+    Todo:
+      * Support custom audio setups here too.
+    """
     def __init__(self, score, sources, generator, audio_setup='stereo', samprate=48000):
 
         # sampling rate in Hz
@@ -34,6 +75,20 @@ class Sonification:
             self.out_channels[str(c)] = Stream(self.score.length, self.samprate)
 
     def render(self, downsamp=1):
+        """Render the sonification.
+        
+        Generates the sonification by running the  Synthesizer
+        :func:`~strauss.generator.Synthesizer.play` or Sampler
+        :func:`~strauss.generator.Sampler.play` functions, and
+        combining these into the output channel streams using any
+        spatialisation for the specified
+        :class:`~strauss.channels.audio_channels`. 
+
+        Args:
+          downsamp (optional, :obj:`int`): Optionally downsample
+          sources for multi-source sonifications for a quicker test
+          render by some integer factor.
+        """
         
         # first determine if time is provided, if not assume all start at zero
         # and last the duration of sonification
@@ -94,7 +149,19 @@ class Sonification:
                 self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
 
     def save_stereo(self, fname, master_volume=1.):
-        """ Save up to the first two channels of sonification as stereo"""
+        """ Save stereo or mono sonifications
+        
+        Can use this function to save :obj:`"stereo"` or :obj:`"mono"`
+        sonifications while avoiding ffmpeg processing.
+
+        Args:
+          fname (:obj:`str`) Filename or filepath
+          master_volume (:obj:`float`) Amplitude of the largest volume
+            peak, from 0-1
+
+        Todo:
+          * Support :obj:`master_volume` in decibels
+        """
 
         if len(self.out_channels) > 2:
             print("Warning: sonification has > 2 channels, only first 2 will be used. See 'save_combined' method.")
@@ -121,7 +188,23 @@ class Sonification:
 
                 
     def save_combined(self, fname, ffmpeg_output=False, master_volume=1.):
-        """ Save rendered sonification as a combined multi-channel audio file """
+        """ Save render as a combined multi-channel wav file 
+        
+        Can use this function to save sonification of any audio_setup,
+        using ffmpeg processing, and unscrampling to the correct
+        channel order.
+
+        Args:
+          fname (:obj:`str`) Filename or filepath
+          ffmpeg_output (:obj:`bool`) If True, print :obj:`ffmpeg`
+            output to screen 
+          master_volume (:obj:`float`) Amplitude of the largest volume
+            peak, from 0-1
+
+        Todo:
+          * Either find a way to avoid the need to unscramble channle
+        	order, or find alternative to save wav files
+        """
         # setup list to house wav stream data 
         inputs = [None]*len(self.out_channels)
 
@@ -160,7 +243,13 @@ class Sonification:
         print("Saved.")
 
     def notebook_display(self):
-        """ plot the multi-channel waveform and embed player in the notebook (using the first two channels if more than 2 channels)"""
+        """ plot the waveforms and embed player in the notebook
+
+        Show waveforms and embed an audio player in the python
+        notebook for direct playback. the notebook player only
+        supports up to stereo, so if more than two channels, only the
+        first two are used as left and right.
+        """
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
 
         vmax = 0.
