@@ -4,7 +4,7 @@
 Elements of a Strauss Sonification
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Strauss makes use of a number of internal Classes to produce the output audio. These handle broadly different aspects of the sonification process, and are detailed in the following subsections. For more in-depth documentation see the :code:`Detailed Documentation`.
+Strauss makes use of a number of internal Classes to produce the output audio. These handle broadly different aspects of the sonification process. For more in-depth documentation see the :code:`Detailed Documentation`.
 
 Briefly, a :code:`Source` represents the data and the mapping of its variables onto aspects of sound. This is taken by the :code:`Score` which defines any constraints on what notes or sounds can be generated at a given time. A :code:`Generator` object then generates these notes and sounds as an audio signal, including any mapping of :code:`Source` properties to expressive properties of sound. These audio signals are then consolidated by the output :code:`Channels`, object according to any spatialisation (e.g. source position) and choice of audio system (mono, stereo, 5.1, etc).
 
