@@ -9,7 +9,7 @@
 
 ## Getting Started
 
-Access the [full documentation here](https://strauss.readthedocs.io/) *(under construction!)*
+Access the [full documentation here](https://strauss.readthedocs.io/) *(under construction!)* and read more about the associated [Audio Universe project here].
 
 Make a copy of the *STRAUSS* repository via SSH,
 
