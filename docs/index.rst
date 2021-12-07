@@ -8,10 +8,10 @@ Welcome to the STRAUSS documentation!
 
 Strauss is a python toolkit for data *"sonification"* - the representation of data using sound - with both scientific and outreach applications.
 
-.. note::
-   Strauss and its documentation are currently under construction!
-
 The code aims to make rich and evocative sonification straightforward, with a number of presets and examples enabling a quick start. At the same time, it is intended to be flexible enough to allow high level of control over the sonification and various expressive elements of sound and harmony if required.
+
+.. note::
+   Strauss and its documentation are currently in development, with more details and features coming soon. Look out for our first numbered release.
 
 .. toctree::
    :maxdepth: 2
