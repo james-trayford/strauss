@@ -177,7 +177,7 @@ class Generator:
         else:
             env_off = s
 
-        r_seg = lambda t: env_segment_curve(t-nlen, r, env_off, r_k)
+        r_seg = lambda t: self.env_segment_curve(t-nlen, r, env_off, r_k)
 
         # conditionals to determine which segment a sample is in
         a_cond = sampt < t1
