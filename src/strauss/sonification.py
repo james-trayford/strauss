@@ -24,6 +24,7 @@ import ffmpeg as ff
 import wavio as wav
 import IPython.display as ipd
 from IPython.core.display import display
+from scipy.io import wavfile
 
 class Sonification:
     """Representing the overall sonification
@@ -242,6 +243,47 @@ class Sonification:
             
         print("Saved.")
 
+    def save(self, fname, master_volume=1.):
+        """ Save render as a combined multi-channel wav file 
+        
+        Can use this function to save sonification of any audio_setup
+        to a 32-bit depth WAV using `scipy.io.wavfile`
+
+        Args:
+          fname (:obj:`str`) Filename or filepath
+          master_volume (:obj:`float`) Amplitude of the largest volume
+            peak, from 0-1
+
+        Todo:
+          * Raise `scipy` issue if common 24-bit WAV can be supported
+        """
+        
+        # first pass - find max amplitude value to normalise output
+        vmax = 0.
+        for c in range(len(self.out_channels)):
+            vmax = max(
+                abs(self.out_channels[str(c)].values.max()),
+                abs(self.out_channels[str(c)].values.min()),
+                vmax
+            )
+
+        # normalisation for conversion to int32 bitdepth wav
+        norm = master_volume * (pow(2, 31)-1) / vmax
+
+        # setup array to house wav stream data 
+        chans = np.zeros((self.out_channels['0'].values.size,
+                          len(self.out_channels)), dtype="int32")
+        
+        # normalise and collect channels into a list
+        for c in range(len(self.out_channels)):
+            vals = self.out_channels[str(c)].values
+            chans[:,c] = (vals*norm).astype("int32")
+            
+        # finally combine and write out wav file
+        wavfile.write(fname, self.samprate, chans)
+        print(f"Saved {fname}")
+
+        
     def notebook_display(self):
         """ plot the waveforms and embed player in the notebook
 
