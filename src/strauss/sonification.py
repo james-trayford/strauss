@@ -294,6 +294,8 @@ class Sonification:
         """
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
 
+        fig = plt.figure(figsize=(18,12))
+        
         vmax = 0.
         for c in range(len(self.out_channels)):
             vmax = max(
@@ -303,12 +305,12 @@ class Sonification:
             ) * 1.05
         
         for i in range(len(self.out_channels)):
-            plt.plot(time[::20], self.out_channels[str(i)].values[::20]+2*i*vmax, label=self.channels.labels[i])
+            plt.plot(time[::20], self.out_channels[str(i)].values[::20]-2*i*vmax, label=self.channels.labels[i])
 
         plt.xlabel('Time (s)')
         plt.ylabel('Relative Amplitude')
         plt.legend(frameon=False, loc=5)
-        plt.xlim(-time[-1]*0.05,time[-1]*1.2)
+        plt.xlim(-time[-1]*0.05,time[-1]*1.3)
         for s in plt.gca().spines.values():
             s.set_visible(False)
         plt.gca().get_yaxis().set_visible(False)
@@ -319,5 +321,7 @@ class Sonification:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]).T
         else:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
+        if len(self.channels.labels) > 2:
+            print("Warning: for more than two channels, only first two channels are mapped to L and R, respectively.")
         plt.show()
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
