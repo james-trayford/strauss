@@ -18,7 +18,7 @@ def parse_note(notename):
     Takes scientific pitch name and returns frequency in Hz.
     flat and sharp numbers supported
     """
-    nsplit = re.split(r"(?<=\d)(?=\D)|(?=\d)(?<=\D)", notename)
+    nsplit = re.findall("(\D+|\d+)", notename)
     semi = semitone_dict[nsplit[0]]/12.
     octv  = int(nsplit[1])
     return tuneC0*pow(2.,semi+octv)
