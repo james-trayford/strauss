@@ -31,3 +31,6 @@ For development purposes, you can instead use:
 
 where the `-e` option allows a local install, such that you can modify and run the source code on the fly without needing to reinstall each time. 
 
+## Acknowledgments
+The *STRAUSS* code has benefited from funding via an [Royal Astronomical Society Eduaction & Outreach grant award](https://ras.ac.uk/awards-and-grants/outreach/education-outreach-small-grants-scheme), providing hardware and software for sound development and spatialisation testing.
+
