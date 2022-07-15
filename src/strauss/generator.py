@@ -9,6 +9,10 @@ Todo:
       class.
     * Support more Envelope and LFO types in the :obj:`play` methods
       (want pitch, volume and filter options for each)
+    * Check buffer length consistency for spectralizer - do we hit
+      grid points?
+    * Throw appropriate errors when rendering with unreasonable length
+      and freq combinations
 """
 
 from . import stream
@@ -17,6 +21,10 @@ from . import presets
 from . import utilities as utils
 from . import filters
 import numpy as np
+import scipy
+# use FFTW backend in scipy
+#scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
+from scipy.fft import fft, ifft, fftfreq
 import glob
 import copy
 import wavio
@@ -88,7 +96,7 @@ class Generator:
         if preset != 'default':
             preset = getattr(presets, self.gtype).load_preset(preset)
             self.modify_preset(preset)
-        
+
     def modify_preset(self, parameters, cleargroup=[]):
         """modify parameters within current preset
 
@@ -111,7 +119,7 @@ class Generator:
                 for k in list(self.preset[grp].keys()):
                     if k not in parameters[grp]:
                         del self.preset[grp][k]
-
+            
     def preset_details(self, term="*"):
         """ Print the names and descriptions of presets
 
@@ -468,7 +476,7 @@ class Synthesizer(Generator):
         utils.linear_to_nested_dict_reassign(mapping, params)
 
         nlength = (params['note_length']+params['volume_envelope']['R'])*samprate
-
+        
         # generator stream (attribute of stream?)
         sstream = stream.Stream(nlength/samprate, samprate)
         samples = sstream.samples
@@ -721,6 +729,130 @@ class Sampler(Generator):
         sstream.values = values * env * utils.const_or_evo(params['volume'], sstream.sampfracs)
         
         # TO DO: filter envelope (specify as a cutoff array function? or filter twice?)
+
+        # filter stream
+        if params['filter'] == "on":
+            if hasattr(params['cutoff'], "__iter__"):
+                # if static cutoff, use minimum buffer count
+                sstream.bufferize(sstream.length/4)
+            else:
+                # 30 ms buffer (hardcoded for now)
+                sstream.bufferize(0.03)
+            sstream.filt_sweep(getattr(filters, params['filter_type']),
+                               utils.const_or_evo_func(params['cutoff']))
+        return sstream    
+
+class Spectralizer(Generator):
+    """Spectralizer generator class
+    """
+    def __init__(self, params=None, samprate=48000):
+
+        # default synth preset
+        self.gtype = 'spec'
+        self.preset = getattr(presets, self.gtype).load_preset()
+        self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
+        
+        # universal initialisation for generator objects:
+        super().__init__(params, samprate)
+
+    def play(self, mapping):
+        """ Play the sound for a given source.
+
+        Play a given source and return the sample values for
+        combination into the overall sonification.
+
+        Note:
+          :obj:`mapping` is a linear dictionary (not nested, as for 
+          :meth:`strauss.generator.modify_preset`) where group members
+          are indicated using :obj:`'/'` notation
+          (e.g. :obj:`{'volume_envelope/A': 0.5, ...`).
+
+        Args:
+          mapping (:obj:`dict`): keys and items are generator
+            parameter names and their values. This combines all the
+            preset mapped parameters, overwritten by any
+            :obj:`Source`-mapped parameters (represented as values or
+            interpolation functions for static and evolving
+            parameters, respectively). This is a linear dictionary
+            (not nested, see :meth:`strauss.generator.modify_preset`)
+            where group members are indicated using :obj:`'/'`
+            notation (e.g. :obj:`{'volume_envelope/A': 0.5, ...`).
+
+        """
+        samprate = self.samprate
+        audbuff = self.audbuff
+
+        params = copy.deepcopy(self.preset)
+        utils.linear_to_nested_dict_reassign(mapping, params)
+
+        duration = (params['note_length']+params['volume_envelope']['R'])
+        nlength = int(duration*samprate)
+        # generator stream (attribute of stream?)
+        sstream = stream.Stream(nlength/samprate, samprate)
+        samples = sstream.samples
+        sstream.get_sampfracs()
+        
+        spectrum = params['spectrum']
+
+        # number of discrete frequencies available in ifft between freq. limits 
+        discrete_freqs = duration*(params['max_freq']-params['min_freq'])
+
+        # how many spectra points fit into the avaialable intermediate frequencies
+        spectra_multiples = (discrete_freqs - 1)/(spectrum.size - 1)
+
+        # the minimum factor by which to increase the stream length to accomodate spectra in whole number multiples
+        buffer_factor = np.ceil(spectra_multiples)/spectra_multiples
+
+        # number of samples to generate including buffer
+        new_nlen = int(buffer_factor * nlength)
+        
+        # hardcode phase randomisation for now
+        phases = 2*np.pi*np.random.random(new_nlen)
+
+        points = int(buffer_factor*discrete_freqs)
+        # plt.scatter(np.linspace(0,points-1, points), np.interp(np.linspace(0,points-1, points), np.linspace(0, points-1, spectrum.size), spectrum), facecolor='none', edgecolor='C1', marker='.', s=1, zorder=100)
+        # plt.scatter(np.linspace(0, points-1, spectrum.size), spectrum, marker ='x', s =30)
+        # plt.xlim(2300, 2400)
+        # plt.show()
+        
+        # the frequency bound indices which the spectrum will be mapped into
+        mindx = int(params['min_freq'] * duration * buffer_factor)
+        maxdx = int(params['max_freq'] * duration * buffer_factor)
+        
+        spectrum /= spectrum.max()
+        ps = np.interp(np.linspace(0,1,maxdx-mindx)**1, np.linspace(0, 1, spectrum.size), spectrum)
+        empt = np.zeros(new_nlen)
+        empt[mindx:maxdx] = ps
+        ps = empt
+        PS = ps*np.cos(phases) + 1j*ps*np.sin(phases)
+        
+        # generate stream values
+        values = np.real(ifft(PS))[:nlength]
+        values /= abs(values).max()
+
+        # get volume envelope
+        env = self.envelope(sstream.samples, params)
+        if params['volume_lfo']['use']:
+            env *= np.clip(1.-self.lfo(sstream.samples, sstream.sampfracs,
+                                       params, 'volume')*0.5, 0, 1)
+            
+        pindex  = np.zeros(samples.size)
+        if callable(params['pitch_shift']):
+            pindex += params['pitch_shift'](sstream.sampfracs)/12.
+        elif params['pitch_shift'] != 0:
+            pindex += params['pitch_shift']/12.
+        if params['pitch_lfo']['use']:
+            pindex += self.lfo(samples, sstream.sampfracs, params, 'pitch')/12.
+        if np.any(pindex):
+            sampfunc = interp1d(samples, values,
+                                bounds_error=False,
+                                fill_value = (0.,0.),
+                                assume_sorted=True)
+            newsamp = np.cumsum(pow(2., pindex))
+            values = sampfunc(newsamp)
+            
+        # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
+        sstream.values = values * utils.const_or_evo(params['volume'], sstream.sampfracs) * env
 
         # filter stream
         if params['filter'] == "on":
