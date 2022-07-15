@@ -1,0 +1,53 @@
+# defaults parameter ranges for all mappable synth parameters
+
+# Numerical note length
+note_length: [1e-2, 30.]
+note_length_unit: 'seconds'
+
+# define the note volume envelope applied to the samples
+# A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
+volume_envelope:
+  A: [1e-2, 20.]
+  D: [1e-2, 20.]
+  S: [0., 1.]
+  R: [1e-2, 20]
+  Ac: [-1. ,1.]
+  Dc: [-1. ,1.]
+  Rc: [-1. ,1.]
+  level: [0., 1.]
+  A_unit: 'seconds'
+  D_unit: 'seconds'
+  S_unit: 'unitless'
+  R_unit: 'seconds'
+  Ac_unit: 'unitless'
+  Dc_unit: 'unitless'
+  Rc_unit: 'unitless'
+  level_unit: 'unitless'    
+  
+# filter cutoff 
+cutoff: [0., 1.]
+cutoff_unit: 'unitless'
+
+# Master volume
+volume: [0,1.]
+volume_unit: 'unitless' 
+
+# frequency limits in Hz
+min_freq: [20,2.2e4]
+max_freq: [20,2.2e4]
+min_freq_unit: 'Hz'
+max_freq_unit: 'Hz'
+
+# Default pitch selection
+pitch: [0,1.]
+pitch_unit: 'unitless'
+
+# center panning:
+phi: [0., 1.]
+phi_unit: 'unitless'
+theta: [0.,1.]
+theta_unit: 'unitless'
+
+# pitch range and default shift in semitones
+pitch_shift: [0., 36.]
+pitch_shift_unit: 'semitones'

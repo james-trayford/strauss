@@ -36,6 +36,7 @@ mappable = ['polar',
             'cutoff',
             'time_evo',
             'pitch_shift',
+            'spectrum',
             'volume_envelope/A',
             'volume_envelope/D',
             'volume_envelope/S',
@@ -65,6 +66,8 @@ param_limits = [(0,1),#np.pi),
                 (0,1),#2*np.pi),
                 (0,1),#np.pi),
                 (0,1),#2*np.pi),
+                (0,1),
+                (0,1),
                 (0,1),
                 (0,1),
                 (0,1),
@@ -221,6 +224,8 @@ class Source:
         for key in self.mapping:
             if key == "time_evo":
                 continue
+            if key == "spectrum":
+                continue
             elif hasattr(self.mapping[key][0], "__iter__"):
                 # print(key, self.mapping[key][0])
                 for i in range(self.n_sources):
@@ -275,7 +280,7 @@ class Events(Source):
                 self.raw_mapping[key] = datadict[key]
             else:
                 Exception(f"Mapped property {key} not in datadict.")
-        self.n_sources = datadict[key].shape[0]
+        self.n_sources = np.array(datadict[key]).shape[0]
  
 class Objects(Source):
     """ Represent data as time-continuous objects.
@@ -314,4 +319,3 @@ class Objects(Source):
 class UnrecognisedProperty(Exception):
     "Error raised when trying to map unrecognised parameters"
     pass
-
