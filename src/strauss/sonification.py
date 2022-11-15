@@ -335,7 +335,7 @@ class Sonification:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
         plt.show()
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
-
+        
     def hear(self):
         """ Play audio directly to the sound device, for command-line
             playback.
@@ -365,6 +365,4 @@ class Sonification:
             print("The Sonification.hear() function requires the PortAudio C-library. This may be missing from your system or "
                   "unsupported in this context. This should be installed by pip on Windows and OSx automatically with the "
                   "sounddevice library, but on Linux you may need to install manually using e.g.:\n"
-                  "\t 'sudo apt-get install libportaudio2.'\n") 
-
-
+                  "\t 'sudo apt-get install libportaudio2.'\n")
