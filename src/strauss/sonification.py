@@ -321,3 +321,4 @@ class Sonification:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
         plt.show()
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
+        return ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False)
