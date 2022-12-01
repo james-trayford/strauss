@@ -119,8 +119,6 @@ class Sonification:
         elif self.score.pitch_binning == 'uniform':
             pitchfrac = np.clip(self.sources.mapping['pitch'], 0, 9.999999e-1)
             
-        plt.scatter(self.sources.mapping['pitch'],pitchfrac)
-        plt.show()
         # get some relevant numbers before iterating through sources
         Nsamp = self.out_channels['0'].values.size
         lastsamp = Nsamp - 1
