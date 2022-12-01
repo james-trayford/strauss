@@ -114,8 +114,13 @@ class Sonification:
 
         # pitch rank of each source divided by the number of sources
         pitchfrac = np.empty_like(self.sources.mapping['pitch'])
-        pitchfrac[np.argsort(self.sources.mapping['pitch'])] = np.arange(self.sources.n_sources)/self.sources.n_sources
-
+        if self.score.pitch_binning == 'adaptive':
+            pitchfrac[np.argsort(self.sources.mapping['pitch'])] = np.arange(self.sources.n_sources)/self.sources.n_sources
+        elif self.score.pitch_binning == 'uniform':
+            pitchfrac = np.clip(self.sources.mapping['pitch'], 0, 9.999999e-1)
+            
+        plt.scatter(self.sources.mapping['pitch'],pitchfrac)
+        plt.show()
         # get some relevant numbers before iterating through sources
         Nsamp = self.out_channels['0'].values.size
         lastsamp = Nsamp - 1
@@ -131,6 +136,7 @@ class Sonification:
             nints = self.score.nintervals[cbin[source]]
             pitch = pitchfrac[source]
             note = chord[int(pitch * nints)]
+
             # make dictionary for feeding to play function with each notes properties
             sourcemap = {}
             # for k in self.sources.mapping.keys():
