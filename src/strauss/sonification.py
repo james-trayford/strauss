@@ -16,6 +16,7 @@ Todo:
 from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign
+from .tts import render_caption
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -75,6 +76,23 @@ class Sonification:
         for c in range(self.channels.Nmics):
             self.out_channels[str(c)] = Stream(self.score.length, self.samprate)
 
+    def caption(self, caption):
+        """ Add a caption associated with the sonification
+
+        This caption can be rendered using text-to-speech alongside
+        the sonification via the "func"`~strauss.sonification.render`
+        function, or displayed to screen.
+        
+        Args:
+          caption: (:obj:`str`) string describing the sonification,
+          for visual display or text-to-speech rendering, and subject
+          to some pre-processing to replace or flag unpronounced
+          characters
+        """
+        self.caption = caption
+        # some pre-processing of the caption string goes here?
+        pass
+            
     def render(self, downsamp=1):
         """Render the sonification.
         
@@ -90,10 +108,17 @@ class Sonification:
           sources for multi-source sonifications for a quicker test
           render by some integer factor.
         """
+
+        # produce mono audio of caption
+        tts.render_caption(self.caption, self.samprate)
+
+        # make a dictionary of stream objects to house the TTS portion (as L75)
+        # with length to fit audio + any silence buffer as a sonification attributr
+        # (i.e. self.caption_channels = ... <dict object> )
         
         # first determine if time is provided, if not assume all start at zero
         # and last the duration of sonification
-
+        
         if "time" not in self.sources.mapping:
             self.sources.mapping['time'] = [0.] * self.sources.n_sources
             self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources
@@ -143,12 +168,15 @@ class Sonification:
             # compute sample indices for truncating notes overshooting sonification length
             trunc_note = min(playlen, lastsamp-tsamp)
             trunc_soni   = trunc_note + tsamp
-
+            
             # spatialise audio by computing relative volume in each speaker
             for i in range(Nchan):
                 panenv = self.channels.mics[i].antenna(phi,theta)
                 self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
 
+        # arrange caption spatially outside source loop, following same approach as Nchan loop above
+        # (i.e. assign a phi and theta value to the caption speech (eg. 0, pi?)
+                
     def save_stereo(self, fname, master_volume=1.):
         """ Save stereo or mono sonifications
         
@@ -179,6 +207,7 @@ class Sonification:
             ) / master_volume
             channels.append(self.out_channels[str(c)].values)
             
+        # combine caption + sonification streams at display time
         wav.write(fname, 
                   np.column_stack(channels),
                   self.samprate, 
@@ -219,6 +248,7 @@ class Sonification:
             ) / master_volume
             
         print("Creating temporary .wav files...")
+        # combine caption + sonification streams at display time
         
         for c in range(len(self.out_channels)):
             tempfname = f"./.TEMP_{c}.wav"
@@ -292,6 +322,7 @@ class Sonification:
         supports up to stereo, so if more than two channels, only the
         first two are used as left and right.
         """
+        
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
 
         vmax = 0.
@@ -314,6 +345,8 @@ class Sonification:
         plt.gca().get_yaxis().set_visible(False)
 
         if len(self.channels.labels) == 1:
+            # combine caption + sonification streams at display time
+            
             # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
             # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]).T
