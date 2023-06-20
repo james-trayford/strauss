@@ -2,7 +2,7 @@
 requires = [
     "ffmpeg-python",
     "matplotlib",
-    "numpy",
+    "numpy>=1.22",
     "pandas",
     "pychord",	
     "scipy",
