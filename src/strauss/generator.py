@@ -22,7 +22,6 @@ import copy
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
-from utilities import resample
 
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object
@@ -572,7 +571,7 @@ class Sampler(Generator):
             rate_in, wavobj = scipy.io.wavfile.read(self.sampdict[note])
             # If it doesn't match the required rate, resample and re-write
             if rate_in != self.samprate:
-                wavobj = resample(rate_in, self.samprate, wavobj)
+                wavobj = utils.resample(rate_in, self.samprate, wavobj)
             # force to mono
             wavdat = wavobj.data.mean(axis=1)
             # remove DC term 
