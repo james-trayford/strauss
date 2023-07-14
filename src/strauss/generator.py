@@ -22,6 +22,7 @@ import copy
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+from utilities import resample
 
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object

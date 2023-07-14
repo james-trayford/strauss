@@ -1,7 +1,6 @@
 from functools import reduce
 import operator
 import numpy as np
-from utilities import resample
 
 # a load of utility functions used by STRAUSS
 
