@@ -1,6 +1,8 @@
 from functools import reduce
 import operator
 import numpy as np
+from utilities import resample
+
 # a load of utility functions used by STRAUSS
 
 def nested_dict_reassign(fromdict, todict):
@@ -69,3 +71,16 @@ def rescale_values(x, oldlims, newlims):
     nlo, nhi = newlims
     descale = np.clip((x - olo) / (ohi-olo), 0 , 1)
     return (nhi-nlo)*descale + nlo
+    
+def resample(rate_in, samprate, wavobj):
+    """ resample audio from original samplerate to required samplerate """
+    duration = wavobj.shape[0] / rate_in
+
+    time_old  = np.linspace(0, duration, wavobj.shape[0])
+    time_new  = np.linspace(0, duration,
+                            int(wavobj.shape[0] * samprate / rate_in))
+
+    interpolator = interp1d(time_old, wavobj.T)
+    new_wavobj = np.round(interpolator(time_new).T).astype(wavobj.dtype)
+    return(new_wavobj)
+
