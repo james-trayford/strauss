@@ -25,6 +25,7 @@ import wavio as wav
 import IPython.display as ipd
 from IPython.core.display import display
 from scipy.io import wavfile
+import warnings
 
 class Sonification:
     """Representing the overall sonification
@@ -70,6 +71,13 @@ class Sonification:
         # set up the audio channel routing for the sonification
         self.channels = audio_channels(setup=audio_setup)
 
+        # check Generator and Sonification sampling rates match...
+        if self.samprate != self.generator.samprate:
+            # if not, revert to Generator sampling rate.
+            warnings.warn("warning: global and generator sampling rates disagree, " \
+            f"reverting to generator value of {self.generator.samprate} Hz")
+            self.samprate = self.generator.samprate
+        
         # ...and the corresponding Stream objects 
         self.out_channels = {}
         for c in range(self.channels.Nmics):

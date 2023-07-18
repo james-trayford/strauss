@@ -19,6 +19,7 @@ from . import filters
 import numpy as np
 import glob
 import copy
+import scipy
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
@@ -568,12 +569,12 @@ class Sampler(Generator):
         self.samples = {}
         self.samplens = {}
         for note in self.sampdict.keys():
-            rate_in, wavobj = scipy.io.wavfile.read(self.sampdict[note])
+            rate_in, wavobj = wavfile.read(self.sampdict[note])
             # If it doesn't match the required rate, resample and re-write
             if rate_in != self.samprate:
                 wavobj = utils.resample(rate_in, self.samprate, wavobj)
             # force to mono
-            wavdat = wavobj.data.mean(axis=1)
+            wavdat = np.mean(wavobj.data, axis=1)
             # remove DC term 
             dc = wavdat.mean()
             wavdat -= dc
