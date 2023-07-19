@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import warnings
 
 # ignore wavfile read warning that complains due to WAV file metadata
-warnings.filterwarnings("ignore", message="Chunk (non-data) not understood, skipping it.")
+warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
 
 
 # TO DO:
