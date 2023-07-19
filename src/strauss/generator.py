@@ -23,6 +23,11 @@ import scipy
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+import warnings
+
+# ignore wavfile read warning that complains due to WAV file metadata
+warnings.filterwarnings("ignore", message="Chunk (non-data) not understood, skipping it.")
+
 
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object
