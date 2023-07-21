@@ -1,0 +1,82 @@
+# defaults for all sampler parameters
+
+# preset name
+name: "default"
+
+# full description
+description: >-
+  Default preset for the sampler, basic setup with no looping, and
+  an on-off volume envelope.
+
+# Numerical note length in s or "sample" for the sample length or "none"
+# to last to the end of the 
+note_length: "sample"
+
+# "off" for no looping "forward" to loop forward "forwardback" to loop back and forth
+looping: "off"
+# If looping, start and end point of loop in seconds.
+# If loop_end is longer than the sample, clip to end of the sample.
+loop_start: 0.
+loop_end:  10.
+
+# define the note volume envelope applied to the samples
+# A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
+volume_envelope:
+  A: 0.
+  D: 0.
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1.
+  
+# Do we apply a filter, and if so specify the cutoff and filter type
+filter: "off"
+filter_type: "LPF1"
+cutoff: 1.
+
+# or 'vibrato'
+pitch_lfo:
+  use: off
+  wave: 'saw'
+  amount: 0.5
+  freq: 4
+  freq_shift: 0
+  phase: 'random'
+  A: 0.3
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
+
+# or 'tremolo'
+volume_lfo:
+  use: off
+  wave: 'sine'
+  amount: 0.5
+  freq: 2
+  freq_shift: 0
+  phase: 'random'
+  A: 0.3
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
+
+# Master Volume
+volume: 1.
+
+# Default pitch selection
+pitch: 1.
+
+# pitch range and default shift in semitones
+pitch_hi: 36
+pitch_lo: 0
+pitch_shift: 0.

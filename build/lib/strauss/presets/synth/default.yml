@@ -1,0 +1,111 @@
+#
+# defaults for all synth parameters, mappable parameter ranges in ./parameter_ranges/default.yml
+#
+
+# preset name
+name: "default"
+
+# full description
+description: >-
+  Default preset for the synthesizer, using three saw wave oscillators,
+  two of which are detuned slightly higher and lower respectively, with
+  lower volumes. This gives a harmonically rich sound, suitable for
+  filtering, with detuned unison saws removing some harshness.
+
+# oscillator information
+oscillators:
+  # oscillator are denoted osc<n> with n=3 by default
+  #
+  # level: the intrinsic volume
+  #
+  # detune: the change in tuning as a percentage of the input frequency
+  #
+  # form: the waveform, choose from:
+  # ['saw', 'square', 'sine', 'tri', 'noise']
+  #
+  osc1:
+    form: 'saw'
+    level: 1.
+    detune: 0.
+    phase: 0
+  osc2:
+    form: 'saw'
+    level: 0.5
+    detune: -2.
+    phase: 0.3
+  osc3:
+    form: 'saw'
+    level: 0.5
+    detune: 2.
+    phase: 0.6
+
+# Numerical note length in s
+note_length: 0.1
+
+# define the note volume envelope applied to the samples
+# A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
+volume_envelope:
+  A: 0.
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1.
+  
+# Do we apply a filter, and if so specify the cutoff and filter type
+filter: "off"
+filter_type: "LPF1"
+cutoff: 1.
+
+# or 'vibrato'
+pitch_lfo:
+  use: off
+  wave: 'sine'
+  amount: 0.5
+  freq: 3
+  freq_shift: 0
+  phase: 'random'
+  A: 0.
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
+
+# or 'tremolo'
+volume_lfo:
+  use: off
+  wave: 'sine'
+  amount: 0.5
+  freq: 3
+  freq_shift: 0
+  phase: 'random'
+  A: 0.
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
+
+
+# Master volume
+volume: 1.
+
+# Default pitch selection
+pitch: 1.
+
+# center panning:
+phi: 0.
+theta: 0
+
+# pitch range and default shift in semitones
+pitch_hi: 0.1
+pitch_lo: 0
+pitch_shift: 0.
+
