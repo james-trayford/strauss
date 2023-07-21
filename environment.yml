@@ -1,0 +1,21 @@
+name: strauss
+channels:
+  - anaconda
+dependencies:
+  - python=3.8
+  - pip
+  - pip:
+    - jupyterlab
+    - ffmpeg_python
+    - ipython
+    - matplotlib
+    - numpy
+    - pandas
+    - pychord
+    - pyyaml
+    - scipy
+    - setuptools >= 4.2
+    - sphinx
+    - tqdm
+    - wavio
+    - wheel
