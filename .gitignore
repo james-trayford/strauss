@@ -80,6 +80,4 @@ docs/_build/
 *.wav
 !data/samples/glockenspiels/*.wav
 !data/samples/mallets/*.wav
-!data/solar_system/*.wav
-
-
+!data/samples/solar_system/*.wav
