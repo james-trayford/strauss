@@ -1,0 +1,13 @@
+name: Remove pre-merge tests!
+on:
+  pull_request:
+    paths:
+      - 'tests/pre-merge/*.ipynb'
+jobs:
+  Block-Merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pre-Merge tests present
+        run: |
+          echo " ⚠️  Please remove ipynb files from tests/pre-merge before merging into the main branch! ⚠️ "
+          exit 1
