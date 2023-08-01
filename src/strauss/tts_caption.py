@@ -2,7 +2,7 @@ from TTS.api import TTS
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import numpy as np
-import utilities as utils
+import strauss.utilities as utils
        
 def render_caption(caption, samprate, model, caption_path):
     ''' The render_caption function generates an audio caption from text input
