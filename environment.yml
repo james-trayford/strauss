@@ -17,6 +17,7 @@ dependencies:
     - setuptools >= 4.2
     - sphinx
     - tqdm
+    - TTS
     - wavio
     - wheel
     - sounddevice
