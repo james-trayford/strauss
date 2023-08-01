@@ -18,6 +18,7 @@ dependencies:
     - sf2utils
     - sphinx
     - tqdm
+    - TTS
     - wavio
     - wheel
     - sounddevice
