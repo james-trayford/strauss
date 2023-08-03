@@ -81,3 +81,6 @@ docs/_build/
 !data/samples/glockenspiels/*.wav
 !data/samples/mallets/*.wav
 !data/samples/solar_system/*.wav
+
+# Also don't want ipynb checkpoints commited to the repo
+*/.ipynb_checkpoints/
