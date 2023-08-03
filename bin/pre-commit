@@ -2,7 +2,7 @@
 
 echo "Clearing outputs of added notebooks..."
 
-for f in $(git diff --name-only --cached | grep ".*\.ipynb$")
+for f in $(git diff --name-only --cached --diff-filter=d | grep ".*\.ipynb$")
 do
     echo "Clearing {$f} output, and re-adding to the commit..."
     jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace $f
