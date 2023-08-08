@@ -4,6 +4,8 @@ import numpy as np
 from scipy.interpolate import interp1d
 from contextlib import contextmanager,redirect_stderr,redirect_stdout
 from os import devnull
+from io import StringIO 
+import sys
 
 class NoSoundDevice:
     """
@@ -102,3 +104,14 @@ def suppress_stdout_stderr():
     with open(devnull, 'w') as fnull:
         with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
             yield (err, out)
+            
+class Capturing(list):
+    """ Context manager for handling stdout (see https://stackoverflow.com/a/16571630) """
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        del self._stringio    # free up some memory
+        sys.stdout = self._stdout

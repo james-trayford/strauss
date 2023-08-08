@@ -62,9 +62,9 @@ class Sonification:
       * Support custom audio setups here too.
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
-                 caption=' ', samprate=48000,
+                 caption=None, samprate=48000,
                  model='tts_models/en/jenny/jenny', 
-                 caption_path='caption.wav'):
+                 caption_path='.TEMP_CAPTION.wav'):
 
         # sampling rate in Hz
         self.samprate = samprate
@@ -118,21 +118,6 @@ class Sonification:
           render by some integer factor.
         """
 
-        # produce mono audio of caption
-        render_caption(self.caption, self.samprate,
-                                   self.model, self.caption_path)
-        rate_in, wavobj = wavfile.read(self.caption_path)
-        wavobj = np.array(wavobj)
-        print(wavobj)
-        # If it doesn't match the required rate, resample and re-write
-        if rate_in != self.samprate:
-            wavobj = utils.resample(rate_in, self.samprate, wavobj)
-
-        # Set up the Stream objects for TTS
-        self.caption_channels = {}
-        for c in range(self.channels.Nmics):
-            self.caption_channels[str(c)] = Stream(wavobj.size/self.samprate, self.samprate)
-        
         # first determine if time is provided, if not assume all start at zero
         # and last the duration of sonification
 
@@ -199,13 +184,28 @@ class Sonification:
                 panenv = self.channels.mics[i].antenna(azi,polar)
                 self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
 
-        caption_norm = abs(wavobj).max()
+        # produce mono audio of caption, if one is provided
+        if str(self.caption or '').strip():
+            render_caption(self.caption, self.samprate,
+                           self.model, self.caption_path)
+            rate_in, wavobj = wavfile.read(self.caption_path)
+            wavobj = np.array(wavobj)
 
-        # spatialise caption by computing relative volume in each speaker
-        for i in range(Nchan):
-            panenv = self.channels.mics[i].antenna(0, np.pi)
-            cnorm = abs(self.out_channels[str(i)].values).max()/caption_norm
-            self.caption_channels[str(i)].values += (wavobj*cnorm*panenv)
+            # clean up caption file...
+            os.remove(self.caption_path)
+            
+            # Set up the Stream objects for TTS
+            self.caption_channels = {}
+            caption_norm = wavobj.max()
+            for c in range(Nchan):
+                self.caption_channels[str(c)] = Stream(wavobj.size/self.samprate, self.samprate)
+                panenv = self.channels.mics[i].antenna(0, np.pi)
+                cnorm = abs(self.out_channels[str(i)].values).max()/caption_norm
+                self.caption_channels[str(i)].values += (wavobj*cnorm*panenv)
+        else:
+            self.caption_channels = {}
+            for c in range(Nchan):
+                self.caption_channels[str(c)] = Stream(0, self.samprate) 
         
     def save_stereo(self, fname, master_volume=1.):
         """ Save stereo or mono sonifications
@@ -394,12 +394,7 @@ class Sonification:
             # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
             outfmt = np.column_stack(channels*2).T
         else:
-<<<<<<< HEAD
-            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
-=======
             outfmt = np.column_stack(channels[:2]).T
-        plt.show()
->>>>>>> a439f7b (Added captions to sonification)
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
         
     def hear(self):
