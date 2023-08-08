@@ -3,20 +3,29 @@ from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import numpy as np
 import strauss.utilities as utils
-       
+import re
+
 def render_caption(caption, samprate, model, caption_path):
     ''' The render_caption function generates an audio caption from text input
     and writes it as a wav file. If the sample rate of the model is not equal 
     to that passed from sonification.py, it resamples to the correct rate and
     re-writes the file. Text from user input is converted with text-to-speech
-    software from Coqui-AI - https://pypi.org/project/TTS/ . Yohello_u can view 
+    software from Coqui-AI - https://pypi.org/project/TTS/ . You can view 
     publicly available voice models with 'TTS.list_models()'
     '''
+
+    # TODO: do this better with logging. We can filter TTS function output, e.g. alert to downloading models...
+    print('Rendering caption (this can take a while if the caption is long, or if the TTS model needs downloading)...')
     
-    # Load in the tts model, render to speech, and write as a wav file
-    tts = TTS(model, progress_bar=False, gpu=False)
-    tts.tts_to_file(text=caption, file_path=caption_path)
-    
+    # capture stdout from the talkative TTS module
+    with utils.Capturing() as output:
+        # Load in the tts model
+        tts = TTS(model, progress_bar=False, gpu=False)
+
+        # render to speech, and write as a wav file (allow )
+        tts.tts_to_file(text=caption, file_path=caption_path)
+
+        
     # Read the file back in to check the sample rate
     rate_in, wavobj = wavfile.read(caption_path)
     
