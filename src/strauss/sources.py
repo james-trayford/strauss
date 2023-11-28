@@ -104,11 +104,27 @@ class Source:
     """
     def __init__(self, mapped_quantities):
         # check these are all mappable parameters
+
+        
         for q in mapped_quantities:
             if q not in mappable:
                 raise UnrecognisedProperty(
                     f"Property \"{q}\" is not recognised")
 
+        if ('theta' in mapped_quantities) and ('polar' in mapped_quantities):
+            raise Exception(
+                "\"theta\" and \"polar\" cannot be combined as " \
+                "these represent the same quantity: \"theta\" and " \
+                "\"phi\" are deprecated and will be replaced with \"polar\"" \
+                " and \"azimuth\" in a future version.")
+
+        if ('phi' in mapped_quantities) and ('azimuth' in mapped_quantities):
+            raise Exception(
+                "\"phi\" and \"azimuth\" cannot be combined as " \
+                "these represent the same quantity: \"theta\" and " \
+                "\"phi\" are deprecated and will be replaced with \"polar\"" \
+                " and \"azimuth\" in a future version.")            
+            
         # initialise common structures
         self.mapped_quantities = mapped_quantities
         self.raw_mapping = {}
@@ -298,3 +314,4 @@ class Objects(Source):
 class UnrecognisedProperty(Exception):
     "Error raised when trying to map unrecognised parameters"
     pass
+
