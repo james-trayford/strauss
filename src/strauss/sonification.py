@@ -140,13 +140,17 @@ class Sonification:
             sstream = self.generator.play(sourcemap)
             playlen = sstream.values.size
             if 'phi' in sourcemap:
-                phi     = const_or_evo(sourcemap['phi'], sstream.sampfracs) * 2 * np.pi
+                azi     = const_or_evo(sourcemap['phi'], sstream.sampfracs) * 2 * np.pi
+            elif 'azimuth' in sourcemap:
+                azi     = const_or_evo(sourcemap['azimuth'], sstream.sampfracs) * 2 * np.pi
             else:
-                phi     = const_or_evo(self.generator.preset['phi'], sstream.sampfracs) * 2 * np.pi
+                azi     = const_or_evo(self.generator.preset['azimuth'], sstream.sampfracs) * 2 * np.pi
             if 'theta' in sourcemap:
-                theta   = const_or_evo(sourcemap['theta'], sstream.sampfracs) * np.pi
+                polar   = const_or_evo(sourcemap['theta'], sstream.sampfracs) * np.pi
+            elif 'polar' in sourcemap:
+                polar   = const_or_evo(sourcemap['polar'], sstream.sampfracs) * np.pi                
             else:
-                theta   = const_or_evo(self.generator.preset['theta'], sstream.sampfracs) * np.pi
+                polar   = const_or_evo(self.generator.preset['polar'], sstream.sampfracs) * np.pi
 
             # compute sample indices for truncating notes overshooting sonification length
             trunc_note = min(playlen, lastsamp-tsamp)
@@ -154,7 +158,7 @@ class Sonification:
 
             # spatialise audio by computing relative volume in each speaker
             for i in range(Nchan):
-                panenv = self.channels.mics[i].antenna(phi,theta)
+                panenv = self.channels.mics[i].antenna(azi,polar)
                 self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
 
     def save_stereo(self, fname, master_volume=1.):

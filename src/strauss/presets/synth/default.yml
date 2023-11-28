@@ -101,8 +101,8 @@ volume: 1.
 pitch: 1.
 
 # center panning:
-phi: 0.
-theta: 0
+azimuth: 0.
+polar: 0
 
 # pitch range and default shift in semitones
 pitch_hi: 0.1
