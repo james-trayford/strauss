@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 from .utilities import rescale_values 
 
 mappable = ['polar',
-            'azi',
+            'azimuth',
             'theta',
             'phi',
             'volume',
@@ -48,7 +48,7 @@ mappable = ['polar',
             'pitch_lfo/amount']
 
 evolvable = ['polar',
-             'azi',
+             'azimuth',
              'theta',
              'phi',
              'volume',
