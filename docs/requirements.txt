@@ -1,1 +1,1 @@
-strauss @ git+https://github.com/james-trayford/strauss.git@update_docs
+strauss @ git+https://github.com/james-trayford/strauss.git
