@@ -26,7 +26,9 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from .utilities import rescale_values 
 
-mappable = ['theta',
+mappable = ['polar',
+            'azi',
+            'theta',
             'phi',
             'volume',
             'pitch',
@@ -45,7 +47,9 @@ mappable = ['theta',
             'pitch_lfo/freq_shift',
             'pitch_lfo/amount']
 
-evolvable = ['theta',
+evolvable = ['polar',
+             'azi',
+             'theta',
              'phi',
              'volume',
              'cutoff',
@@ -57,8 +61,9 @@ evolvable = ['theta',
              'pitch_lfo/freq',
              'pitch_lfo/freq_shift',
              'pitch_lfo/amount']
-
 param_limits = [(0,1),#np.pi),
+                (0,1),#2*np.pi),
+                (0,1),#np.pi),
                 (0,1),#2*np.pi),
                 (0,1),
                 (0,1),
@@ -144,7 +149,7 @@ class Source:
         	param_lim_dict values are taken.
 
         Note:
-           There is special behaviour for the `phi` and `theta`
+           There is special behaviour for the `polar` and `azimuth`
            parameters, to ensure shortest angular distance when
            interpolating across the 0-2pi and 0-pi boundaries.
         
@@ -207,7 +212,7 @@ class Source:
                         raise Exception(f"Mapping error: Parameter \"{key}\" cannot be evolved.")
                     x = self.mapping["time_evo"][i]
                     y = self.mapping[key][i]
-                    if key == "phi":
+                    if key == "phi" or key == "azimuth":
                         # special case: shortest angular distance
                         # between phi points is always assumed
                         ydiff = np.diff(y)
