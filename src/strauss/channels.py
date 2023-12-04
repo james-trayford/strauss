@@ -16,6 +16,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 import sys
+from scipy.special import lpmv
 
 class mic:
     """Microphone / sound detector object
@@ -27,7 +28,9 @@ class mic:
     Args: 
       azimuth (:obj:`float`): Angular position of the microphone on the
     	horizontal plane, from 0 to 2pi with 0.5 pi being to the left
-    	and 1.5 pi being to the right. 
+    	and 1.5 pi being to the right. In the special case of ambisonic,
+    	this is instead an index corresponding to the _Ambisonic Channel
+	Number_ (ACN)
       mic_type (:obj:`str`): Type of microphone, choose from
     	:obj:`"directional"` (collects using a cardioid antenna pattern),
     	:obj:`"omni"` (collects sound from all directions equally) and
@@ -41,7 +44,7 @@ class mic:
     Raises:
       Exception: if mic_type not in allowed options
     """
-    def __init__(self, azimuth, mic_type="directional", label="C", channel=1):
+    def __init__(self, azimuth, mic_type="directional", label="C", channel=1,  order=None, degree=None):
         self.azimuth = azimuth
         self.mic_type = mic_type
         self.label = label
@@ -53,9 +56,39 @@ class mic:
             self.antenna = lambda a, b=0.5*np.pi: a**0.
         elif mic_type == "mute":
             self.antenna = lambda a, b=0.5*np.pi: a*0.
+        elif mic_type == "ambisonic":
+            self.antenna = self._ambisonic_antenna(acn=azimuth)
         else:
-            raise Exception(f"Mic type \"{mic_type}\" unknown.")        
+            raise Exception(f"Mic type \"{mic_type}\" unknown.")
         
+    def _ambisonic_antenna(self, acn):        
+        # get order and degree of spherical harmonic from ACN using ambiX standard
+        # (see iem.kug.ac.at/fileadmin/media/iem/projects/2011/
+        # ambisonics11_nachbar_zotter_sontacchi_deleflie.pdf, footnote 5)
+        # with modified l expression protecting against zero division in acn == 0 case.
+        l = int(acn**0.5)
+        m = acn - l*(l+1)
+        mabs = abs(m)
+
+        # normalise using SN3D standard (see iem.kug.ac.at/fileadmin/media/
+        # iem/projects/2011/ambisonics11_nachbar_zotter_sontacchi_deleflie.pdf,
+        # equation 3)
+        fctrl = np.math.factorial
+        normSN3D = np.sqrt((2-(0**mabs)/4*np.pi) * fctrl(l-mabs)/fctrl(l+mabs))
+
+        # trig function to use, dependent on sense of m (see ref eq 2)
+        if m < 0:
+            tfunc = np.sin
+        if m >= 0:
+            tfunc = np.cos
+        
+        # return lambda function, indexing correct spherical harmonic and
+        # normalising to  SN3D normalisation (ref equation 2).
+        # Note: additonal (-1)^mabs term needed to match ambiX given differing
+        # assoc. Legendre polynom. definitions between ambiX and numpy. 
+        return lambda a, b=0.5*np.pi: normSN3D * pow(-1,mabs) * lpmv(mabs, l, np.cos(b)) * tfunc(mabs*a)
+        
+    
 class audio_channels:
     """Representing output audio channels.
 
@@ -111,7 +144,7 @@ class audio_channels:
         sevenpoint_types = ["directional"] * 2  + \
                            ["mute"] * 2 + \
                            ["directional"] * 4
-
+        
         # mic labels corresponding to each speaker
         mono_labels = ['C']
         stereo_labels = ['L', 'R']
@@ -151,6 +184,13 @@ class audio_channels:
         elif setup == "7.1":
             self.setup_channels(sevenpoint_azimuths, sevenpoint_types, sevenpoint_labels)
             self.forder = sevenpoint_forder
+        elif setup[:-1] == 'ambiX':
+            # i.e. ambiX3 => 3rd order ambisonics.
+            nchan = np.sum(2*np.arange(int(setup[-1])+1).astype(int) + 1)
+            labfunc = lambda a, b: str(a)+str(b)
+            self.setup_channels(np.arange(nchan, dtype='int'),
+                                ['ambisonic']*nchan,
+                                list(map(labfunc, ['C']*nchan, range(nchan))))
         elif setup == "custom":
             self.setup_channels(custom_setup['azimuths'],
                                 custom_setup['types'],
@@ -162,7 +202,8 @@ class audio_channels:
         else:
             raise Exception(f"setup \"{setup}\" not understood")
             
-    def setup_channels(self, azimuths, types, labels):
+
+    def setup_channels(self, azimuths, types, labels, orders=None, degrees=None):
         """initialise audio channel setup for lists of properties
 
         Subroutine for setting up the audio_channels as arrays of
@@ -189,7 +230,7 @@ class audio_channels:
         self.mics = []
         
         for i in range(self.Nmics):
-            microphone = mic(azimuths[i], types[i], labels[i], self.channels[i])
+            microphone = mic(azimuths[i], types[i], labels[i], self.channels[i], orders, degrees)
             self.mics.append(microphone)
 
     def plot_antenna(self):
@@ -215,8 +256,11 @@ class audio_channels:
         for i in range(self.Nmics):
             labelpos = 1.2
             microphone = self.mics[i]
-            normalised_volume += microphone.antenna(plot_azimuths)
-            ax.plot(plot_azimuths, microphone.antenna(plot_azimuths))
+            antenna = microphone.antenna(plot_azimuths)
+            normalised_volume += antenna
+            p = ax.plot(plot_azimuths, np.clip(antenna,0, np.inf))
+            p2 = ax.plot(plot_azimuths, np.clip(-antenna,0, np.inf),
+                         c=p[0].get_color(), ls =':')
             if np.all(microphone.antenna(plot_azimuths) == 0.):
                 labelpos += shift
                 shift -= 0.15
