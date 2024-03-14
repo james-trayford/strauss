@@ -19,6 +19,7 @@ from .utilities import const_or_evo, nested_dict_idx_reassign
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import sys
 import os
 import ffmpeg as ff
 import wavio as wav
@@ -26,6 +27,7 @@ import IPython.display as ipd
 from IPython.core.display import display
 from scipy.io import wavfile
 import warnings
+import sounddevice as sd
 
 class Sonification:
     """Representing the overall sonification
@@ -333,3 +335,29 @@ class Sonification:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
         plt.show()
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
+
+    def hear(self):
+        """ Play audio directly to the sound device, for command-line
+            playback.
+        """
+
+        vmax = 0.
+        for c in range(len(self.out_channels)):
+            vmax = max(
+                abs(self.out_channels[str(c)].values.max()),
+                abs(self.out_channels[str(c)].values.min()),
+                vmax
+            ) * 1.05
+        
+        if len(self.channels.labels) == 1:
+            # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
+            # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
+            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]) / vmax
+        else:
+            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]) / vmax
+        dur = int(np.round(outfmt.shape[0]/self.out_channels['0'].samprate))
+        playback_msg = f"Playing Sonification ({dur} s): "
+        print(playback_msg)
+        sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
+
+

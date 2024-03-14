@@ -19,3 +19,4 @@ dependencies:
     - tqdm
     - wavio
     - wheel
+    - sounddevice
