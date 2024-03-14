@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'tests/pre-merge/*.ipynb'
+      - 'tests/pre-merge/*.py'
     pull_request_target:
       branches:
         - main

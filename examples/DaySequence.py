@@ -53,19 +53,17 @@ system = "stereo"
 sampler = Sampler("../data/samples/day_sequence")
 sampler.modify_preset({'filter':'on'}) # want filtering on for sun altitude effect
 
-
-# **Set mapping limits of mapped quantities**
+# **Set mapping limits of mapped quantities** (truncated relative to planetarium show example)
 maplims =  {'azimuth': (0, 360),
             'polar': (0, 180),
             'pitch' : (0, 1),
             'cutoff' : (0, 1),
             'volume' : (0,1),
-            'time_evo' : (0,147)}
-
+            'time_evo' : (0,75)}
 
 # **Initialise the score:**
 # setup score
-score =  Score([['A4','B4']], 147)
+score =  Score([['A4','B4']], 75)
 
 # **Render sonification for specified planet...**
 data = {'azimuth': np.array([90,90, 0, 330, 240,240]),
@@ -80,6 +78,7 @@ events = Objects(maplims.keys())
 events.fromdict(data)
 events.apply_mapping_functions(map_lims=maplims)
 
+print("Generating sonification of Sun alone...")
 soni = Sonification(score, events, sampler, system)
 soni.render()
 
@@ -87,7 +86,7 @@ soni.render()
 soni.hear()
 
 # **Listen to and plot the waveforms from the sonification:**
-
+print("Generating sonification with scattered light sound...")
 data2 = {'azimuth': np.ones(8)*0,
         'polar': np.zeros(8), # constant polar of 90 deg
         'pitch': 1,     # constant pitch
@@ -115,8 +114,3 @@ soni2.hear()
 # NOTE: Change `"../../FILENAME.wav"` to your filepath of choice. By default, the sound file is normalised to that of the highest amplitude sample, but can be set to a lower normalisation by setting the `master_volume` parameter to a value between `0.` and `1.`.
 
 # soni2.save_combined("../../day_sequence.wav", True, master_volume=1.0)
-
-
-
-
-
