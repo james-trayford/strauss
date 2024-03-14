@@ -578,8 +578,11 @@ class Sampler(Generator):
             # If it doesn't match the required rate, resample and re-write
             if rate_in != self.samprate:
                 wavobj = utils.resample(rate_in, self.samprate, wavobj)
-            # force to mono
-            wavdat = np.mean(wavobj.data, axis=1)
+            # force to mono array, else convert values to float
+            if wavobj.ndim > 1:
+                wavdat = np.mean(wavobj.data, axis=1)
+            else:
+                wavdat = np.array(wavobj.data, dtype='float64')
             # remove DC term 
             dc = wavdat.mean()
             wavdat -= dc
