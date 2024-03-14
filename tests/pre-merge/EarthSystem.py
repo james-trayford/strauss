@@ -24,7 +24,7 @@ from scipy.interpolate import interp1d
 
 print("\n Sonifying Earth's rotation, using the land covering fraction with longitude...")
 
-datafile = "../data/datasets/landfrac.txt"
+datafile = "../../data/datasets/landfrac.txt"
 data = np.genfromtxt(datafile)
 
 longitude = data[:,0]

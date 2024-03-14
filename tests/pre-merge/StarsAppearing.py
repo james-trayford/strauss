@@ -45,7 +45,7 @@ score =  Score(chords, length)
 # - **`maplims`**: entries are `tuple`s representing the (`low`,`high`) limits of each mapping.numerical values represent absolute limits (used here for the angles in degrees to correctly limit the `azimuth` and `polar` mappings to 360° (2π) and 180° (π) respectively. `str` values are taken to be percentiles from 0 to 100. string values > 100 can also be used, where e.g. 104 is 4% larger than the 100th percentile value. This is used for the time here, so that the last sample doesnt trigger at exactly the end of the sonification, giving time for the sound to die away slowly.
 
 
-datafile = "../data/datasets/stars_paranal.txt"
+datafile = "../../data/datasets/stars_paranal.txt"
 mapcols =  {'azimuth':1, 'polar':0, 'volume':2, 'time':2, 'pitch':3}
 
 mapvals =  {'azimuth': lambda x : x,
