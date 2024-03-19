@@ -21,16 +21,16 @@ import copy
 print("\nSonifying the Sun's motion across the sky...")
 
 # First we download the samples to the local data directory, if they haven't been already:
-outdir = "../data/samples/day_sequence/"
+dirname = os.path.dirname(__file__)
+outdir = os.path.join(dirname, '../data/samples/day_sequence/')
 
 if glob.glob(f"{outdir}/*.wav"):
     print(f"Directory {outdir} already exists.")
 else:
     print("Downloading files...")
     import urllib.request
-    import os
     
-    path = os.path.realpath('../data/samples/day_sequence/')
+    path = os.path.realpath(outdir)
     os.mkdir(path)
     
     files = ("sun_A4.wav", "scatter_B4.wav")
@@ -50,7 +50,7 @@ system = "stereo"
 
 # **Now, set-up the sampler:**
 # set up sampler
-sampler = Sampler("../data/samples/day_sequence")
+sampler = Sampler(outdir)
 sampler.modify_preset({'filter':'on'}) # want filtering on for sun altitude effect
 
 # **Set mapping limits of mapped quantities** (truncated relative to planetarium show example)

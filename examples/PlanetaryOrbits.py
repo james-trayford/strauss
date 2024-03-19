@@ -88,7 +88,8 @@ system = "stereo"
 
 
 # set up sampler
-sampler = Sampler("../data/samples/solar_system")
+dirname = os.path.dirname(__file__)
+sampler = Sampler(os.path.join(dirname, "../data/samples/solar_system"))
 
 # we want to loop the orchestral samples
 sampler.modify_preset({'looping':'forward', # looping style
