@@ -358,6 +358,13 @@ class Sonification:
         dur = int(np.round(outfmt.shape[0]/self.out_channels['0'].samprate))
         playback_msg = f"Playing Sonification ({dur} s): "
         print(playback_msg)
-        sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
+        try:
+            sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
+        except OSError as error: 
+            print(error) 
+            print("The Sonification.hear() function requires the PortAudio C-library. This may be missing from your system or "
+                  "unsupported in this context. This should be installed by pip on Windows and OSx automatically with the "
+                  "sounddevice library, but on Linux you may need to install manually using e.g.:\n"
+                  "\t 'sudo apt-get install libportaudio2.'\n") 
 
 
