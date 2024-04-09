@@ -69,6 +69,15 @@ volume_lfo:
 # Master volume
 volume: 1.
 
+# how to interpolate and resample the spectrum
+# "sample": interpolate spectrum values directly
+# "preserve_power": integrate, interpolate then diff to avoid missing power in narrow features
+interpolation_type: 'sample' 
+
+# For an evolving spectrum, do we regenerate phases for each buffer, or keep the same?
+# These have differing effects 
+regen_phases: true
+
 # frequency limits in Hz
 min_freq: 50.
 max_freq: 2000.
@@ -77,8 +86,8 @@ max_freq: 2000.
 pitch: 1.
 
 # center panning:
-phi: 0.
-theta: 0
+azimuth: 0.
+polar: 0
 
 # pitch range and default shift in semitones
 pitch_hi: 0.1

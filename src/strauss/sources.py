@@ -224,6 +224,8 @@ class Source:
             if key == "time_evo":
                 continue
             if key == "spectrum":
+                # if hasattr(self.mapping[key][0][0], "__iter__"):
+                # ^ in case we want to catch and pre process multi-spectra
                 continue
             elif hasattr(self.mapping[key][0], "__iter__"):
                 # print(key, self.mapping[key][0])
