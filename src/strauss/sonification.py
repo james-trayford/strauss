@@ -302,7 +302,7 @@ class Sonification:
         print(f"Saved {fname}")
 
         
-    def notebook_display(self):
+    def notebook_display(self, show_waveform=True):
         """ plot the waveforms and embed player in the notebook
 
         Show waveforms and embed an audio player in the python
@@ -320,16 +320,18 @@ class Sonification:
                 vmax
             ) * 1.05
         
-        for i in range(len(self.out_channels)):
-            plt.plot(time[::20], self.out_channels[str(i)].values[::20]+2*i*vmax, label=self.channels.labels[i])
-
-        plt.xlabel('Time (s)')
-        plt.ylabel('Relative Amplitude')
-        plt.legend(frameon=False, loc=5)
-        plt.xlim(-time[-1]*0.05,time[-1]*1.2)
-        for s in plt.gca().spines.values():
-            s.set_visible(False)
-        plt.gca().get_yaxis().set_visible(False)
+        if show_waveform:
+            for i in range(len(self.out_channels)):
+                plt.plot(time[::20], self.out_channels[str(i)].values[::20]+2*i*vmax, label=self.channels.labels[i])
+            plt.xlabel('Time (s)')
+            plt.ylabel('Relative Amplitude')
+            plt.legend(frameon=False, loc=5)
+            plt.xlim(-time[-1]*0.05,time[-1]*1.2)
+            for s in plt.gca().spines.values():
+                s.set_visible(False)
+                plt.gca().get_yaxis().set_visible(False)
+            plt.show()
+        
 
         if len(self.channels.labels) == 1:
             # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
@@ -337,7 +339,6 @@ class Sonification:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]).T
         else:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
-        plt.show()
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
         
     def hear(self):
