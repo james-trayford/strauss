@@ -1,6 +1,7 @@
 import numpy as np
 import wavio
 import matplotlib.pyplot as plt
+from scipy.signal.windows import hann
 # To Do
 # - implement filter Q-parameter mapping
 
@@ -101,7 +102,8 @@ class Buffers:
         self._nbuffs_tot = 2*self._nbuffs-1
 
         # tent function for linearly x-fading buffers on recombination
-        self.fade = 1.-abs(np.linspace(1,-1, self._nsamp_buff))
+        # self.fade = 1.-abs(np.linspace(1,-1, self._nsamp_buff))
+        self.fade = hann(self._nsamp_buff)
 
         # pad the stream up to an exact multiple of buffer sample length
         self.nsamp_padstream = self._nbuffs * self._nsamp_buff

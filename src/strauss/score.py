@@ -52,8 +52,13 @@ class Score:
       length: (:obj:`str` or :obj:`float`): the length of the
     	sonification. If a string, parse minutes and seconds from
     	format 'Xm Y.Zs'. If a float read as seconds.
+      pitch_binning (optional, :obj:`str`): pitch binning mode - choose
+        from 'adaptive', where sources are binned by the pitch mapping
+        such that each interval is represented the same fraction of the
+        time, and 'uniform' where the pitch binning is based on uniform
+        size bins in the mapped pitch parameter. 
     """
-    def __init__(self, chord_sequence, length):
+    def __init__(self, chord_sequence, length, pitch_binning='adaptive'):
         # check types to handle score length correctly
         if isinstance(length, str):
             regex = "([0-9]*)m\s*([0-9]*.[0-9]*)s"
@@ -67,6 +72,12 @@ class Score:
             self.note_sequence = chord_sequence
         if isinstance(chord_sequence, str):
             self.note_sequence = parse_chord_sequence(chord_sequence)
+
+        if pitch_binning in ['adaptive','uniform']:
+            self.pitch_binning = pitch_binning
+        else:
+            raise Exception(
+                f"\"{pitch_binning}\" is not a valid pitch_binning mode")        
 
         # number of chords in the sequence 
         self.nchords = len(self.note_sequence)
