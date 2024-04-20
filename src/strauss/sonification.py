@@ -27,10 +27,10 @@ import IPython.display as ipd
 from IPython.core.display import display
 from scipy.io import wavfile
 import warnings
-try:
-    import sounddevice as sd
-except OSError as sderr:
-    sd = NoSoundDevice(sderr)
+# try:
+#     import sounddevice as sd
+# except OSError as sderr:
+#     sd = NoSoundDevice(sderr)
 
 class Sonification:
     """Representing the overall sonification
@@ -367,7 +367,8 @@ class Sonification:
         playback_msg = f"Playing Sonification ({dur} s): "
         print(playback_msg)
         try:
-            sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
+            pass
+            # sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
         except OSError as error: 
             print(error) 
             print("The Sonification.hear() function requires the PortAudio C-library. This may be missing from your system or "
