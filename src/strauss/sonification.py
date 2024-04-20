@@ -15,7 +15,7 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign
+from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -27,7 +27,10 @@ import IPython.display as ipd
 from IPython.core.display import display
 from scipy.io import wavfile
 import warnings
-import sounddevice as sd
+try:
+    import sounddevice as sd
+except OSError as sderr:
+    sd = NoSoundDevice(sderr)
 
 class Sonification:
     """Representing the overall sonification
