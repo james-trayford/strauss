@@ -3,6 +3,17 @@ import operator
 import numpy as np
 from scipy.interpolate import interp1d
 
+
+class NoSoundDevice:
+    """
+    drop-in replacement for sounddevice module if not working,
+    so can still use other functionality.
+    """
+    def __init__(self, err):
+        self.err = err
+    def play(self, audio, rate, blocking=1):
+        raise self.err
+        
 # a load of utility functions used by STRAUSS
 
 def nested_dict_reassign(fromdict, todict):

@@ -15,7 +15,7 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign
+from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -27,7 +27,10 @@ import IPython.display as ipd
 from IPython.core.display import display
 from scipy.io import wavfile
 import warnings
-import sounddevice as sd
+try:
+    import sounddevice as sd
+except OSError as sderr:
+    sd = NoSoundDevice(sderr)
 
 class Sonification:
     """Representing the overall sonification
@@ -367,7 +370,7 @@ class Sonification:
             sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
         except OSError as error: 
             print(error) 
-            print("The Sonification.hear() function requires the PortAudio C-library. This may be missing from your system or "
-                  "unsupported in this context. This should be installed by pip on Windows and OSx automatically with the "
+            print("The Sonification.hear() function requires the PortAudio C-library. This may be missing from your system or \n"
+                  "unsupported in this context. This should be installed by pip on Windows and OSx automatically with the \n "
                   "sounddevice library, but on Linux you may need to install manually using e.g.:\n"
                   "\t 'sudo apt-get install libportaudio2.'\n")
