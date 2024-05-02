@@ -29,7 +29,7 @@ from scipy.io import wavfile
 import warnings
 try:
     import sounddevice as sd
-except OSError as sderr:
+except (OSError, ModuleNotFoundError) as sderr:
     sd = NoSoundDevice(sderr)
 
 class Sonification:
