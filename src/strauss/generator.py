@@ -32,6 +32,7 @@ from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import warnings
+import copy
 
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
@@ -398,22 +399,23 @@ class Synthesizer(Generator):
         :obj:`self.generate` method, using the
         :obj:`self.combine_oscs`.
         """
-        oscdict = self.preset['oscillators']
-        self.osclist = []
-        for osc in oscdict.keys():
-            lvl = oscdict[osc]['level']
-            det = oscdict[osc]['detune']
-            phase = oscdict[osc]['phase']
-            form = oscdict[osc]['form']
-            snorm = self.samprate
-            fnorm = (1 + det/100.)
-            if phase == 'random':
-                oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, np.random.random())
-            else:
-                oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
-            self.osclist.append(oscf)
+        # oscdict = self.preset['oscillators']
+        # self.osclist = []
+        # for osc in oscdict.keys():
+        #     lvl = oscdict[osc]['level']
+        #     det = oscdict[osc]['detune']
+        #     phase = oscdict[osc]['phase']
+        #     form = oscdict[osc]['form']
+        #     snorm = self.samprate
+        #     fnorm = (1 + det/100.)
+        #     if phase == 'random':
+        #         oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, np.random.random())
+        #     else:
+        #         oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
+        #     self.osclist.append(oscf)
+        #     flg += 1
         self.generate = self.combine_oscs
-
+        
     def modify_preset(self, parameters, clear_oscs=True):
         """Synthesizer-specific wrapper for the modify_preset method.
 
@@ -444,11 +446,23 @@ class Synthesizer(Generator):
           tot (:obj:`array`-like): values for each sample
         """
         tot = 0.
+        oscdict = self.preset['oscillators']
         if isinstance(f, str):
             # we want a numerical frequency to generate tone
             f = notes.parse_note(f)
-        for osc in self.osclist:
-            tot += osc(s,f)
+        for osc in oscdict:
+            lvl = oscdict[osc]['level']
+            det = oscdict[osc]['detune']
+            phase = oscdict[osc]['phase']
+            form = oscdict[osc]['form']
+            snorm = self.samprate
+            fnorm = (1 + det/100.)
+            if phase == 'random':
+                tot += lvl * getattr(self,form)(s/snorm, f*fnorm, np.random.random())
+            else:
+                tot += lvl * getattr(self,form)(s/snorm, f*fnorm, phase)
+            # self.osclist.append(oscf)
+            # flg += 1        
         return tot
 
     def play(self, mapping):
