@@ -200,10 +200,13 @@ class Source:
                     # string values notate percentile limits
                     pc = float(l)
                     buff = 1
+                    sub = 0
                     if pc > 100:
+                        # if percentile over 100 we add 
                         buff = pc/100.
                         pc = 100
-                    lim = np.percentile(np.hstack([mapvals]), pc)*buff
+                        sub = lims[0]
+                    lim = sub + (np.percentile(np.hstack([mapvals]), pc) - sub)*buff
                     lims.append(lim)
                 else:
                     # numerical values notate absolute limits
