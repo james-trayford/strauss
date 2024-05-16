@@ -32,6 +32,8 @@ from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import warnings
+import logging
+from sf2utils.sf2parse import Sf2File
 
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
@@ -552,7 +554,7 @@ class Sampler(Generator):
           :obj:`sampfiles` variable?
     """
 
-    def __init__(self, sampfiles, params=None, samprate=48000):
+    def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None):
         # default sampler preset
         self.gtype = 'sampler'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -564,13 +566,127 @@ class Sampler(Generator):
         if isinstance(sampfiles, dict):
             self.sampdict = sampfiles
         if isinstance(sampfiles, str):
-            wavs = glob.glob(sampfiles+"/*")
-            self.sampdict = {}
-            for w in wavs:
-                note = w.split('/')[-1].split('_')[-1].split('.')[0]
-                self.sampdict[note] = w
+            if sampfiles[-4:] == '.sf2':
+                # if a soundfont (.sf2) file, use read routines
+                with open(sampfiles, 'rb') as sf2_file:
+                    self.sf2 = Sf2File(sf2_file)
+                    # number of presets (excluding EOS entry)
+                    npres = len(self.sf2.raw.pdta['Phdr'][:-1])
+                    if npres == 1:
+                        # if there's only one preset, choose it
+                        sf_preset = 0
+                    if not (isinstance(sf_preset, int) and (sf_preset >= 0) and (sf_preset < npres)):
+                        # if there's more than one, and no valid number specified, ask for one.
+                        print("valid 'sf_preset' not provided for soundfont file, choose from:")
+                        print('\n'+''.join(['-']*80))
+                        for i in range(npres):
+                            hdr = self.sf2.raw.pdta['Phdr'][i]
+                            print(f"{i+1}. {hdr.name.decode('utf-8')}")
+                        print(''.join(['-']*80)+'\n')
+                        # TODO: zero index, but would 1 index be more user friendly?
+                        sf_preset = int(input(f"Choose Preset Number (0-{i}): \t"))
+                    # TODO: isolate the warning suppression better?
+                    logger = logging.getLogger()
+                    pres = self.sf2.build_presets()
+                    logger.disabled = True
+                    sf_data = self.get_sfpreset_samples(pres[sf_preset])
+                    self.sampdict = self.reconstruct_samples(sf_data)
+                    logger.disabled = False
+                    
+            else:
+                wavs = glob.glob(sampfiles+"/*")
+                self.sampdict = {}
+                for w in wavs:
+                    note = w.split('/')[-1].split('_')[-1].split('.')[0]
+                    self.sampdict[note] = w
         self.load_samples()
 
+    def get_sfpreset_samples(self, sfpreset):
+        minmidi = np.inf
+        maxmidi = -np.inf
+        stdvel = 100
+        sampdat = {}
+        sratedat = {}
+        krangedat = {}
+        mapsamps = {}
+        opitchdat = {}
+
+        # iterate through preset 'bags' containing 
+        # sample sets associated to each note
+        for bag in sfpreset.bags:
+            isvelstd = True
+            inst = bag.instrument
+            vr = bag.velocity_range
+            if vr:
+                isvelstd = (vr[0] <= stdvel) and (vr[1] >= stdvel)
+            # we support a fixed velocity, choose value stdvel
+            # as standard, so only want bags of samples 
+            # associated with that range
+            if not isvelstd:
+                continue
+            if inst:
+                # if bag is not empty, iterate through samples
+                for sbag in inst.bags:
+                # for i in range(len(inst.samples)):
+                    samp = sbag.sample
+                    if not samp:
+                        # if sbag not associated with a sample, skip
+                        continue
+                    # don't support stereo samples, due to spatialisation
+                    # in strauss. Only read in mono or left channel samples.  
+                    if samp.is_left or samp.is_mono:
+                        tune = 0
+                        ftun = 0
+                        if sbag.tuning:
+                            tune += sbag.tuning
+                        if sbag.fine_tuning:
+                            tune += sbag.fine_tuning/100
+                        sample = np.frombuffer(samp.raw_sample_data, dtype='int16')
+                        note = samp.original_pitch
+                        if sbag.base_note:
+                            note = sbag.base_note
+                        name = samp.name
+                        keys = np.array(sbag.key_range)
+                        minmidi = min(minmidi, keys[0])
+                        maxmidi = max(maxmidi, keys[1])
+                        for i in range(keys[0], keys[1]+1):
+                            if i not in mapsamps:
+                                mapsamps[i] = []
+                            mapsamps[i].append(name)
+                        opitchdat[name] = note-tune
+                        sratedat[name] = samp.sample_rate
+                        sampdat[name] = sample
+        return {'samples': sampdat, 'sample_rate': sratedat, 'original_pitch': opitchdat,
+               'min_note': minmidi, 'max_note': maxmidi, 'sample_map': mapsamps}
+
+    def reconstruct_samples(self, sfpre_dict):
+        minkey = sfpre_dict['min_note']
+        maxkey = sfpre_dict['max_note']
+        smap = sfpre_dict['sample_map']
+        sampdict = {}
+        
+        for i in range(max(minkey,16), min(maxkey, 115)+1):
+            wave_stack = []
+            maxlen = 0
+            for nme in smap[i]:
+                # print((i-sfpre_dict['original_pitch'][nme])/12.)
+                semi_shift = pow(2, (i-sfpre_dict['original_pitch'][nme])/12.)
+                srate = sfpre_dict['sample_rate'][nme]
+                samp = sfpre_dict['samples'][nme]
+                vals = utils.resample(semi_shift*srate, self.samprate, samp)
+                maxlen = max(maxlen, vals.size)
+                wave_stack.append(vals)
+            compwave = np.zeros(maxlen, dtype='int16')
+            nwave = len(wave_stack)
+            for wave in wave_stack:
+                compwave[:wave.size] += wave//nwave
+            nte = notes.mkey_to_note(i)
+            sampdict[nte] = compwave
+        
+            # outname = f'../../example_wavs/out_{nte}.wav'
+            # write(outname, samprate, compwave)
+        return sampdict
+            
     def load_samples(self):
         """Load audio samples into the sampler.
 
@@ -582,15 +698,18 @@ class Sampler(Generator):
         self.samples = {}
         self.samplens = {}
         for note in self.sampdict.keys():
-            rate_in, wavobj = wavfile.read(self.sampdict[note])
-            # If it doesn't match the required rate, resample and re-write
-            if rate_in != self.samprate:
-                wavobj = utils.resample(rate_in, self.samprate, wavobj)
-            # force to mono array, else convert values to float
-            if wavobj.ndim > 1:
-                wavdat = np.mean(wavobj.data, axis=1)
+            if isinstance(self.sampdict[note], str):
+                rate_in, wavobj = wavfile.read(self.sampdict[note])
+                # If it doesn't match the required rate, resample and re-write
+                if rate_in != self.samprate:
+                    wavobj = utils.resample(rate_in, self.samprate, wavobj)
+                # force to mono array, else convert values to float
+                if wavobj.ndim > 1:
+                    wavdat = np.mean(wavobj.data, axis=1)
+                else:
+                    wavdat = np.array(wavobj.data, dtype='float64')
             else:
-                wavdat = np.array(wavobj.data, dtype='float64')
+                wavdat = self.sampdict[note].astype('float64')
             # remove DC term 
             dc = wavdat.mean()
             wavdat -= dc
