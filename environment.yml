@@ -15,6 +15,7 @@ dependencies:
     - pyyaml
     - scipy
     - setuptools >= 4.2
+    - sf2utils
     - sphinx
     - tqdm
     - wavio
