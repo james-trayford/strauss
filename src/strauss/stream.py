@@ -7,13 +7,20 @@ from scipy.signal.windows import hann
 
 class Stream:
     """ Stream object representing audio samples"""
-    def __init__(self, length, samprate=44100):
+    def __init__(self, length, samprate=44100, ltype='seconds'):
+
         # variables we want to keep constant
-        self.length = length
         self.samprate = samprate
         self._nyqfrq = 0.5*self.samprate
-        self._nsamp_stream = int(samprate * length)
         
+        if ltype == 'seconds':
+            self.length = length
+            self._nsamp_stream = int(samprate * length)
+        elif ltype == 'samples':
+            self._nsamp_stream = length
+            self.length = length / samprate
+            
+            
         # sample values initialised to 0 (silence)
         self.values =  np.zeros(self._nsamp_stream)
 
