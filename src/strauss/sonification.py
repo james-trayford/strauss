@@ -28,6 +28,7 @@ import IPython.display as ipd
 from IPython.core.display import display
 from scipy.io import wavfile
 import warnings
+import tempfile
 try:
     import sounddevice as sd
 except (OSError, ModuleNotFoundError) as sderr:
@@ -56,24 +57,20 @@ class Sonification:
       samprate (:obj:`int`) Integer sample rate in samples per second
         (Hz), typically :obj:`44100` or :obj:`48000` for most audio
     	applications
-      model (:obj:`str`) The text-to-speech model used for captions. 
+      ttsmodel (:obj:`str`) The text-to-speech model used for captions. 
 
     Todo:
       * Support custom audio setups here too.
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
                  caption=None, samprate=48000,
-                 model='tts_models/en/jenny/jenny', 
-                 caption_path='.TEMP_CAPTION.wav'):
+                 ttsmodel='tts_models/en/jenny/jenny'):
 
         # sampling rate in Hz
         self.samprate = samprate
         
         # tts model name
-        self.model = model
-        
-        # caption wav path
-        self.caption_path = caption_path
+        self.ttsmodel = ttsmodel
         
         # caption
         self.caption = caption
@@ -186,22 +183,24 @@ class Sonification:
 
         # produce mono audio of caption, if one is provided
         if str(self.caption or '').strip():
-            render_caption(self.caption, self.samprate,
-                           self.model, self.caption_path)
-            rate_in, wavobj = wavfile.read(self.caption_path)
-            wavobj = np.array(wavobj)
-
-            # clean up caption file...
-            os.remove(self.caption_path)
-            
+            # use a temporary directory to ensure caption file cleanup
+            with tempfile.TemporaryDirectory() as cdir:
+                cpath = os.path.join(cdir, 'caption.wav')
+                render_caption(self.caption, self.samprate,
+                               self.ttsmodel, cpath)
+                rate_in, wavobj = wavfile.read(cpath)
+                wavobj = np.array(wavobj)
             # Set up the Stream objects for TTS
             self.caption_channels = {}
             caption_norm = wavobj.max()
             for c in range(Nchan):
-                self.caption_channels[str(c)] = Stream(wavobj.size/self.samprate, self.samprate)
-                panenv = self.channels.mics[i].antenna(0, np.pi)
-                cnorm = abs(self.out_channels[str(i)].values).max()/caption_norm
-                self.caption_channels[str(i)].values += (wavobj*cnorm*panenv)
+                self.caption_channels[str(c)] = Stream(wavobj.shape[0], self.samprate, ltype='samples')
+                
+                # place caption straight ahead spatially
+                panenv = self.channels.mics[c].antenna(0, 0.5*np.pi)
+                
+                cnorm = abs(self.out_channels[str(c)].values).max()/caption_norm
+                self.caption_channels[str(c)].values += (wavobj*cnorm*panenv)
         else:
             self.caption_channels = {}
             for c in range(Nchan):
