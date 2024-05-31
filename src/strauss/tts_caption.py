@@ -1,9 +1,18 @@
-from TTS.api import TTS
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import numpy as np
 import strauss.utilities as utils
 import re
+try:
+    from TTS.api import TTS
+except (OSError, ModuleNotFoundError) as sderr:
+    def TTS(*args, **kwargs):
+        raise TTSIsNotSupported("strauss has not been installed with text-to-speech support. \n"
+              "This is not installed by default, due to some specific module requirements of the TTS module."
+              "Reinstalling strauss with 'pip install strauss[TTS]' will give you access to this function")
+
+class TTSIsNotSupported(Exception):
+    pass
 
 def render_caption(caption, samprate, model, caption_path):
     ''' The render_caption function generates an audio caption from text input
@@ -33,4 +42,5 @@ def render_caption(caption, samprate, model, caption_path):
     if rate_in != samprate:
         new_wavobj = utils.resample(rate_in, samprate, wavobj)
         wavfile.write(caption_path, samprate, new_wavobj)
+
 
