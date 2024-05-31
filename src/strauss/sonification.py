@@ -16,6 +16,7 @@ Todo:
 from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
+from .tts_caption import render_caption
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -27,6 +28,7 @@ import IPython.display as ipd
 from IPython.core.display import display
 from scipy.io import wavfile
 import warnings
+import tempfile
 try:
     import sounddevice as sd
 except (OSError, ModuleNotFoundError) as sderr:
@@ -54,15 +56,24 @@ class Sonification:
     	pass to :class:`~strauss.channels.audio_channels`
       samprate (:obj:`int`) Integer sample rate in samples per second
         (Hz), typically :obj:`44100` or :obj:`48000` for most audio
-    	applications. 
+    	applications
+      ttsmodel (:obj:`str`) The text-to-speech model used for captions. 
 
     Todo:
       * Support custom audio setups here too.
     """
-    def __init__(self, score, sources, generator, audio_setup='stereo', samprate=48000):
+    def __init__(self, score, sources, generator, audio_setup='stereo',
+                 caption=None, samprate=48000,
+                 ttsmodel='tts_models/en/jenny/jenny'):
 
         # sampling rate in Hz
         self.samprate = samprate
+        
+        # tts model name
+        self.ttsmodel = ttsmodel
+        
+        # caption
+        self.caption = caption
         
         # sonification owns an instance of the Score
         self.score = score
@@ -103,7 +114,7 @@ class Sonification:
           sources for multi-source sonifications for a quicker test
           render by some integer factor.
         """
-        
+
         # first determine if time is provided, if not assume all start at zero
         # and last the duration of sonification
 
@@ -170,6 +181,31 @@ class Sonification:
                 panenv = self.channels.mics[i].antenna(azi,polar)
                 self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
 
+        # produce mono audio of caption, if one is provided
+        if str(self.caption or '').strip():
+            # use a temporary directory to ensure caption file cleanup
+            with tempfile.TemporaryDirectory() as cdir:
+                cpath = os.path.join(cdir, 'caption.wav')
+                render_caption(self.caption, self.samprate,
+                               self.ttsmodel, cpath)
+                rate_in, wavobj = wavfile.read(cpath)
+                wavobj = np.array(wavobj)
+            # Set up the Stream objects for TTS
+            self.caption_channels = {}
+            caption_norm = wavobj.max()
+            for c in range(Nchan):
+                self.caption_channels[str(c)] = Stream(wavobj.shape[0], self.samprate, ltype='samples')
+                
+                # place caption straight ahead spatially
+                panenv = self.channels.mics[c].antenna(0, 0.5*np.pi)
+                
+                cnorm = abs(self.out_channels[str(c)].values).max()/caption_norm
+                self.caption_channels[str(c)].values += (wavobj*cnorm*panenv)
+        else:
+            self.caption_channels = {}
+            for c in range(Nchan):
+                self.caption_channels[str(c)] = Stream(0, self.samprate) 
+        
     def save_stereo(self, fname, master_volume=1.):
         """ Save stereo or mono sonifications
         
@@ -198,17 +234,22 @@ class Sonification:
                 abs(self.out_channels[str(c)].values.min()),
                 vmax
             ) / master_volume
-            channels.append(self.out_channels[str(c)].values)
             
-        wav.write(fname, 
+            # combine caption + sonification streams at display time
+            channel_values = np.concatenate([self.out_channels[str(c)].values,
+                                self.caption_channels[str(c)].values])   
+            
+            channels.append(channel_values)
+           
+        wav.write(fname,
                   np.column_stack(channels),
                   self.samprate, 
                   scale = (-vmax,vmax),
                   sampwidth=3)
-            
+
         print("Saved.")
 
-                
+
     def save_combined(self, fname, ffmpeg_output=False, master_volume=1.):
         """ Save render as a combined multi-channel wav file 
         
@@ -240,9 +281,11 @@ class Sonification:
             ) / master_volume
             
         print("Creating temporary .wav files...")
-        
+
+        # combine caption + sonification streams at display time
         for c in range(len(self.out_channels)):
             tempfname = f"./.TEMP_{c}.wav"
+            self.out_channels[str(c)].values += self.caption_channels[str(c)].values
             wav.write(tempfname, 
                       self.out_channels[str(c)].values,
                       self.samprate, 
@@ -250,7 +293,7 @@ class Sonification:
                       sampwidth=3)
             inputs[self.channels.forder[c]] = ff.input(tempfname)
             
-        print("Joning temporary .wav files...")
+        print("Joining temporary .wav files...")
         (
             ff.filter(inputs, 'join', inputs=len(inputs), channel_layout=self.channels.setup)
             .output(fname)
@@ -313,6 +356,7 @@ class Sonification:
         supports up to stereo, so if more than two channels, only the
         first two are used as left and right.
         """
+
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
 
         vmax = 0.
@@ -336,12 +380,20 @@ class Sonification:
             plt.show()
         
 
-        if len(self.channels.labels) == 1:
+        channels = []
+
+        # combine caption + sonification streams at display time
+        for c in range(len(self.out_channels)):
+            channel_values = np.concatenate([self.caption_channels[str(c)].values,
+                                             self.out_channels[str(c)].values])   
+            channels.append(channel_values)
+
+        if len(self.channels.labels) == 1:             
             # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
             # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
-            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]).T
+            outfmt = np.column_stack(channels*2).T
         else:
-            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
+            outfmt = np.column_stack(channels[:2]).T
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
         
     def hear(self):
