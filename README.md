@@ -1,7 +1,7 @@
 # STRAUSS
 ***S**onification **T**ools and **R**esources for **A**stronomers **U**sing **S**ound **S**ynthesis*
 
-![Sonification Tools & Resources for Astronomers Using Sound Synthesis](/misc/strauss_logo.png "STRAUSS logo")
+![Sonification Tools & Resources for Astronomers Using Sound Synthesis](/misc/strauss_logo_new_dark.png "STRAUSS logo")
 
 ## Sonification and STRAUSS
 
@@ -42,5 +42,5 @@ and activate the environment with
 `conda activate strauss`
 
 ## Acknowledgments
-The *STRAUSS* code has benefited from funding via an [Royal Astronomical Society Eduaction & Outreach grant award](https://ras.ac.uk/awards-and-grants/outreach/education-outreach-small-grants-scheme), providing hardware and software for sound development and spatialisation testing.
-
+*STRAUSS* is developed and provided free and open source, supported by a [UKRI Early Stagre Research and Development Award](https://www.ukri.org/opportunity/early-stage-research-and-development-scheme/), grant code ST/X004651/1.
+The *STRAUSS* code has also benefited from funding via an [Royal Astronomical Society Eduaction & Outreach grant award](https://ras.ac.uk/awards-and-grants/outreach/education-outreach-small-grants-scheme), providing hardware and software for sound development and spatialisation testing.
