@@ -82,5 +82,9 @@ docs/_build/
 !data/samples/mallets/*.wav
 !data/samples/solar_system/*.wav
 
+# ignore sf2 files as these can be big...
+*.sf2
+*.sfz
+
 # Also don't want ipynb checkpoints commited to the repo
 */.ipynb_checkpoints/

@@ -1,0 +1,16 @@
+# preset name
+name: "sustain"
+
+# full description
+description: >-
+  Sustain a sample indefinitely, achieved by holding the note on and using a loop between
+  0.2 and 0.5 seconds - works well to represent Object source types that vary over an extended
+  period. This works best with extended samples or instruments that don't vary much, such as
+  a violin or organ. Short samples (< 1s) or those that are quick or percussive (e.g. a piano)
+  can lead to a regular variation in the sound that distracts from the data sonification.
+  Tweaking loop_start and loop_end can help create a smoother sound for a given sample.
+
+# use the 'forwardback' looping mode by default, between 0.2 and 0.5 seconds for each sample
+looping: "forwardback"
+loop_start: 0.2
+loop_end: 0.5
