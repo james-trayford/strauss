@@ -694,8 +694,10 @@ class Sampler(Generator):
             for wave in wave_stack:
                 compwave[:wave.size] += wave//nwave
             nte = notes.mkey_to_note(i)
-            sampdict[nte] = compwave
-        
+            sampdict[nte] = compwave # return notes using sharps
+            if nte[1] == '#':
+                # if a sharp, also assign flat...
+                sampdict[nte.replace('#','b')] = compwave
             # outname = f'../../example_wavs/out_{nte}.wav'
             # write(outname, samprate, compwave)
         return sampdict
