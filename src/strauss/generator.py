@@ -28,6 +28,7 @@ from scipy.fft import fft, ifft, fftfreq
 import glob
 import copy
 import scipy
+import json
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
@@ -594,7 +595,8 @@ class Sampler(Generator):
                         print('\n'+''.join(['-']*80))
                         for i in range(npres):
                             hdr = self.sf2.raw.pdta['Phdr'][i]
-                            print(f"{i+1}. {hdr.name.decode('utf-8')}")
+                            name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
+                            print(f"{i+1}. {name}")
                         print(''.join(['-']*80)+'\n')
                         # TODO: zero index, but would 1 index be more user friendly?
                         sf_preset = int(input(f"Choose Preset Number (1-{i+1}): \t"))
