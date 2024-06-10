@@ -415,14 +415,13 @@ class Sonification:
         if len(self.channels.labels) == 1:             
             # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
             # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
-            outfmt = np.column_stack(channels*2)
+            outfmt = np.column_stack(channels*2)/vmax
         else:
-            outfmt = np.column_stack(channels[:2])
+            outfmt = np.column_stack(channels[:2])/vmax
 
         dur = int(np.round(outfmt.shape[0]/self.out_channels['0'].samprate))
         playback_msg = f"Playing Sonification ({dur} s): "
         print(playback_msg)
-        print(outfmt.shape)
         try:
             sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
         except OSError as error: 
