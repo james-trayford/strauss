@@ -359,11 +359,17 @@ class Sonification:
 
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
 
+        channels = []
         vmax = 0.
+        
+        # combine caption + sonification streams at display time
         for c in range(len(self.out_channels)):
+            channel_values = np.concatenate([self.caption_channels[str(c)].values,
+                                             self.out_channels[str(c)].values])   
+            channels.append(channel_values)
             vmax = max(
-                abs(self.out_channels[str(c)].values.max()),
-                abs(self.out_channels[str(c)].values.min()),
+                abs(channels[c].max()),
+                abs(channels[c].min()),
                 vmax
             ) * 1.05
         
@@ -379,21 +385,12 @@ class Sonification:
                 plt.gca().get_yaxis().set_visible(False)
             plt.show()
         
-
-        channels = []
-
-        # combine caption + sonification streams at display time
-        for c in range(len(self.out_channels)):
-            channel_values = np.concatenate([self.caption_channels[str(c)].values,
-                                             self.out_channels[str(c)].values])   
-            channels.append(channel_values)
-
         if len(self.channels.labels) == 1:             
             # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
             # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
-            outfmt = np.column_stack(channels*2).T
+            outfmt = np.column_stack(channels*2).T / vmax
         else:
-            outfmt = np.column_stack(channels[:2]).T
+            outfmt = np.column_stack(channels[:2]).T / vmax
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
         
     def hear(self):
@@ -401,23 +398,31 @@ class Sonification:
             playback.
         """
 
+        channels = []
         vmax = 0.
+        
+        # combine caption + sonification streams at display time
         for c in range(len(self.out_channels)):
+            channel_values = np.concatenate([self.caption_channels[str(c)].values,
+                                             self.out_channels[str(c)].values])   
+            channels.append(channel_values)
             vmax = max(
-                abs(self.out_channels[str(c)].values.max()),
-                abs(self.out_channels[str(c)].values.min()),
+                abs(channels[c].max()),
+                abs(channels[c].min()),
                 vmax
             ) * 1.05
-        
-        if len(self.channels.labels) == 1:
+                
+        if len(self.channels.labels) == 1:             
             # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
             # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
-            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]) / vmax
+            outfmt = np.column_stack(channels*2)
         else:
-            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]) / vmax
+            outfmt = np.column_stack(channels[:2])
+
         dur = int(np.round(outfmt.shape[0]/self.out_channels['0'].samprate))
         playback_msg = f"Playing Sonification ({dur} s): "
         print(playback_msg)
+        print(outfmt.shape)
         try:
             sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
         except OSError as error: 
