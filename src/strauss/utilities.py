@@ -1,6 +1,20 @@
 from functools import reduce
 import operator
 import numpy as np
+from scipy.interpolate import interp1d
+from contextlib import contextmanager,redirect_stderr,redirect_stdout
+from os import devnull
+
+class NoSoundDevice:
+    """
+    drop-in replacement for sounddevice module if not working,
+    so can still use other functionality.
+    """
+    def __init__(self, err):
+        self.err = err
+    def play(self, audio, rate, blocking=1):
+        raise self.err
+        
 # a load of utility functions used by STRAUSS
 
 def nested_dict_reassign(fromdict, todict):
@@ -69,3 +83,22 @@ def rescale_values(x, oldlims, newlims):
     nlo, nhi = newlims
     descale = np.clip((x - olo) / (ohi-olo), 0 , 1)
     return (nhi-nlo)*descale + nlo
+    
+def resample(rate_in, samprate, wavobj):
+    """ resample audio from original samplerate to required samplerate """
+    duration = wavobj.shape[0] / rate_in
+
+    time_old  = np.linspace(0, duration, wavobj.shape[0])
+    time_new  = np.linspace(0, duration,
+                            int(wavobj.shape[0] * samprate / rate_in))
+
+    interpolator = interp1d(time_old, wavobj.T)
+    new_wavobj = np.round(interpolator(time_new).T).astype(wavobj.dtype)
+    return(new_wavobj)
+
+@contextmanager
+def suppress_stdout_stderr():
+    """A context manager that redirects stdout and stderr to devnull"""
+    with open(devnull, 'w') as fnull:
+        with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
+            yield (err, out)

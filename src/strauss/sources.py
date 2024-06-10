@@ -26,13 +26,16 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from .utilities import rescale_values 
 
-mappable = ['theta',
+mappable = ['polar',
+            'azimuth',
+            'theta',
             'phi',
             'volume',
             'pitch',
             'time',
             'cutoff',
             'time_evo',
+            'spectrum',
             'pitch_shift',
             'volume_envelope/A',
             'volume_envelope/D',
@@ -45,7 +48,9 @@ mappable = ['theta',
             'pitch_lfo/freq_shift',
             'pitch_lfo/amount']
 
-evolvable = ['theta',
+evolvable = ['polar',
+             'azimuth',
+             'theta',
              'phi',
              'volume',
              'cutoff',
@@ -57,9 +62,11 @@ evolvable = ['theta',
              'pitch_lfo/freq',
              'pitch_lfo/freq_shift',
              'pitch_lfo/amount']
-
 param_limits = [(0,1),#np.pi),
                 (0,1),#2*np.pi),
+                (0,1),#np.pi),
+                (0,1),#2*np.pi),
+                (0,1),
                 (0,1),
                 (0,1),
                 (0,1),
@@ -99,11 +106,27 @@ class Source:
     """
     def __init__(self, mapped_quantities):
         # check these are all mappable parameters
+
+        
         for q in mapped_quantities:
             if q not in mappable:
                 raise UnrecognisedProperty(
                     f"Property \"{q}\" is not recognised")
 
+        if ('theta' in mapped_quantities) and ('polar' in mapped_quantities):
+            raise Exception(
+                "\"theta\" and \"polar\" cannot be combined as " \
+                "these represent the same quantity: \"theta\" and " \
+                "\"phi\" are deprecated and will be replaced with \"polar\"" \
+                " and \"azimuth\" in a future version.")
+
+        if ('phi' in mapped_quantities) and ('azimuth' in mapped_quantities):
+            raise Exception(
+                "\"phi\" and \"azimuth\" cannot be combined as " \
+                "these represent the same quantity: \"theta\" and " \
+                "\"phi\" are deprecated and will be replaced with \"polar\"" \
+                " and \"azimuth\" in a future version.")            
+            
         # initialise common structures
         self.mapped_quantities = mapped_quantities
         self.raw_mapping = {}
@@ -144,7 +167,7 @@ class Source:
         	param_lim_dict values are taken.
 
         Note:
-           There is special behaviour for the `phi` and `theta`
+           There is special behaviour for the `polar` and `azimuth`
            parameters, to ensure shortest angular distance when
            interpolating across the 0-2pi and 0-pi boundaries.
         
@@ -177,10 +200,13 @@ class Source:
                     # string values notate percentile limits
                     pc = float(l)
                     buff = 1
+                    sub = 0
                     if pc > 100:
+                        # if percentile over 100 we add 
                         buff = pc/100.
                         pc = 100
-                    lim = np.percentile(np.hstack([mapvals]), pc)*buff
+                        sub = lims[0]
+                    lim = sub + (np.percentile(np.hstack([mapvals]), pc) - sub)*buff
                     lims.append(lim)
                 else:
                     # numerical values notate absolute limits
@@ -200,6 +226,10 @@ class Source:
         for key in self.mapping:
             if key == "time_evo":
                 continue
+            if key == "spectrum":
+                # if hasattr(self.mapping[key][0][0], "__iter__"):
+                # ^ in case we want to catch and pre process multi-spectra
+                continue
             elif hasattr(self.mapping[key][0], "__iter__"):
                 # print(key, self.mapping[key][0])
                 for i in range(self.n_sources):
@@ -207,7 +237,7 @@ class Source:
                         raise Exception(f"Mapping error: Parameter \"{key}\" cannot be evolved.")
                     x = self.mapping["time_evo"][i]
                     y = self.mapping[key][i]
-                    if key == "phi":
+                    if key == "phi" or key == "azimuth":
                         # special case: shortest angular distance
                         # between phi points is always assumed
                         ydiff = np.diff(y)
@@ -254,7 +284,7 @@ class Events(Source):
                 self.raw_mapping[key] = datadict[key]
             else:
                 Exception(f"Mapped property {key} not in datadict.")
-        self.n_sources = datadict[key].shape[0]
+        self.n_sources = np.array(datadict[key]).shape[0]
  
 class Objects(Source):
     """ Represent data as time-continuous objects.

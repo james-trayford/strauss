@@ -12,33 +12,6 @@ description: >-
   lower volumes. This gives a harmonically rich sound, suitable for
   filtering, with detuned unison saws removing some harshness.
 
-# oscillator information
-oscillators:
-  # oscillator are denoted osc<n> with n=3 by default
-  #
-  # level: the intrinsic volume
-  #
-  # detune: the change in tuning as a percentage of the input frequency
-  #
-  # form: the waveform, choose from:
-  # ['saw', 'square', 'sine', 'tri', 'noise']
-  #
-  osc1:
-    form: 'saw'
-    level: 1.
-    detune: 0.
-    phase: 0
-  osc2:
-    form: 'saw'
-    level: 0.5
-    detune: 0.75
-    phase: 0.3
-  osc3:
-    form: 'saw'
-    level: 0.5
-    detune: 0.75
-    phase: 0.6
-
 # Numerical note length in s
 note_length: 0.1
 
@@ -93,9 +66,21 @@ volume_lfo:
   Rc: 0.
   level: 1
 
-
 # Master volume
 volume: 1.
+
+# how to interpolate and resample the spectrum
+# "sample": interpolate spectrum values directly
+# "preserve_power": integrate, interpolate then diff to avoid missing power in narrow features
+interpolation_type: 'sample' 
+
+# For an evolving spectrum, do we regenerate phases for each buffer, or keep the same?
+# These have differing effects 
+regen_phases: true
+
+# frequency limits in Hz
+min_freq: 50.
+max_freq: 2000.
 
 # Default pitch selection
 pitch: 1.

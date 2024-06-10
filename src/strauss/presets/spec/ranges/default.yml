@@ -32,15 +32,21 @@ cutoff_unit: 'unitless'
 volume: [0,1.]
 volume_unit: 'unitless' 
 
+# frequency limits in Hz
+min_freq: [20,2.2e4]
+max_freq: [20,2.2e4]
+min_freq_unit: 'Hz'
+max_freq_unit: 'Hz'
+
 # Default pitch selection
 pitch: [0,1.]
 pitch_unit: 'unitless'
 
 # center panning:
-azimuth: [0., 1.]
-azimuth_unit: 'unitless'
-polar: [0.,1.]
-polar_unit: 'unitless'
+phi: [0., 1.]
+phi_unit: 'unitless'
+theta: [0.,1.]
+theta_unit: 'unitless'
 
 # pitch range and default shift in semitones
 pitch_shift: [0., 36.]

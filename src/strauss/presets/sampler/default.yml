@@ -76,7 +76,12 @@ volume: 1.
 # Default pitch selection
 pitch: 1.
 
+# center panning:
+azimuth: 0.
+polar: 0
+
 # pitch range and default shift in semitones
 pitch_hi: 36
 pitch_lo: 0
 pitch_shift: 0.
+

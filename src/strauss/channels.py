@@ -6,7 +6,7 @@ objects that are channeled to different speakers in the sonification
 output.
 
 Todo:
-  * Allow microphones to have a :obj:`theta` as well as :obj:`phi`
+  * Allow microphones to have a :obj:`polar` as well as :obj:`azimuth`
     value, to place them anywhere on a sphere around a listener.
   * parameterise the :obj:`"soundsphere"` standard setup, for VR
     applications (in development).
@@ -25,7 +25,7 @@ class mic:
     spatialisation in the sonicfication.
 
     Args: 
-      phi (:obj:`float`): Angular position of the microphone on the
+      azimuth (:obj:`float`): Angular position of the microphone on the
     	horizontal plane, from 0 to 2pi with 0.5 pi being to the left
     	and 1.5 pi being to the right. 
       mic_type (:obj:`str`): Type of microphone, choose from
@@ -41,14 +41,14 @@ class mic:
     Raises:
       Exception: if mic_type not in allowed options
     """
-    def __init__(self, phi, mic_type="directional", label="C", channel=1):
-        self.phi = phi
+    def __init__(self, azimuth, mic_type="directional", label="C", channel=1):
+        self.azimuth = azimuth
         self.mic_type = mic_type
         self.label = label
         self.channel = channel
         
         if mic_type == "directional":
-            self.antenna = lambda a, b=0.5*np.pi: 0.5*(1+np.cos(a-phi)*np.sin(b))
+            self.antenna = lambda a, b=0.5*np.pi: 0.5*(1+np.cos(a-azimuth)*np.sin(b))
         elif mic_type == "omni":
             self.antenna = lambda a, b=0.5*np.pi: a**0.
         elif mic_type == "mute":
@@ -68,7 +68,7 @@ class audio_channels:
         :obj:`"mono"`, :obj:`"stereo"`, :obj:`"5p1"` and
         :obj:`"7p1"`, or :obj:`"custom"`. 
       custom_setup (:obj:`dict`): Dictionary defining a customised
-    	audio setup, containing keys for :obj:`"phis"`, :obj:`"types"`
+    	audio setup, containing keys for :obj:`"azimuths"`, :obj:`"types"`
     	and :obj:`"labels"`, containing lists parametrising the first
     	three arguments of the :class:`mic` object, respectively
     	in the order of their channel index. Also optionally an forder
@@ -90,12 +90,12 @@ class audio_channels:
         ##############################################
         
         # mic angles in radians
-        mono_phis = [0.]
-        stereo_phis = [0.5*np.pi, 1.5*np.pi]
-        fivepoint_phis = [1./3*np.pi, 5./3*np.pi,
+        mono_azimuths = [0.]
+        stereo_azimuths = [0.5*np.pi, 1.5*np.pi]
+        fivepoint_azimuths = [1./3*np.pi, 5./3*np.pi,
                             0., 0.,
                             2./3*np.pi, 4./3*np.pi]
-        sevenpoint_phis = fivepoint_phis + stereo_phis
+        sevenpoint_azimuths = fivepoint_azimuths + stereo_azimuths
 
         # mic type, either omni(-directional) directional,
         # or muted (mute channels not used for spatialisation)
@@ -140,19 +140,19 @@ class audio_channels:
 
             
         if setup == "mono":
-            self.setup_channels(mono_phis, mono_types, mono_labels)
+            self.setup_channels(mono_azimuths, mono_types, mono_labels)
             self.forder = mono_forder
         elif setup == "stereo":
-            self.setup_channels(stereo_phis, stereo_types, stereo_labels)
+            self.setup_channels(stereo_azimuths, stereo_types, stereo_labels)
             self.forder = stereo_forder
         elif setup == "5.1":
-            self.setup_channels(fivepoint_phis, fivepoint_types, fivepoint_labels)
+            self.setup_channels(fivepoint_azimuths, fivepoint_types, fivepoint_labels)
             self.forder = fivepoint_forder
         elif setup == "7.1":
-            self.setup_channels(sevenpoint_phis, sevenpoint_types, sevenpoint_labels)
+            self.setup_channels(sevenpoint_azimuths, sevenpoint_types, sevenpoint_labels)
             self.forder = sevenpoint_forder
         elif setup == "custom":
-            self.setup_channels(custom_setup['phis'],
+            self.setup_channels(custom_setup['azimuths'],
                                 custom_setup['types'],
                                 custom_setup['labels'])
             if 'forder' in custom_setup:
@@ -162,7 +162,7 @@ class audio_channels:
         else:
             raise Exception(f"setup \"{setup}\" not understood")
             
-    def setup_channels(self, phis, types, labels):
+    def setup_channels(self, azimuths, types, labels):
         """initialise audio channel setup for lists of properties
 
         Subroutine for setting up the audio_channels as arrays of
@@ -170,7 +170,7 @@ class audio_channels:
         attribute to the :obj:`audio_channels`
 
         Args:
-          phis (:obj:`list(float)`): list of :obj:`phi` values for
+          azimuths (:obj:`list(float)`): list of :obj:`azimuth` values for
         	:obj:`mic` object
           types (:obj:`list(float)`): list of :obj:`mic_types` values
           	for :obj:`mic` object.
@@ -178,10 +178,10 @@ class audio_channels:
           	:obj:`mic` object
 
         """
-        self.phis = phis
+        self.azimuths = azimuths
         self.types = types
         self.labels = labels
-        self.Nmics = len(phis)
+        self.Nmics = len(azimuths)
 
         # Note: channel ordering important, sets output channel number
         self.channels = range(1, self.Nmics+1)
@@ -189,7 +189,7 @@ class audio_channels:
         self.mics = []
         
         for i in range(self.Nmics):
-            microphone = mic(phis[i], types[i], labels[i], self.channels[i])
+            microphone = mic(azimuths[i], types[i], labels[i], self.channels[i])
             self.mics.append(microphone)
 
     def plot_antenna(self):
@@ -204,8 +204,8 @@ class audio_channels:
           routines. 
         """
 
-        plot_phis = np.linspace(0, 2*np.pi, 100)
-        normalised_volume = 0.*plot_phis
+        plot_azimuths = np.linspace(0, 2*np.pi, 100)
+        normalised_volume = 0.*plot_azimuths
 
         # setup axes
         fig = plt.figure(figsize=(8,8))
@@ -215,23 +215,23 @@ class audio_channels:
         for i in range(self.Nmics):
             labelpos = 1.2
             microphone = self.mics[i]
-            normalised_volume += microphone.antenna(plot_phis)
-            ax.plot(plot_phis, microphone.antenna(plot_phis))
-            if np.all(microphone.antenna(plot_phis) == 0.):
+            normalised_volume += microphone.antenna(plot_azimuths)
+            ax.plot(plot_azimuths, microphone.antenna(plot_azimuths))
+            if np.all(microphone.antenna(plot_azimuths) == 0.):
                 labelpos += shift
                 shift -= 0.15
-            ax.scatter(microphone.phi, labelpos)
+            ax.scatter(microphone.azimuth, labelpos)
             ax.annotate(microphone.label+f" (ch. {microphone.channel})",
-                         (microphone.phi, labelpos),
+                         (microphone.azimuth, labelpos),
                          (0, 10), textcoords='offset points', ha='center')
         normalised_volume /= normalised_volume.max()
-        plt.plot(plot_phis, normalised_volume, c='k', ls ='--', label='net amplitude')
+        plt.plot(plot_azimuths, normalised_volume, c='k', ls ='--', label='net amplitude')
         
         # configure axes
         ax = plt.gca()
         ax.set_theta_zero_location("N")
         ax.set_yticklabels([])
-        ax.set_xlabel('phi')
+        ax.set_xlabel('azimuth')
         ax.set_ylim(0,1.4)
         ax.legend(frameon=0)
         ax.grid(True)

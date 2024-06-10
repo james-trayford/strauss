@@ -15,16 +15,22 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign
+from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import sys
 import os
 import ffmpeg as ff
 import wavio as wav
 import IPython.display as ipd
 from IPython.core.display import display
 from scipy.io import wavfile
+import warnings
+try:
+    import sounddevice as sd
+except (OSError, ModuleNotFoundError) as sderr:
+    sd = NoSoundDevice(sderr)
 
 class Sonification:
     """Representing the overall sonification
@@ -70,6 +76,13 @@ class Sonification:
         # set up the audio channel routing for the sonification
         self.channels = audio_channels(setup=audio_setup)
 
+        # check Generator and Sonification sampling rates match...
+        if self.samprate != self.generator.samprate:
+            # if not, revert to Generator sampling rate.
+            warnings.warn("warning: global and generator sampling rates disagree, " \
+            f"reverting to generator value of {self.generator.samprate} Hz")
+            self.samprate = self.generator.samprate
+        
         # ...and the corresponding Stream objects 
         self.out_channels = {}
         for c in range(self.channels.Nmics):
@@ -104,8 +117,11 @@ class Sonification:
 
         # pitch rank of each source divided by the number of sources
         pitchfrac = np.empty_like(self.sources.mapping['pitch'])
-        pitchfrac[np.argsort(self.sources.mapping['pitch'])] = np.arange(self.sources.n_sources)/self.sources.n_sources
-
+        if self.score.pitch_binning == 'adaptive':
+            pitchfrac[np.argsort(self.sources.mapping['pitch'])] = np.arange(self.sources.n_sources)/self.sources.n_sources
+        elif self.score.pitch_binning == 'uniform':
+            pitchfrac = np.clip(self.sources.mapping['pitch'], 0, 9.999999e-1)
+            
         # get some relevant numbers before iterating through sources
         Nsamp = self.out_channels['0'].values.size
         lastsamp = Nsamp - 1
@@ -121,6 +137,7 @@ class Sonification:
             nints = self.score.nintervals[cbin[source]]
             pitch = pitchfrac[source]
             note = chord[int(pitch * nints)]
+
             # make dictionary for feeding to play function with each notes properties
             sourcemap = {}
             # for k in self.sources.mapping.keys():
@@ -132,13 +149,17 @@ class Sonification:
             sstream = self.generator.play(sourcemap)
             playlen = sstream.values.size
             if 'phi' in sourcemap:
-                phi     = const_or_evo(sourcemap['phi'], sstream.sampfracs) * 2 * np.pi
+                azi     = const_or_evo(sourcemap['phi'], sstream.sampfracs) * 2 * np.pi
+            elif 'azimuth' in sourcemap:
+                azi     = const_or_evo(sourcemap['azimuth'], sstream.sampfracs) * 2 * np.pi
             else:
-                phi     = const_or_evo(self.generator.preset['phi'], sstream.sampfracs) * 2 * np.pi
+                azi     = const_or_evo(self.generator.preset['azimuth'], sstream.sampfracs) * 2 * np.pi
             if 'theta' in sourcemap:
-                theta   = const_or_evo(sourcemap['theta'], sstream.sampfracs) * np.pi
+                polar   = const_or_evo(sourcemap['theta'], sstream.sampfracs) * np.pi
+            elif 'polar' in sourcemap:
+                polar   = const_or_evo(sourcemap['polar'], sstream.sampfracs) * np.pi                
             else:
-                theta   = const_or_evo(self.generator.preset['theta'], sstream.sampfracs) * np.pi
+                polar   = const_or_evo(self.generator.preset['polar'], sstream.sampfracs) * np.pi
 
             # compute sample indices for truncating notes overshooting sonification length
             trunc_note = min(playlen, lastsamp-tsamp)
@@ -146,7 +167,7 @@ class Sonification:
 
             # spatialise audio by computing relative volume in each speaker
             for i in range(Nchan):
-                panenv = self.channels.mics[i].antenna(phi,theta)
+                panenv = self.channels.mics[i].antenna(azi,polar)
                 self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
 
     def save_stereo(self, fname, master_volume=1.):
@@ -284,7 +305,7 @@ class Sonification:
         print(f"Saved {fname}")
 
         
-    def notebook_display(self):
+    def notebook_display(self, show_waveform=True):
         """ plot the waveforms and embed player in the notebook
 
         Show waveforms and embed an audio player in the python
@@ -302,16 +323,18 @@ class Sonification:
                 vmax
             ) * 1.05
         
-        for i in range(len(self.out_channels)):
-            plt.plot(time[::20], self.out_channels[str(i)].values[::20]+2*i*vmax, label=self.channels.labels[i])
-
-        plt.xlabel('Time (s)')
-        plt.ylabel('Relative Amplitude')
-        plt.legend(frameon=False, loc=5)
-        plt.xlim(-time[-1]*0.05,time[-1]*1.2)
-        for s in plt.gca().spines.values():
-            s.set_visible(False)
-        plt.gca().get_yaxis().set_visible(False)
+        if show_waveform:
+            for i in range(len(self.out_channels)):
+                plt.plot(time[::20], self.out_channels[str(i)].values[::20]+2*i*vmax, label=self.channels.labels[i])
+            plt.xlabel('Time (s)')
+            plt.ylabel('Relative Amplitude')
+            plt.legend(frameon=False, loc=5)
+            plt.xlim(-time[-1]*0.05,time[-1]*1.2)
+            for s in plt.gca().spines.values():
+                s.set_visible(False)
+                plt.gca().get_yaxis().set_visible(False)
+            plt.show()
+        
 
         if len(self.channels.labels) == 1:
             # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
@@ -319,5 +342,35 @@ class Sonification:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]).T
         else:
             outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]).T
-        plt.show()
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
+        
+    def hear(self):
+        """ Play audio directly to the sound device, for command-line
+            playback.
+        """
+
+        vmax = 0.
+        for c in range(len(self.out_channels)):
+            vmax = max(
+                abs(self.out_channels[str(c)].values.max()),
+                abs(self.out_channels[str(c)].values.min()),
+                vmax
+            ) * 1.05
+        
+        if len(self.channels.labels) == 1:
+            # we have used 48000 Hz everywhere above as standard, but to quickly hear the sonification sped up / slowed down,
+            # you can modify the 'rate' argument below (e.g. multiply by 0.5 for half speed, by 2 for double speed, etc)
+            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['0'].values]) / vmax
+        else:
+            outfmt = np.column_stack([self.out_channels['0'].values, self.out_channels['1'].values]) / vmax
+        dur = int(np.round(outfmt.shape[0]/self.out_channels['0'].samprate))
+        playback_msg = f"Playing Sonification ({dur} s): "
+        print(playback_msg)
+        try:
+            sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
+        except OSError as error: 
+            print(error) 
+            print("The Sonification.hear() function requires the PortAudio C-library. This may be missing from your system or \n"
+                  "unsupported in this context. This should be installed by pip on Windows and OSx automatically with the \n "
+                  "sounddevice library, but on Linux you may need to install manually using e.g.:\n"
+                  "\t 'sudo apt-get install libportaudio2.'\n")

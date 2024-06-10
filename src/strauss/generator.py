@@ -9,6 +9,10 @@ Todo:
       class.
     * Support more Envelope and LFO types in the :obj:`play` methods
       (want pitch, volume and filter options for each)
+    * Check buffer length consistency for spectralizer - do we hit
+      grid points?
+    * Throw appropriate errors when rendering with unreasonable length
+      and freq combinations
 """
 
 from . import stream
@@ -17,11 +21,24 @@ from . import presets
 from . import utilities as utils
 from . import filters
 import numpy as np
+import scipy
+# use FFTW backend in scipy
+#scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
+from scipy.fft import fft, ifft, fftfreq
 import glob
 import copy
-import wavio
+import scipy
+import json
+from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+import warnings
+import logging
+from sf2utils.sf2parse import Sf2File
+
+# ignore wavfile read warning that complains due to WAV file metadata
+warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
+
 
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object
@@ -88,7 +105,7 @@ class Generator:
         if preset != 'default':
             preset = getattr(presets, self.gtype).load_preset(preset)
             self.modify_preset(preset)
-        
+
     def modify_preset(self, parameters, cleargroup=[]):
         """modify parameters within current preset
 
@@ -111,7 +128,7 @@ class Generator:
                 for k in list(self.preset[grp].keys()):
                     if k not in parameters[grp]:
                         del self.preset[grp][k]
-
+            
     def preset_details(self, term="*"):
         """ Print the names and descriptions of presets
 
@@ -384,20 +401,21 @@ class Synthesizer(Generator):
         :obj:`self.generate` method, using the
         :obj:`self.combine_oscs`.
         """
-        oscdict = self.preset['oscillators']
-        self.osclist = []
-        for osc in oscdict.keys():
-            lvl = oscdict[osc]['level']
-            det = oscdict[osc]['detune']
-            phase = oscdict[osc]['phase']
-            form = oscdict[osc]['form']
-            snorm = self.samprate
-            fnorm = (1 + det/100.)
-            if phase == 'random':
-                oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, np.random.random())
-            else:
-                oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
-            self.osclist.append(oscf)
+        # oscdict = self.preset['oscillators']
+        # self.osclist = []
+        # for osc in oscdict.keys():
+        #     lvl = oscdict[osc]['level']
+        #     det = oscdict[osc]['detune']
+        #     phase = oscdict[osc]['phase']
+        #     form = oscdict[osc]['form']
+        #     snorm = self.samprate
+        #     fnorm = (1 + det/100.)
+        #     if phase == 'random':
+        #         oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, np.random.random())
+        #     else:
+        #         oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
+        #     self.osclist.append(oscf)
+        #     flg += 1
         self.generate = self.combine_oscs
 
     def modify_preset(self, parameters, clear_oscs=True):
@@ -430,11 +448,23 @@ class Synthesizer(Generator):
           tot (:obj:`array`-like): values for each sample
         """
         tot = 0.
+        oscdict = self.preset['oscillators']
         if isinstance(f, str):
             # we want a numerical frequency to generate tone
             f = notes.parse_note(f)
-        for osc in self.osclist:
-            tot += osc(s,f)
+        for osc in oscdict:
+            lvl = oscdict[osc]['level']
+            det = oscdict[osc]['detune']
+            phase = oscdict[osc]['phase']
+            form = oscdict[osc]['form']
+            snorm = self.samprate
+            fnorm = (1 + det/100.)
+            if phase == 'random':
+                tot += lvl * getattr(self,form)(s/snorm, f*fnorm, np.random.random())
+            else:
+                tot += lvl * getattr(self,form)(s/snorm, f*fnorm, phase)
+            # self.osclist.append(oscf)
+            # flg += 1
         return tot
 
     def play(self, mapping):
@@ -468,7 +498,7 @@ class Synthesizer(Generator):
         utils.linear_to_nested_dict_reassign(mapping, params)
 
         nlength = (params['note_length']+params['volume_envelope']['R'])*samprate
-
+        
         # generator stream (attribute of stream?)
         sstream = stream.Stream(nlength/samprate, samprate)
         samples = sstream.samples
@@ -538,7 +568,7 @@ class Sampler(Generator):
           :obj:`sampfiles` variable?
     """
 
-    def __init__(self, sampfiles, params=None, samprate=48000):
+    def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None):
         # default sampler preset
         self.gtype = 'sampler'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -550,13 +580,130 @@ class Sampler(Generator):
         if isinstance(sampfiles, dict):
             self.sampdict = sampfiles
         if isinstance(sampfiles, str):
-            wavs = glob.glob(sampfiles+"/*")
-            self.sampdict = {}
-            for w in wavs:
-                note = w.split('/')[-1].split('_')[-1].split('.')[0]
-                self.sampdict[note] = w
+            if sampfiles[-4:] == '.sf2':
+                # if a soundfont (.sf2) file, use read routines
+                with open(sampfiles, 'rb') as sf2_file:
+                    self.sf2 = Sf2File(sf2_file)
+                    # number of presets (excluding EOS entry)
+                    npres = len(self.sf2.raw.pdta['Phdr'][:-1])
+                    if npres == 1:
+                        # if there's only one preset, choose it
+                        sf_preset = 1
+                    if not (isinstance(sf_preset, int) and (sf_preset >= 1) and (sf_preset <= npres)):
+                        # if there's more than one, and no valid number specified, ask for one.
+                        print("valid 'sf_preset' not provided for soundfont file, choose from:")
+                        print('\n'+''.join(['-']*80))
+                        for i in range(npres):
+                            hdr = self.sf2.raw.pdta['Phdr'][i]
+                            name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
+                            print(f"{i+1}. {name}")
+                        print(''.join(['-']*80)+'\n')
+                        # TODO: zero index, but would 1 index be more user friendly?
+                        sf_preset = int(input(f"Choose Preset Number (1-{i+1}): \t"))
+                    # TODO: isolate the warning suppression better?
+                    logger = logging.getLogger()
+                    pres = self.sf2.build_presets()
+                    logger.disabled = True
+                    sf_data = self.get_sfpreset_samples(pres[sf_preset-1])
+                    self.sampdict = self.reconstruct_samples(sf_data)
+                    logger.disabled = False
+                    
+            else:
+                wavs = glob.glob(sampfiles+"/*")
+                self.sampdict = {}
+                for w in wavs:
+                    note = w.split('/')[-1].split('_')[-1].split('.')[0]
+                    self.sampdict[note] = w
         self.load_samples()
 
+    def get_sfpreset_samples(self, sfpreset):
+        minmidi = np.inf
+        maxmidi = -np.inf
+        stdvel = 100
+        sampdat = {}
+        sratedat = {}
+        krangedat = {}
+        mapsamps = {}
+        opitchdat = {}
+
+        # iterate through preset 'bags' containing 
+        # sample sets associated to each note
+        for bag in sfpreset.bags:
+            isvelstd = True
+            inst = bag.instrument
+            vr = bag.velocity_range
+            if vr:
+                isvelstd = (vr[0] <= stdvel) and (vr[1] >= stdvel)
+            # we support a fixed velocity, choose value stdvel
+            # as standard, so only want bags of samples 
+            # associated with that range
+            if not isvelstd:
+                continue
+            if inst:
+                # if bag is not empty, iterate through samples
+                for sbag in inst.bags:
+                # for i in range(len(inst.samples)):
+                    samp = sbag.sample
+                    if not samp:
+                        # if sbag not associated with a sample, skip
+                        continue
+                    # don't support stereo samples, due to spatialisation
+                    # in strauss. Only read in mono or left channel samples.  
+                    if samp.is_left or samp.is_mono:
+                        tune = 0
+                        ftun = 0
+                        if sbag.tuning:
+                            tune += sbag.tuning
+                        if sbag.fine_tuning:
+                            tune += sbag.fine_tuning/100
+                        sample = np.frombuffer(samp.raw_sample_data, dtype='int16')
+                        note = samp.original_pitch
+                        if sbag.base_note:
+                            note = sbag.base_note
+                        name = samp.name
+                        keys = np.array(sbag.key_range)
+                        minmidi = min(minmidi, keys[0])
+                        maxmidi = max(maxmidi, keys[1])
+                        for i in range(keys[0], keys[1]+1):
+                            if i not in mapsamps:
+                                mapsamps[i] = []
+                            mapsamps[i].append(name)
+                        opitchdat[name] = note-tune
+                        sratedat[name] = samp.sample_rate
+                        sampdat[name] = sample
+        return {'samples': sampdat, 'sample_rate': sratedat, 'original_pitch': opitchdat,
+               'min_note': minmidi, 'max_note': maxmidi, 'sample_map': mapsamps}
+
+    def reconstruct_samples(self, sfpre_dict):
+        minkey = sfpre_dict['min_note']
+        maxkey = sfpre_dict['max_note']
+        smap = sfpre_dict['sample_map']
+        sampdict = {}
+        
+        for i in range(max(minkey,16), min(maxkey, 115)+1):
+            wave_stack = []
+            maxlen = 0
+            for nme in smap[i]:
+                # print((i-sfpre_dict['original_pitch'][nme])/12.)
+                semi_shift = pow(2, (i-sfpre_dict['original_pitch'][nme])/12.)
+                srate = sfpre_dict['sample_rate'][nme]
+                samp = sfpre_dict['samples'][nme]
+                vals = utils.resample(semi_shift*srate, self.samprate, samp)
+                maxlen = max(maxlen, vals.size)
+                wave_stack.append(vals)
+            compwave = np.zeros(maxlen, dtype='int16')
+            nwave = len(wave_stack)
+            for wave in wave_stack:
+                compwave[:wave.size] += wave//nwave
+            nte = notes.mkey_to_note(i)
+            sampdict[nte] = compwave # return notes using sharps
+            if nte[1] == '#':
+                # if a sharp, also assign flat...
+                sampdict[nte.replace('#','b')] = compwave
+            # outname = f'../../example_wavs/out_{nte}.wav'
+            # write(outname, samprate, compwave)
+        return sampdict
+            
     def load_samples(self):
         """Load audio samples into the sampler.
 
@@ -568,9 +715,18 @@ class Sampler(Generator):
         self.samples = {}
         self.samplens = {}
         for note in self.sampdict.keys():
-            wavobj = wavio.read(self.sampdict[note])
-            # force to mono
-            wavdat = wavobj.data.mean(axis=1)
+            if isinstance(self.sampdict[note], str):
+                rate_in, wavobj = wavfile.read(self.sampdict[note])
+                # If it doesn't match the required rate, resample and re-write
+                if rate_in != self.samprate:
+                    wavobj = utils.resample(rate_in, self.samprate, wavobj)
+                # force to mono array, else convert values to float
+                if wavobj.ndim > 1:
+                    wavdat = np.mean(wavobj.data, axis=1)
+                else:
+                    wavdat = np.array(wavobj.data, dtype='float64')
+            else:
+                wavdat = self.sampdict[note].astype('float64')
             # remove DC term 
             dc = wavdat.mean()
             wavdat -= dc
@@ -730,6 +886,213 @@ class Sampler(Generator):
             else:
                 # 30 ms buffer (hardcoded for now)
                 sstream.bufferize(0.03)
+            sstream.filt_sweep(getattr(filters, params['filter_type']),
+                               utils.const_or_evo_func(params['cutoff']))
+        return sstream    
+
+class Spectralizer(Generator):
+    """Spectralizer generator class
+    """
+    def __init__(self, params=None, samprate=48000):
+
+        # default synth preset
+        self.gtype = 'spec'
+        self.preset = getattr(presets, self.gtype).load_preset()
+        self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
+
+        self.freqwarn = True
+        
+        # universal initialisation for generator objects:
+        super().__init__(params, samprate)
+
+    def spectrum_to_signal(self, spectrum, phases, new_nlen, mindx, maxdx, interp_type):
+        """ Convert the input spectrum into sound signal
+        """        
+
+        # NOTE: interpolation around a delta function can lead to splitting power between adjacent
+        # frequencies and result in an artificial beating. This can be avoided by choosing values
+        # a length that places the spectrum on the grid exactly
+        
+        if interp_type == "sample":
+            ps = np.interp(np.linspace(0,1,maxdx-mindx), np.linspace(0, 1, spectrum.size), spectrum)
+        elif interp_type == "preserve_power":
+            # we don't renormalise by len(ps) / spectrum.size,
+            # as renormalising to peak later anyway.
+            ps = np.diff(np.interp(np.linspace(0, 1, maxdx-mindx+1),
+                                   np.linspace(0, 1, spectrum.size),
+                                   np.cumsum(spectrum)))
+           
+        empt = np.zeros(new_nlen)
+        empt[mindx:maxdx] = ps
+        ps = empt
+        PS = ps*np.cos(phases) + 1j*ps*np.sin(phases)
+        return np.real(ifft(PS))[:new_nlen]
+        
+    def play(self, mapping):
+        """ Play the sound for a given source.
+
+        Play a given source and return the sample values for
+        combination into the overall sonification.
+
+        Note:
+          :obj:`mapping` is a linear dictionary (not nested, as for 
+          :meth:`strauss.generator.modify_preset`) where group members
+          are indicated using :obj:`'/'` notation
+          (e.g. :obj:`{'volume_envelope/A': 0.5, ...`).
+
+        Args:
+          mapping (:obj:`dict`): keys and items are generator
+            parameter names and their values. This combines all the
+            preset mapped parameters, overwritten by any
+            :obj:`Source`-mapped parameters (represented as values or
+            interpolation functions for static and evolving
+            parameters, respectively). This is a linear dictionary
+            (not nested, see :meth:`strauss.generator.modify_preset`)
+            where group members are indicated using :obj:`'/'`
+            notation (e.g. :obj:`{'volume_envelope/A': 0.5, ...`).
+
+        """
+        samprate = self.samprate
+        audbuff = self.audbuff
+
+        params = copy.deepcopy(self.preset)
+        utils.linear_to_nested_dict_reassign(mapping, params)
+
+        duration = (params['note_length']+params['volume_envelope']['R'])
+        nlength = int(duration*samprate)
+        # generator stream (attribute of stream?)
+        sstream = stream.Stream(nlength/samprate, samprate)
+        samples = sstream.samples
+        sstream.get_sampfracs()
+
+        spectrum = params['spectrum']
+        interp_type = params['interpolation_type']
+        
+        if np.array(spectrum).ndim == 1:
+            # number of discrete frequencies available in ifft between freq. limits 
+            discrete_freqs = duration*(params['max_freq']-params['min_freq'])
+            
+            # how many spectra points fit into the available intermediate frequencies
+            spectra_multiples = (discrete_freqs - 1)/(spectrum.size - 1)
+            
+            # the minimum factor by which to increase the stream length to accomodate spectra in whole number multiples
+            buffer_factor = np.ceil(spectra_multiples)/spectra_multiples
+
+            # number of samples to generate including buffer
+            new_nlen = int(buffer_factor * nlength)
+        
+            # the frequency bound indices which the spectrum will be mapped into
+            mindx = int(params['min_freq'] * duration * buffer_factor)
+            maxdx = int(params['max_freq'] * duration * buffer_factor)
+            
+            # hardcode phase randomisation for now
+            phases = 2*np.pi*np.random.random(new_nlen)
+            
+            # generate stream values
+            sstream.values = self.spectrum_to_signal(spectrum, phases, new_nlen, mindx, maxdx, interp_type)[:nlength]
+        else:
+
+            if 'time_evo' in params:
+                np.diff(params['time_evo'])
+
+            nspec, nwlen  = np.array(spectrum).shape
+                
+            # buffer for each spectrum
+            buffdur = duration / (nspec-1)
+            sstream.bufferize(buffdur)
+
+            # indices of IFFT input spectrum corresponding to the nearest desired frequencies
+            # NOTE: we don't force the spectrum to reproduce desired frequencies to the accuracy of
+            # a few samples in the evolving spectrum case.
+            mindx = np.round(params['min_freq'] * buffdur).astype(int)
+            maxdx = np.round(params['max_freq'] * buffdur).astype(int)
+
+            if ((maxdx - mindx)*10 < nwlen) and self.freqwarn and params['interpolation_type'] == 'sample':
+
+                basewarn = ("\n\n Spectrum strongly undersampled (by more than a factor 10) while using 'sample' \n"
+                            "interpolation type. This could miss spectral features. You could consider: \n"
+                            "\t - Changing interpolation type to 'preserve power' (i.e. generator.modify_preset({'interpolation_type':'preserve_power'})) \n")
+
+                fdiff = params['max_freq']- params['min_freq']
+                newdur = (nwlen/fdiff) *(nspec-1)
+                if newdur < 300: # i.e. 5 minutes
+                    # suggest increasing duration if reasonable 
+                    basewarn += f"\t - Increase the duration of the sonification (e.g. to > {newdur:.0f}) \n"
+                if ((2e4 - 30) * buffdur > nwlen):
+                    newdiff = np.log10(nwlen / buffdur)
+                    flo = pow(10,0.5*(np.log10(30) + np.log10(2e4)) - 0.5*newdiff)
+                    fhi = pow(10,0.5*(np.log10(30) + np.log10(2e4)) + 0.5*newdiff)
+                    basewarn += f"\t - Increase the sound frequency range eg ({np.floor(flo):.0f} to {np.ceil(fhi):.0f} Hz)\n"
+
+                warnings.warn(basewarn
+                    + f"\t - Rebin spectra more coarsely \n")
+                    
+                # only warn once per instance
+                self.freqwarn = False
+            
+            # length of buffer and therefore IFFT in this case
+            new_nlen = sstream.buffers._nsamp_buff
+            
+            # hardcode phase randomisation for now
+            phases = 2*np.pi*np.random.random(new_nlen)
+            
+            # iterate through buffers and spectra
+            nolap = nspec-1
+            buffsize = sstream.buffers._nsamp_buff
+
+            for i in range(nspec):
+                # print(buffsize)
+                buffs = self.spectrum_to_signal(spectrum[i], phases, new_nlen,
+                                                mindx, maxdx, interp_type)
+                # print(sstream.buffers._nsamp_buff, buffs.size)
+                sstream.buffers.buffs_tile[i] = buffs[:sstream.buffers._nsamp_buff]
+                if i == nolap:
+                    continue
+                # print(sstream.buffers.buffs_tile[i][0], sstream.buffers.buffs_tile[i][-1])
+                sstream.buffers.buffs_olap[i][buffsize//2:] = sstream.buffers.buffs_tile[i][:buffsize//2]
+                sstream.buffers.buffs_olap[i][:buffsize//2] = sstream.buffers.buffs_tile[i][buffsize//2:]
+
+                if params['regen_phases']:
+                    # regenerate randomised phases if doing so
+                    phases = 2*np.pi*np.random.random(new_nlen)
+                  
+            sstream.consolidate_buffers()
+            
+
+        sstream.values /= abs(sstream.values).max()
+        
+        # get volume envelope
+        env = self.envelope(sstream.samples, params)
+        if params['volume_lfo']['use']:
+            env *= np.clip(1.-self.lfo(sstream.samples, sstream.sampfracs,
+                                       params, 'volume')*0.5, 0, 1)
+
+        pindex  = np.zeros(samples.size)
+        if callable(params['pitch_shift']):
+            pindex += params['pitch_shift'](sstream.sampfracs)/12.
+        elif params['pitch_shift'] != 0:
+            pindex += params['pitch_shift']/12.
+        if params['pitch_lfo']['use']:
+            pindex += self.lfo(samples, sstream.sampfracs, params, 'pitch')/12.
+        if np.any(pindex):
+            sampfunc = interp1d(samples, sstream.values,
+                                bounds_error=False,
+                                fill_value = (0.,0.),
+                                assume_sorted=True)
+            newsamp = np.cumsum(pow(2., pindex))
+            sstream.values = sampfunc(newsamp)
+
+        # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
+        sstream.values *= utils.const_or_evo(params['volume'], sstream.sampfracs) * env
+
+        # filter stream
+        if params['filter'] == "on":
+            if hasattr(params['cutoff'], "__iter__"):
+                # if static cutoff, use minimum buffer count
+                sstream.bufferize(sstream.length/4)
+        else:
+            # 30 ms buffer (hardcoded for now)
+            sstream.bufferize(0.03)
             sstream.filt_sweep(getattr(filters, params['filter_type']),
                                utils.const_or_evo_func(params['cutoff']))
         return sstream    
