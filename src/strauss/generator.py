@@ -591,15 +591,22 @@ class Sampler(Generator):
                         sf_preset = 1
                     if not (isinstance(sf_preset, int) and (sf_preset >= 1) and (sf_preset <= npres)):
                         # if there's more than one, and no valid number specified, ask for one.
-                        print("valid 'sf_preset' not provided for soundfont file, choose from:")
-                        print('\n'+''.join(['-']*80))
+                        print("valid 'sf_preset' not provided for soundfont file, available presets are:")
+                        print('\n'+''.join(['-']*40))
+                        choose_name = ''
                         for i in range(npres):
                             hdr = self.sf2.raw.pdta['Phdr'][i]
                             name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
                             print(f"{i+1}. {name}")
-                        print(''.join(['-']*80)+'\n')
+                            if not choose_name:
+                                choose_name = name
+                        print(''.join(['-']*40)+'\n')
                         # TODO: zero index, but would 1 index be more user friendly?
-                        sf_preset = int(input(f"Choose Preset Number (1-{i+1}): \t"))
+                        print(f"By default choosing preset 1 ({choose_name}).\n\n"
+                              "Re-run 'Sampler' with the 'sf_preset' keyword argument to select a specific\n"
+                              f"preset, ie. 'Sampler(\"{sampfiles}\",sf_preset=N)',\n"
+                              f"where N is an integer from 1-{i+1}.\n")
+                        sf_preset = 1
                     # TODO: isolate the warning suppression better?
                     logger = logging.getLogger()
                     pres = self.sf2.build_presets()
