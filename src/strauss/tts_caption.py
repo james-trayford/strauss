@@ -15,12 +15,21 @@ class TTSIsNotSupported(Exception):
     pass
 
 def render_caption(caption, samprate, model, caption_path):
-    ''' The render_caption function generates an audio caption from text input
+    '''The render_caption function generates an audio caption from text input
     and writes it as a wav file. If the sample rate of the model is not equal 
     to that passed from sonification.py, it resamples to the correct rate and
     re-writes the file. Text from user input is converted with text-to-speech
     software from Coqui-AI - https://pypi.org/project/TTS/ . You can view 
     publicly available voice models with 'TTS.list_models()'
+
+    Args:
+      caption (:obj:`str`): script to be spoken by the TTS voice
+      samprate (:obj:`int`): samples per second
+      model (:obj:`str`): valid name of TTS voice from the underying TTS
+        module
+      model (:obj:`str`): valid name of TTS voice from the underying TTS
+        module
+      caption_path (:obj:`str`): filepath for spoken caption output
     '''
 
     # TODO: do this better with logging. We can filter TTS function output, e.g. alert to downloading models...

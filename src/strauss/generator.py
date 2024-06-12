@@ -546,19 +546,26 @@ class Sampler(Generator):
     """Sampler generator class
 
     This generator class generates sound using pre-loaded audio
-    samples, representing different notes. The relative
-    frequency, phase and amplitude of these oscillators are defined in
-    the preset, and linearly combined to produce the sound. defines
-    attribute :obj:`self.gtype = 'synth'`.
+    samples, representing d`ifferent notes. Presets define parameters
+    controlling how these defines
+    attribute :obj:`self.gtype = 'sampler'`.
 
     Args:
-        sampfiles ()
+        sampfiles (`required`, :obj:`str`): string pointing to samples
+          to load. This can either point to a directory containing
+          samples, where `"path/to/samples"` contains files named
+          as `samples_A#4.wav` (ie. `<lowest_directory>_<note>.wav`),
+          or a *Soundfont* file, with extension `.sf2`.
     	params (`optional`, :obj:`dict`): any generator parameters
     	  that differ from the generator :obj:`preset`, where keys and
     	  values are parameters names and values respectively. 
     	samprate (`optional`, :obj:`int`): the sample rate of
   	  the generated audio in samples per second (Hz)
-
+        sf_preset (`optional`, :obj:`int`) if using a *Soundfont*
+          (`.sf2`) file, this is the number of the preset to use.
+          All `.sf2` files should contain at least one preset. When
+          given default `None` value, will print available presets
+          and select the first preset. Note presets are 1-indexed.
     Todo:
     	* Add zone mapping for samples (e.g. allow a sample to define
           a range of notes played at different speeds).
@@ -624,6 +631,23 @@ class Sampler(Generator):
         self.load_samples()
 
     def get_sfpreset_samples(self, sfpreset):
+        """Reading samples from a soundfont file along with metadata to
+           scale and tune notes.
+
+        Args:
+          sf_preset (`optional`, :obj:`int`) The number of the *Soundfont*
+            preset to use. All `.sf2` files should contain at least one
+            preset. When given default `None` value, will print available
+            presets and select the first preset. Note presets are
+            1-indexed.
+
+        Returns:
+          sfpre_dict (:obj:`dict`): dictionary of data required to load
+            soundfont samples in to the `Sampler`, including raw `samples`,
+            `sample_rate`, `original_pitch` of the samples, the `min_note`
+            and `max_note` in midi values to use the sample, and the
+           `sample_map`, assigning each sample to a note.
+        """
         minmidi = np.inf
         maxmidi = -np.inf
         stdvel = 100
@@ -682,6 +706,21 @@ class Sampler(Generator):
                'min_note': minmidi, 'max_note': maxmidi, 'sample_map': mapsamps}
 
     def reconstruct_samples(self, sfpre_dict):
+        """Interpolate, combine and resample soundfont samples for each note,
+           and load into the `Sampler`.
+
+           Args:
+             sfpre_dict (:obj:`dict`): dictionary of data required to load
+               soundfont samples in to the `Sampler`, including raw `samples`,
+               `sample_rate`, `original_pitch` of the samples, the `min_note`
+               and `max_note` in midi values to use the sample, and the
+               `sample_map`, assigning each sample to a note.
+        
+           Return:
+             sampdict (:obj:`dict`): output dictionary of mapped notes, with
+               values of arrays of sample values at the samplerate of the
+               `Generator`.
+        """
         minkey = sfpre_dict['min_note']
         maxkey = sfpre_dict['max_note']
         smap = sfpre_dict['sample_map']
