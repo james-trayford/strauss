@@ -11,7 +11,13 @@
 
 Access the [full documentation here](https://strauss.readthedocs.io/) *(under construction!)* and read more about the associated [Audio Universe project here](https://www.audiouniverse.org/).
 
-Make a copy of the *STRAUSS* repository via SSH,
+*STRAUSS* is  [PyPI hosted package](https://pypi.org/project/strauss/) and can be installed directly via `pip`:
+
+`pip install strauss`
+
+For a standard install (without text-to speech support).
+
+If you would like access to all the resources and explore the code directly, make a copy of the *STRAUSS* repository via SSH,
 
 `git clone git@github.com:james-trayford/strauss.git strauss`
 
@@ -19,7 +25,7 @@ or HTTPS if you don't have [SSH keys set up](https://docs.github.com/en/github/a
 
 `git clone https://github.com/james-trayford/strauss.git strauss`
 
-*STRAUSS* may then be installed using pip
+and install *STRAUSS* from your local repository using `pip`
 
 `cd strauss`
 
@@ -40,6 +46,19 @@ before `pip install -e .`
 and activate the environment with
 
 `conda activate strauss`
+
+### Installing with text-to-speech support
+
+*STRAUSS* can also be installed with text-to-speech (TTS) support, allowing audio captioning of sonifications and future accessibility features, via the [TTS module](https://github.com/coqui-ai/TTS). Due to the specific module requirements of this module, install can sometimes lead to incompatibilities with other modules and be slower, so is packaged with *STRAUSS* as an optional extra. If you'd like to use these features, its easy to directly from PyPI:
+
+`pip install strauss[TTS]`
+
+or if you're working from a local copy of the repository, as above, use
+
+`pip install -e ".[TTS]"`
+
+with or without the `-e` option depending on whether you want to edit the *STRAUSS* code or not, as above. 
+
 
 ## Acknowledgments
 *STRAUSS* is developed and provided free and open source, supported by a [UKRI Early Stage Research and Development Award](https://www.ukri.org/opportunity/early-stage-research-and-development-scheme/), grant code ST/X004651/1.
