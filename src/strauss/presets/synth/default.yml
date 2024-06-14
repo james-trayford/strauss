@@ -31,12 +31,12 @@ oscillators:
   osc2:
     form: 'saw'
     level: 0.5
-    detune: -2.
+    detune: 0.75
     phase: 0.3
   osc3:
     form: 'saw'
     level: 0.5
-    detune: 2.
+    detune: 0.75
     phase: 0.6
 
 # Numerical note length in s

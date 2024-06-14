@@ -35,3 +35,9 @@ def chord_notes(chordname, rootoct=3):
     chord = chrd.Chord(chordname)
     notes = chord.components_with_pitch(int(rootoct))
     return notes
+
+def mkey_to_note(val):
+    from strauss.notes import notesharps
+    octv = val // 12 - 1
+    semi = val % 12
+    return f'{notesharps[semi]}{octv}'
