@@ -42,5 +42,5 @@ and activate the environment with
 `conda activate strauss`
 
 ## Acknowledgments
-*STRAUSS* is developed and provided free and open source, supported by a [UKRI Early Stagre Research and Development Award](https://www.ukri.org/opportunity/early-stage-research-and-development-scheme/), grant code ST/X004651/1.
+*STRAUSS* is developed and provided free and open source, supported by a [UKRI Early Stage Research and Development Award](https://www.ukri.org/opportunity/early-stage-research-and-development-scheme/), grant code ST/X004651/1.
 The *STRAUSS* code has also benefited from funding via an [Royal Astronomical Society Eduaction & Outreach grant award](https://ras.ac.uk/awards-and-grants/outreach/education-outreach-small-grants-scheme), providing hardware and software for sound development and spatialisation testing.
