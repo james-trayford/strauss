@@ -155,6 +155,7 @@ class Sonification:
             # for k in self.sources.mapping.keys():
             #     sourcemap[k] = self.soures.mapping[k][source]
             nested_dict_idx_reassign(self.sources.mapping, sourcemap, source)
+
             sourcemap['note'] = note
 
             # run generator to play each note
@@ -431,3 +432,15 @@ class Sonification:
                   "unsupported in this context. This should be installed by pip on Windows and OSx automatically with the \n "
                   "sounddevice library, but on Linux you may need to install manually using e.g.:\n"
                   "\t 'sudo apt-get install libportaudio2.'\n")
+
+    def _make_seamless(self, overlap_dur=0.05):
+        self.loop_channels = {}
+        buffsize = int(overlap_dur*self.samprate)
+        ramp = np.linspace(0,1, buffsize+1)
+        for c in range(len(self.out_channels)):
+            self.loop_channels[str(c)] = Stream(self.out_channels[str(c)].values.size - buffsize,
+                                                self.samprate, ltype='samples')
+            self.loop_channels[str(c)].values = self.out_channels[str(c)].values[:-buffsize]
+            self.loop_channels[str(c)].values[:buffsize] *= ramp[:-1]
+            self.loop_channels[str(c)].values[:buffsize] += ramp[::-1][:-1] * self.out_channels[str(c)].values[-buffsize:]
+            
