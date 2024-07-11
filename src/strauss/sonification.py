@@ -284,7 +284,7 @@ class Sonification:
 
         # combine caption + sonification streams at display time
         for c in range(len(self.out_channels)):
-            tempfname = f"./.TEMP_{c}.wav"
+            tempfname = os.path.join('.', f'.TEMP_{c}.wav')
             self.out_channels[str(c)].values += self.caption_channels[str(c)].values
             wav.write(tempfname, 
                       self.out_channels[str(c)].values,
@@ -303,7 +303,7 @@ class Sonification:
         
         print("Cleaning up...")
         for c in range(len(self.out_channels)):
-            os.remove(f"./.TEMP_{c}.wav")
+            os.remove(os.path.join('.', f'.TEMP_{c}.wav'))
             
         print("Saved.")
 
