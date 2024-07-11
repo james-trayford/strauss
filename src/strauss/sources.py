@@ -24,7 +24,8 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
-from .utilities import rescale_values 
+from .utilities import rescale_values
+#from .animate import animate
 
 mappable = ['polar',
             'azimuth',
@@ -192,7 +193,7 @@ class Source:
                 plims = param_lims[key]
             else:
                 plims = param_lim_dict[key]
-                
+              
             lims = []
             # scale mapped values within limits if specified
             for l in vallims:
@@ -248,6 +249,20 @@ class Source:
                             y[x > xpre] -= ysense
                     self.mapping[key][i] = interp1d(x,y, bounds_error=False,
                                                     fill_value=(y[0],y[-1]))
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            x = np.linspace(vallims[0], vallims[1], 30)
+            y = map_funcs[key](x)
+            ax.plot(x, y)
+            plt.title('Parameter Mapping',
+	              fontweight="bold")
+            ax.legend(loc=0)
+            ax.set_xlabel('data range')
+            ax.set_ylabel(key)
+            ax.set_xlim(vallims[0], vallims[1])
+            ax.set_ylim(plims[0], plims[1])
+            plt.savefig(f"test{key}.png")
+
             
 class Events(Source):
     """ Represent data as time-discrete events.
