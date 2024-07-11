@@ -623,10 +623,15 @@ class Sampler(Generator):
                     logger.disabled = False
                     
             else:
-                wavs = glob.glob(sampfiles+"/*")
+                #wavs = glob.glob(sampfiles+"/*")
+                wavs = glob.glob(os.path.join(sampfiles, "*")
                 self.sampdict = {}
                 for w in wavs:
-                    note = w.split('/')[-1].split('_')[-1].split('.')[0]
+                    #note = w.split('/')[-1].split('_')[-1].split('.')[0]
+                    if '\' in w:
+                        note = w.split('\')[-1].split('_')[-1].split('.')[0]
+                    else:
+                        note = w.split('/')[-1].split('_')[-1].split('.')[0]
                     self.sampdict[note] = w
         self.load_samples()
 
