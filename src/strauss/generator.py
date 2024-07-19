@@ -629,7 +629,8 @@ class Sampler(Generator):
                 self.sampdict = {}
                 for w in wavs:
                     ##note = w.split('/')[-1].split('_')[-1].split('.')[0]
-                    note = pathlib.PurePath(w).name
+                    filename = pathlib.PurePath(w).name
+                    note = filename.split('_')[-1].split('.')[0]
                     self.sampdict[note] = w
         self.load_samples()
 
