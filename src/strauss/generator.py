@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 import warnings
 import logging
 from sf2utils.sf2parse import Sf2File
+import pathlib
 
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
@@ -627,11 +628,8 @@ class Sampler(Generator):
                 wavs = glob.glob(os.path.join(sampfiles, "*")
                 self.sampdict = {}
                 for w in wavs:
-                    #note = w.split('/')[-1].split('_')[-1].split('.')[0]
-                    if '\' in w:
-                        note = w.split('\')[-1].split('_')[-1].split('.')[0]
-                    else:
-                        note = w.split('/')[-1].split('_')[-1].split('.')[0]
+                    ##note = w.split('/')[-1].split('_')[-1].split('.')[0]
+                    note = pathlib.PurePath(w).name
                     self.sampdict[note] = w
         self.load_samples()
 
