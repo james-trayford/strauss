@@ -29,6 +29,7 @@ from IPython.core.display import display
 from scipy.io import wavfile
 import warnings
 import tempfile
+from pathlib import Path
 try:
     import sounddevice as sd
 except (OSError, ModuleNotFoundError) as sderr:
@@ -185,7 +186,7 @@ class Sonification:
         if str(self.caption or '').strip():
             # use a temporary directory to ensure caption file cleanup
             with tempfile.TemporaryDirectory() as cdir:
-                cpath = os.path.join(cdir, 'caption.wav')
+                cpath = Path(cdir, 'caption.wav')
                 render_caption(self.caption, self.samprate,
                                self.ttsmodel, cpath)
                 rate_in, wavobj = wavfile.read(cpath)
@@ -284,7 +285,7 @@ class Sonification:
 
         # combine caption + sonification streams at display time
         for c in range(len(self.out_channels)):
-            tempfname = os.path.join('.', f'.TEMP_{c}.wav')
+            tempfname = Path('.', f'.TEMP_{c}.wav')
             self.out_channels[str(c)].values += self.caption_channels[str(c)].values
             wav.write(tempfname, 
                       self.out_channels[str(c)].values,
@@ -303,7 +304,8 @@ class Sonification:
         
         print("Cleaning up...")
         for c in range(len(self.out_channels)):
-            os.remove(os.path.join('.', f'.TEMP_{c}.wav'))
+            #os.remove(os.path.join('.', f'.TEMP_{c}.wav'))
+            Path('.', f'.TEMP_{c}.wav').unlink()
             
         print("Saved.")
 
