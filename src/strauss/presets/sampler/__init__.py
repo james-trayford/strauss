@@ -1,10 +1,9 @@
-import glob
 import yaml
-import pathlib
+from pathlib import Path
 
 ##thisdir = '/'.join(__file__.split('/')[:-1])
-path = pathlib.PurePath(__file__)
-thisdir = path.parent
+p = Path(__file__)
+thisdir = p.parent
 
 def read_yaml(filename):
     ##with open(filename, 'r') as fdata:
@@ -17,21 +16,21 @@ def read_yaml(filename):
 
 def load_ranges(name="default"):
     ##filename = f"{thisdir}/ranges/default.yml"
-    filename = pathlib.PurePath(f"{thisdir}","ranges","default.yml")
+    filename = Path(f"{thisdir}","ranges", f"{name}.yml")
     return read_yaml(filename)
 
 def load_preset(name="default"):
     ##if '/' in name:
-    if pathlib.PurePath(name).name != pathlib.PurePath(name):
+    if Path(name).name == Path(name):
         # if open user directly
-        filename = pathlib.PurePath(name)
+        filename = Path(f"{name}.yml")
     else:
         # else load built-in preset of that name
-        filename = pathlib.PurePath(f"{thisdir}", f"{name}.yml")
+        filename = Path(f"{thisdir}", f"{name}.yml")
     return read_yaml(filename)
 
 def preset_details(name='*'):
-    pres = glob.glob(pathlib.PurePath(f"{thisdir}", f"*{name.lower()}*.yml"))
+    pres = sorted(Path(f"{thisdir}").glob(f"*{name.lower()}*.yml"))
     for p in pres:
         with p.open(mode='r') as fdata:
             try:
