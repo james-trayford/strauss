@@ -1,12 +1,10 @@
 import yaml
 from pathlib import Path
 
-##thisdir = '/'.join(__file__.split('/')[:-1])
 p = Path(__file__)
 thisdir = p.parent
 
 def read_yaml(filename):
-    ##with open(filename, 'r') as fdata:
     with filename.open(mode='r') as fdata:
         try:
             yamldict = yaml.safe_load(fdata)
@@ -15,12 +13,10 @@ def read_yaml(filename):
     return yamldict
 
 def load_ranges(name="default"):
-    ##filename = f"{thisdir}/ranges/default.yml"
     filename = Path(f"{thisdir}","ranges", f"{name}.yml")
     return read_yaml(filename)
 
 def load_preset(name="default"):
-    ##if '/' in name:
     if Path(name).name == Path(name):
         # if open user directly
         filename = Path(f"{name}.yml")

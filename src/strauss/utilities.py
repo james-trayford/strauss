@@ -57,7 +57,6 @@ def reassign_nested_item_from_keypath(dictionary, keypath, value):
              or (for Windows systems): str, 'a\b\c' corresponds to dict['a']['b']['c'] 
     value: any, value to reassign dictionary value with
     """
-    ##keylist = keypath.split('/')
     p = Path(keypath)
     keylist = list(p.parts)
     get_item = lambda d, kl: reduce(operator.getitem, kl, d)

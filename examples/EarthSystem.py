@@ -16,6 +16,7 @@ from strauss.generator import Synthesizer
 import IPython.display as ipd
 import os
 from scipy.interpolate import interp1d
+from pathlib import Path
 
 
 # **Then, import the land fraction data**
@@ -24,8 +25,7 @@ from scipy.interpolate import interp1d
 
 print("\n Sonifying Earth's rotation, using the land covering fraction with longitude...")
 
-dirname = os.path.dirname(__file__)
-datafile = os.path.join(dirname, '../data/datasets/landfrac.txt')
+datafile = Path("..", "data", "datasets", "landfrac.txt")
 data = np.genfromtxt(datafile)
 
 longitude = data[:,0]
@@ -84,5 +84,5 @@ soni.hear()
 # **Combine and save sonification to a multi-channel wav** 
 # NOTE: Change `"../../FILENAME.wav"` to your filepath of choice
 
-# soni.save_combined("../../earth.wav", True)
+# soni.save_combined(Path("..", "..", "earth.wav"), True)
 

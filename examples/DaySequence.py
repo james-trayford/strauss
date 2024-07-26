@@ -16,28 +16,27 @@ import IPython.display as ipd
 import glob
 import os
 import copy
+from pathlib import Path
 
 
 print("\nSonifying the Sun's motion across the sky...")
 
 # First we download the samples to the local data directory, if they haven't been already:
-dirname = os.path.dirname(__file__)
-outdir = os.path.join(dirname, '../data/samples/day_sequence/')
+outdir = Path("..", "data", "samples", "day_sequence")
 
-if glob.glob(f"{outdir}/*.wav"):
+if Path(f"{outdir}").glob("*.wav"):
     print(f"Directory {outdir} already exists.")
 else:
     print("Downloading files...")
     import urllib.request
     
-    path = os.path.realpath(outdir)
-    os.mkdir(path)
+    Path('..', 'data', 'samples', 'day_sequence').mkdir(parents=True, exist_ok=True)
     
     files = ("sun_A4.wav", "scatter_B4.wav")
     urls = ("https://drive.google.com/uc?export=download&id=15D7xHEKtKppTvzzwECIq_0UGhifdhrEy",
             "https://drive.google.com/uc?export=download&id=1bnhZ_kagtWMUkj1VtEE6vzQGfnYexQfL")
     for f, u in zip(files, urls):
-        with urllib.request.urlopen(u) as response, open(f"{path}/{f}", 'wb') as out_file:
+        with urllib.request.urlopen(u) as response, Path(f"{outdir}", f"{f}").open(mode='wb') as out_file:
             print(f"\t getting {f}")
             data = response.read() # a `bytes` object
             out_file.write(data)
@@ -50,7 +49,7 @@ system = "stereo"
 
 # **Now, set-up the sampler:**
 # set up sampler
-sampler = Sampler(outdir)
+sampler = Sampler(str(outdir))
 sampler.modify_preset({'filter':'on'}) # want filtering on for sun altitude effect
 
 # **Set mapping limits of mapped quantities** (truncated relative to planetarium show example)
@@ -113,4 +112,4 @@ soni2.hear()
 # 
 # NOTE: Change `"../../FILENAME.wav"` to your filepath of choice. By default, the sound file is normalised to that of the highest amplitude sample, but can be set to a lower normalisation by setting the `master_volume` parameter to a value between `0.` and `1.`.
 
-# soni2.save_combined("../../day_sequence.wav", True, master_volume=1.0)
+# soni2.save_combined(Path("..", "..", "day_sequence.wav"), True, master_volume=1.0)

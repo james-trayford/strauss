@@ -17,6 +17,7 @@ import IPython.display as ipd
 import os
 from scipy.interpolate import interp1d
 import numpy as np
+from pathlib import Path
 
 
 # In other examples we use a 'parameter mapping' approach for one-dimensional data series, where we map _y_ as a function of _x_ using the change in some expressive property of sound (e.g. `pitch_shift`) as a function of time.
@@ -30,11 +31,11 @@ import numpy as np
 # In[74]:
 
 
-spectral_data1 = np.genfromtxt('../data/datasets/NGC1535.csv', delimiter=',')
+spectral_data1 = np.genfromtxt(Path('..', 'data', 'datasets', 'NGC1535.csv'), delimiter=',')
 wlen1 = spectral_data1[:,0]
 fluxdens1 = spectral_data1[:,1]
 
-spectral_data2 = np.genfromtxt('../data/datasets/NGC6302.csv', delimiter=',')
+spectral_data2 = np.genfromtxt(Path('..', 'data', 'datasets', 'NGC6302.csv'), delimiter=',')
 wlen2 = spectral_data2[:,0]
 fluxdens2 = spectral_data2[:,1]
 
@@ -141,7 +142,7 @@ plt.close()
 # In[101]:
 
 
-image = plt.imread('../misc/strauss_logo.png')
+image = plt.imread(Path('..', 'misc', 'strauss_logo.png'))
 image = image[:,:,:-1].sum(axis=-1)
 image_inv = 1-image
 plt.imshow(image_inv, cmap='gray_r')
