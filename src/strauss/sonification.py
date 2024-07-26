@@ -304,7 +304,6 @@ class Sonification:
         
         print("Cleaning up...")
         for c in range(len(self.out_channels)):
-            #os.remove(os.path.join('.', f'.TEMP_{c}.wav'))
             Path('.', f'.TEMP_{c}.wav').unlink()
             
         print("Saved.")

@@ -27,9 +27,9 @@ from pathlib import Path
 # 
 # Don't worry too much about this code, you can equally download these files through your browser if you find this more convenient
 
-outdir = "../data/samples/soundfonts/"
+outdir = Path("..", "data", "samples", "soundfonts")
 
-if glob.glob(f"{outdir}/*.sf2"):
+if Path(f"{outdir}").glob("*.sf2"):
     print(f"Directory {outdir} with sf2 files already exists.")
 else:
     print("Downloading files...")
@@ -39,13 +39,12 @@ else:
     path = Path(outdir)
     path.mkdir(parents=True, exist_ok=True)
     path = str(path)
-    # path = os.path.realpath(outdir)
     
     files = ("guitars.sf2", "flute.sf2")
     urls = ("https://drive.google.com/uc?export=download&id=18CCYj8AFy7wpDdGg0ADx8GfTTHEFilrs",
            "https://drive.google.com/uc?export=download&id=1DAbIitPRUUGidrhVt4wiwwXrSxOD7RDY")
     for f, u in zip(files, urls):
-        with urllib.request.urlopen(u) as response, open(f"{path}/{f}", 'wb') as out_file:
+        with urllib.request.urlopen(u) as response, Path(f"{path}",f"{f}").open(mode='wb') as out_file:
             print(f"\t getting {f}")
             data = response.read() # a `bytes` object
             out_file.write(data)
@@ -56,20 +55,20 @@ else:
 # 
 # First the ***flute*** soundfont. Generally soundfonts can store multiple different instruments or sets of sounds as `"presets"`. The flute file has just a single flute instruments, so if we load this file it should pick this preset automatically with no complaints.
 
-flute_sampler = Sampler(outdir+"flute.sf2")
+flute_sampler = Sampler(str(Path(outdir,"flute.sf2")))
 
 
 # On the other hand, the ***guitar*** file has multiple presets. If we try loading this in in the same way, the `_strauss_` sampler will make you pick the preset to use, via its preset number. Enter a number from the list, and press _Enter_ to to select it. 
 
 print("\nAn example of preset selection for the Sampler (note this is overridden in the script with a pre-chosen preset).\n")
-guitar_sampler = Sampler(outdir+"guitars.sf2")
+guitar_sampler = Sampler(str(Path(outdir, "guitars.sf2")))
 
 
 # This interface can be useful to inspect whats inside the soundfont file, but to avoid this, we can pick the preset ahead of time, using the `sf_preset` keyword argument:
 
 
 sf_preset = 19
-guitar_sampler= Sampler(outdir+"guitars.sf2", sf_preset=sf_preset)
+guitar_sampler= Sampler((str(Path(outdir,"flute.sf2"))), sf_preset=sf_preset)
 
 
 # So, lets try using these files to sonify data series. We use light-curve data packaged for the star `55 Cancri`. This provides a noisy data set with interesting long and short term variations, as well as a gap in the data.
@@ -90,7 +89,7 @@ guitar_sampler= Sampler(outdir+"guitars.sf2", sf_preset=sf_preset)
 #generator = guitar_sampler
 generator = copy.copy(flute_sampler)
 
-lightcurve = np.genfromtxt('../data/datasets/55Cancri_lc.dat')
+lightcurve = np.genfromtxt(Path('..', 'data', 'datasets', '55Cancri_lc.dat'))
 x = lightcurve[:,0][:]
 y = lightcurve[:,1][:]
 

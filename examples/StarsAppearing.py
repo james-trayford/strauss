@@ -16,6 +16,7 @@ import numpy as np
 from strauss.generator import Sampler
 import IPython.display as ipd
 import os
+from pathlib import Path
 
 
 # <u> __The Score:__ </u>
@@ -45,8 +46,7 @@ score =  Score(chords, length)
 # - **`maplims`**: entries are `tuple`s representing the (`low`,`high`) limits of each mapping.numerical values represent absolute limits (used here for the angles in degrees to correctly limit the `azimuth` and `polar` mappings to 360° (2π) and 180° (π) respectively. `str` values are taken to be percentiles from 0 to 100. string values > 100 can also be used, where e.g. 104 is 4% larger than the 100th percentile value. This is used for the time here, so that the last sample doesnt trigger at exactly the end of the sonification, giving time for the sound to die away slowly.
 
 
-dirname = os.path.dirname(__file__)
-datafile = os.path.join(dirname, '../data/datasets/stars_paranal.txt')
+datafile = Path("..", "data", "datasets", "stars_paranal.txt")
 mapcols =  {'azimuth':1, 'polar':0, 'volume':2, 'time':2, 'pitch':3}
 
 mapvals =  {'azimuth': lambda x : x,
@@ -70,7 +70,7 @@ events.apply_mapping_functions(mapvals, maplims)
 # 
 # The final element we need is a ***Generator*** that actually generates the audio given the ***Score*** and ***Sources***. Here, we use a ***Sampler***-type generator that plays an audio sample for each note. The samples and other parameters (not specified here) control the sound for each note. These can be specified in `dict` format note-by-note (keys are note name strings, entries are strings pointing to the `WAV` format audio sample to load) or just using a string that points to a sample directory (each sample filename in that directory ends with `_XX.wav` where `XX` is the note name) we use the example sample back in `./data/samples/glockenspiels` <span style="color:gray">_(Note: rendering can take a while with the long audio samples we use here, shorter samples can be used to render faster, such as those in `./data/samples/mallets`. This is also useful if you want to try different notes or chords, as only the 5 notes specified above are provided in the glockenspiel sample folder.)_</span>
 
-sampler = Sampler(os.path.join(dirname, "../data/samples/glockenspiels"))
+sampler = Sampler(str(Path("..", "data", "samples", "glockenspiels")))
 sampler.preset_details("default")
 
 
@@ -94,5 +94,5 @@ soni.render()
 soni.hear()
 
 # Run `soni.save_combined('<directory/to/filename.wav>')` if you want to save the sonification to a file.
-# soni.save_combined('../../rendered_stars_stereo.wav',True)
+# soni.save_combined(Path('..', '..', 'rendered_stars_stereo.wav'),True)
 
