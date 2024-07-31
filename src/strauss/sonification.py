@@ -65,13 +65,13 @@ class Sonification:
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
                  caption=None, samprate=48000,
-                 ttsmodel='tts_models/en/jenny/jenny'):
+                 ttsmodel=Path('tts_models','en','jenny', 'jenny')):
 
         # sampling rate in Hz
         self.samprate = samprate
         
         # tts model name
-        self.ttsmodel = ttsmodel
+        self.ttsmodel = str(ttsmodel)
         
         # caption
         self.caption = caption

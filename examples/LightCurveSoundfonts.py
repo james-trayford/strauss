@@ -29,7 +29,7 @@ from pathlib import Path
 
 outdir = Path("..", "data", "samples", "soundfonts")
 
-if Path(f"{outdir}").glob("*.sf2"):
+if list(Path(f"{outdir}").glob("*.sf2")):
     print(f"Directory {outdir} with sf2 files already exists.")
 else:
     print("Downloading files...")
@@ -55,20 +55,20 @@ else:
 # 
 # First the ***flute*** soundfont. Generally soundfonts can store multiple different instruments or sets of sounds as `"presets"`. The flute file has just a single flute instruments, so if we load this file it should pick this preset automatically with no complaints.
 
-flute_sampler = Sampler(str(Path(outdir,"flute.sf2")))
+flute_sampler = Sampler(Path(outdir,"flute.sf2"))
 
 
 # On the other hand, the ***guitar*** file has multiple presets. If we try loading this in in the same way, the `_strauss_` sampler will make you pick the preset to use, via its preset number. Enter a number from the list, and press _Enter_ to to select it. 
 
 print("\nAn example of preset selection for the Sampler (note this is overridden in the script with a pre-chosen preset).\n")
-guitar_sampler = Sampler(str(Path(outdir, "guitars.sf2")))
+guitar_sampler = Sampler(Path(outdir, "guitars.sf2"))
 
 
 # This interface can be useful to inspect whats inside the soundfont file, but to avoid this, we can pick the preset ahead of time, using the `sf_preset` keyword argument:
 
 
 sf_preset = 19
-guitar_sampler= Sampler((str(Path(outdir,"flute.sf2"))), sf_preset=sf_preset)
+guitar_sampler= Sampler(Path(outdir,"flute.sf2"), sf_preset=sf_preset)
 
 
 # So, lets try using these files to sonify data series. We use light-curve data packaged for the star `55 Cancri`. This provides a noisy data set with interesting long and short term variations, as well as a gap in the data.

@@ -24,7 +24,7 @@ print("\nSonifying the Sun's motion across the sky...")
 # First we download the samples to the local data directory, if they haven't been already:
 outdir = Path("..", "data", "samples", "day_sequence")
 
-if Path(f"{outdir}").glob("*.wav"):
+if list(Path(f"{outdir}").glob("*.wav")):
     print(f"Directory {outdir} already exists.")
 else:
     print("Downloading files...")

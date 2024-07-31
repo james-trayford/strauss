@@ -587,8 +587,11 @@ class Sampler(Generator):
         super().__init__(params, samprate)
         
         if isinstance(sampfiles, dict):
+            # catch case sample dictionary provided directly
             self.sampdict = sampfiles
-        if isinstance(sampfiles, str):
+        else:
+            # re-cast sampfiles as a string
+            sampfiles = str(sampfiles)
             if sampfiles[-4:] == '.sf2':
                 # if a soundfont (.sf2) file, use read routines
                 with open(sampfiles, 'rb') as sf2_file:
