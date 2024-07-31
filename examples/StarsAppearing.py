@@ -70,7 +70,7 @@ events.apply_mapping_functions(mapvals, maplims)
 # 
 # The final element we need is a ***Generator*** that actually generates the audio given the ***Score*** and ***Sources***. Here, we use a ***Sampler***-type generator that plays an audio sample for each note. The samples and other parameters (not specified here) control the sound for each note. These can be specified in `dict` format note-by-note (keys are note name strings, entries are strings pointing to the `WAV` format audio sample to load) or just using a string that points to a sample directory (each sample filename in that directory ends with `_XX.wav` where `XX` is the note name) we use the example sample back in `./data/samples/glockenspiels` <span style="color:gray">_(Note: rendering can take a while with the long audio samples we use here, shorter samples can be used to render faster, such as those in `./data/samples/mallets`. This is also useful if you want to try different notes or chords, as only the 5 notes specified above are provided in the glockenspiel sample folder.)_</span>
 
-sampler = Sampler(str(Path("..", "data", "samples", "glockenspiels")))
+sampler = Sampler(Path("..", "data", "samples", "glockenspiels"))
 sampler.preset_details("default")
 
 

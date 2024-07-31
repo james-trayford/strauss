@@ -41,7 +41,7 @@ data = {'pitch':np.arange(5),
        'theta': np.arange(5)}
 
 
-generator = Sampler(str(Path(sample_path)))
+generator = Sampler(Path(sample_path))
 
 events.fromdict(data)
 events.apply_mapping_functions(map_lims=maplims)
@@ -66,7 +66,7 @@ print("Example of a caption using an alternative voice...")
 
 soni = Sonification(score, events, generator, system,
                     caption=caption_en,
-                   ttsmodel=str(Path('tts_models', 'en', 'ljspeech', 'tacotron2-DDC')))
+                   ttsmodel=Path('tts_models', 'en', 'ljspeech', 'tacotron2-DDC'))
 soni.render()
 soni.hear()
 
@@ -79,7 +79,7 @@ print("Example of a caption in a different language (German), selecting a voice 
 
 soni = Sonification(score, events, generator, system,
                     caption=caption_de, 
-                    ttsmodel=str(Path('tts_models', 'de', 'thorsten', 'vits')))
+                    ttsmodel=Path('tts_models', 'de', 'thorsten', 'vits'))
 soni.render()
 soni.hear()
 
