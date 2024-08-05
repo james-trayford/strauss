@@ -58,13 +58,13 @@ else:
 flute_sampler = Sampler(Path(outdir,"flute.sf2"))
 
 
-# On the other hand, the ***guitar*** file has multiple presets. If we try loading this in in the same way, the `_strauss_` sampler will make you pick the preset to use, via its preset number. Enter a number from the list, and press _Enter_ to to select it. 
+# On the other hand, the ***guitar*** file has multiple presets. If we try loading this in in the same way, the `_strauss_` sampler will default to picking the first preset to use, but will print a list of all of the presets and thier associated numbers. 
 
 print("\nAn example of preset selection for the Sampler (note this is overridden in the script with a pre-chosen preset).\n")
 guitar_sampler = Sampler(Path(outdir, "guitars.sf2"))
 
 
-# This interface can be useful to inspect whats inside the soundfont file, but to avoid this, we can pick the preset ahead of time, using the `sf_preset` keyword argument:
+# This can be useful to inspect whats inside the soundfont file. If we already know which preset we want (by e.g. inspecting this list), we can pick the preset ahead of time, using the `sf_preset` keyword argument:
 
 
 sf_preset = 19
