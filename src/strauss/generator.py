@@ -35,6 +35,8 @@ import matplotlib.pyplot as plt
 import warnings
 import logging
 from sf2utils.sf2parse import Sf2File
+from pathlib import Path
+import os
 
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
@@ -585,8 +587,11 @@ class Sampler(Generator):
         super().__init__(params, samprate)
         
         if isinstance(sampfiles, dict):
+            # catch case sample dictionary provided directly
             self.sampdict = sampfiles
-        if isinstance(sampfiles, str):
+        else:
+            # re-cast sampfiles as a string
+            sampfiles = str(sampfiles)
             if sampfiles[-4:] == '.sf2':
                 # if a soundfont (.sf2) file, use read routines
                 with open(sampfiles, 'rb') as sf2_file:
@@ -623,11 +628,12 @@ class Sampler(Generator):
                     logger.disabled = False
                     
             else:
-                wavs = glob.glob(sampfiles+"/*")
+                wavs = sorted(Path(sampfiles).glob("*"))
                 self.sampdict = {}
                 for w in wavs:
-                    note = w.split('/')[-1].split('_')[-1].split('.')[0]
-                    self.sampdict[note] = w
+                    filename = Path(w).name
+                    note = filename.split('_')[-1].split('.')[0]
+                    self.sampdict[note] = str(w)
         self.load_samples()
 
     def get_sfpreset_samples(self, sfpreset):

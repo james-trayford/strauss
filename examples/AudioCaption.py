@@ -13,12 +13,14 @@ import numpy as np
 from strauss.generator import Sampler
 import os
 import pprint
+from pathlib import Path
 
 # Generate a placeholder sonification (a short sequence of glockenspiel notes) that we may want to add a caption to:
 
 # platform agnostic absolute path for samples...
 import strauss
-sample_path = '/'.join(strauss.__file__.split('/')[:-3] +['data','samples','glockenspiels'])
+strauss_dir = Path(strauss.__file__).parents[2]
+sample_path = Path(strauss_dir, 'data','samples','glockenspiels')
 
 # setup used in stars appearing example
 chords = [['Db3','Gb3', 'Ab3', 'Eb4','F4']]
@@ -39,7 +41,7 @@ data = {'pitch':np.arange(5),
        'theta': np.arange(5)}
 
 
-generator = Sampler(sample_path)
+generator = Sampler(Path(sample_path))
 
 events.fromdict(data)
 events.apply_mapping_functions(map_lims=maplims)
@@ -64,7 +66,7 @@ print("Example of a caption using an alternative voice...")
 
 soni = Sonification(score, events, generator, system,
                     caption=caption_en,
-                   ttsmodel='tts_models/en/ljspeech/tacotron2-DDC')
+                   ttsmodel=Path('tts_models', 'en', 'ljspeech', 'tacotron2-DDC'))
 soni.render()
 soni.hear()
 
@@ -77,7 +79,7 @@ print("Example of a caption in a different language (German), selecting a voice 
 
 soni = Sonification(score, events, generator, system,
                     caption=caption_de, 
-                    ttsmodel="tts_models/de/thorsten/vits")
+                    ttsmodel=Path('tts_models', 'de', 'thorsten', 'vits'))
 soni.render()
 soni.hear()
 

@@ -6,6 +6,7 @@ from contextlib import contextmanager,redirect_stderr,redirect_stdout
 from os import devnull
 from io import StringIO 
 import sys
+from pathlib import Path
 
 class NoSoundDevice:
     """
@@ -53,9 +54,11 @@ def reassign_nested_item_from_keypath(dictionary, keypath, value):
     """
     dictionary: dict, dict object to reassign values of
     keypath: str, 'a/b/c' corresponds to dict['a']['b']['c'] 
+             or (for Windows systems): str, 'a\b\c' corresponds to dict['a']['b']['c'] 
     value: any, value to reassign dictionary value with
     """
-    keylist = keypath.split('/')
+    p = Path(keypath)
+    keylist = list(p.parts)
     get_item = lambda d, kl: reduce(operator.getitem, kl, d)
     get_item(dictionary, keylist[:-1])[keylist[-1]] = value
             
