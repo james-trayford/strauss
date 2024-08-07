@@ -22,8 +22,12 @@ from . import utilities as utils
 from . import filters
 import numpy as np
 import scipy
-# use FFTW backend in scipy
-#scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
+# can we use FFTW backend in scipy?
+try:
+    import pyfftw
+    scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
+except (OSError, ModuleNotFoundError):
+    pass
 from scipy.fft import fft, ifft, fftfreq
 import glob
 import copy
@@ -1028,8 +1032,11 @@ class Spectralizer(Generator):
             spectra_multiples = (discrete_freqs - 1)/(spectrum.size - 1)
             
             # the minimum factor by which to increase the stream length to accomodate spectra in whole number multiples
-            buffer_factor = np.ceil(spectra_multiples)/spectra_multiples
-
+            if params['fit_spec_multiples']:
+                buffer_factor = np.ceil(spectra_multiples)/spectra_multiples
+            else:
+                buffer_factor = 1
+                
             # number of samples to generate including buffer
             new_nlen = int(buffer_factor * nlength)
         
