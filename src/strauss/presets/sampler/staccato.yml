@@ -1,0 +1,19 @@
+# preset name
+name: "staccato"
+
+# full description
+description: >-
+  Forces a short volume envelope on each sample, such that a note is held for 30ms and fades out over 70ms, giving 100ms
+  duration for each note to sound - works well to represent rapidly varying data using an Events source type.
+
+# Numerical note length in s or "sample" for the sample length or "none"
+# to last to the end of the 
+note_length: 0.03
+
+# define the note volume envelope applied to the samples
+# A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
+volume_envelope:
+  A: 0.01
+  D: 0.
+  S: 1.
+  R: 0.07

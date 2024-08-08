@@ -28,10 +28,15 @@ from scipy.fft import fft, ifft, fftfreq
 import glob
 import copy
 import scipy
+import json
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import warnings
+import logging
+from sf2utils.sf2parse import Sf2File
+from pathlib import Path
+import os
 
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
@@ -398,20 +403,21 @@ class Synthesizer(Generator):
         :obj:`self.generate` method, using the
         :obj:`self.combine_oscs`.
         """
-        oscdict = self.preset['oscillators']
-        self.osclist = []
-        for osc in oscdict.keys():
-            lvl = oscdict[osc]['level']
-            det = oscdict[osc]['detune']
-            phase = oscdict[osc]['phase']
-            form = oscdict[osc]['form']
-            snorm = self.samprate
-            fnorm = (1 + det/100.)
-            if phase == 'random':
-                oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, np.random.random())
-            else:
-                oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
-            self.osclist.append(oscf)
+        # oscdict = self.preset['oscillators']
+        # self.osclist = []
+        # for osc in oscdict.keys():
+        #     lvl = oscdict[osc]['level']
+        #     det = oscdict[osc]['detune']
+        #     phase = oscdict[osc]['phase']
+        #     form = oscdict[osc]['form']
+        #     snorm = self.samprate
+        #     fnorm = (1 + det/100.)
+        #     if phase == 'random':
+        #         oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, np.random.random())
+        #     else:
+        #         oscf = lambda samp, f: lvl * getattr(self,form)(samp/snorm, f*fnorm, phase)
+        #     self.osclist.append(oscf)
+        #     flg += 1
         self.generate = self.combine_oscs
 
     def modify_preset(self, parameters, clear_oscs=True):
@@ -444,11 +450,23 @@ class Synthesizer(Generator):
           tot (:obj:`array`-like): values for each sample
         """
         tot = 0.
+        oscdict = self.preset['oscillators']
         if isinstance(f, str):
             # we want a numerical frequency to generate tone
             f = notes.parse_note(f)
-        for osc in self.osclist:
-            tot += osc(s,f)
+        for osc in oscdict:
+            lvl = oscdict[osc]['level']
+            det = oscdict[osc]['detune']
+            phase = oscdict[osc]['phase']
+            form = oscdict[osc]['form']
+            snorm = self.samprate
+            fnorm = (1 + det/100.)
+            if phase == 'random':
+                tot += lvl * getattr(self,form)(s/snorm, f*fnorm, np.random.random())
+            else:
+                tot += lvl * getattr(self,form)(s/snorm, f*fnorm, phase)
+            # self.osclist.append(oscf)
+            # flg += 1
         return tot
 
     def play(self, mapping):
@@ -530,19 +548,26 @@ class Sampler(Generator):
     """Sampler generator class
 
     This generator class generates sound using pre-loaded audio
-    samples, representing different notes. The relative
-    frequency, phase and amplitude of these oscillators are defined in
-    the preset, and linearly combined to produce the sound. defines
-    attribute :obj:`self.gtype = 'synth'`.
+    samples, representing d`ifferent notes. Presets define parameters
+    controlling how these defines
+    attribute :obj:`self.gtype = 'sampler'`.
 
     Args:
-        sampfiles ()
+        sampfiles (`required`, :obj:`str`): string pointing to samples
+          to load. This can either point to a directory containing
+          samples, where `"path/to/samples"` contains files named
+          as `samples_A#4.wav` (ie. `<lowest_directory>_<note>.wav`),
+          or a *Soundfont* file, with extension `.sf2`.
     	params (`optional`, :obj:`dict`): any generator parameters
     	  that differ from the generator :obj:`preset`, where keys and
     	  values are parameters names and values respectively. 
     	samprate (`optional`, :obj:`int`): the sample rate of
   	  the generated audio in samples per second (Hz)
-
+        sf_preset (`optional`, :obj:`int`) if using a *Soundfont*
+          (`.sf2`) file, this is the number of the preset to use.
+          All `.sf2` files should contain at least one preset. When
+          given default `None` value, will print available presets
+          and select the first preset. Note presets are 1-indexed.
     Todo:
     	* Add zone mapping for samples (e.g. allow a sample to define
           a range of notes played at different speeds).
@@ -552,7 +577,7 @@ class Sampler(Generator):
           :obj:`sampfiles` variable?
     """
 
-    def __init__(self, sampfiles, params=None, samprate=48000):
+    def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None):
         # default sampler preset
         self.gtype = 'sampler'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -562,15 +587,175 @@ class Sampler(Generator):
         super().__init__(params, samprate)
         
         if isinstance(sampfiles, dict):
+            # catch case sample dictionary provided directly
             self.sampdict = sampfiles
-        if isinstance(sampfiles, str):
-            wavs = glob.glob(sampfiles+"/*")
-            self.sampdict = {}
-            for w in wavs:
-                note = w.split('/')[-1].split('_')[-1].split('.')[0]
-                self.sampdict[note] = w
+        else:
+            # re-cast sampfiles as a string
+            sampfiles = str(sampfiles)
+            if sampfiles[-4:] == '.sf2':
+                # if a soundfont (.sf2) file, use read routines
+                with open(sampfiles, 'rb') as sf2_file:
+                    self.sf2 = Sf2File(sf2_file)
+                    # number of presets (excluding EOS entry)
+                    npres = len(self.sf2.raw.pdta['Phdr'][:-1])
+                    if npres == 1:
+                        # if there's only one preset, choose it
+                        sf_preset = 1
+                    if not (isinstance(sf_preset, int) and (sf_preset >= 1) and (sf_preset <= npres)):
+                        # if there's more than one, and no valid number specified, ask for one.
+                        print("valid 'sf_preset' not provided for soundfont file, available presets are:")
+                        print('\n'+''.join(['-']*40))
+                        choose_name = ''
+                        for i in range(npres):
+                            hdr = self.sf2.raw.pdta['Phdr'][i]
+                            name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
+                            print(f"{i+1}. {name}")
+                            if not choose_name:
+                                choose_name = name
+                        print(''.join(['-']*40)+'\n')
+                        # TODO: zero index, but would 1 index be more user friendly?
+                        print(f"By default choosing preset 1 ({choose_name}).\n\n"
+                              "Re-run 'Sampler' with the 'sf_preset' keyword argument to select a specific\n"
+                              f"preset, ie. 'Sampler(\"{sampfiles}\",sf_preset=N)',\n"
+                              f"where N is an integer from 1-{i+1}.\n")
+                        sf_preset = 1
+                    # TODO: isolate the warning suppression better?
+                    logger = logging.getLogger()
+                    pres = self.sf2.build_presets()
+                    logger.disabled = True
+                    sf_data = self.get_sfpreset_samples(pres[sf_preset-1])
+                    self.sampdict = self.reconstruct_samples(sf_data)
+                    logger.disabled = False
+                    
+            else:
+                wavs = sorted(Path(sampfiles).glob("*"))
+                self.sampdict = {}
+                for w in wavs:
+                    filename = Path(w).name
+                    note = filename.split('_')[-1].split('.')[0]
+                    self.sampdict[note] = str(w)
         self.load_samples()
 
+    def get_sfpreset_samples(self, sfpreset):
+        """Reading samples from a soundfont file along with metadata to
+           scale and tune notes.
+
+        Args:
+          sf_preset (`optional`, :obj:`int`) The number of the *Soundfont*
+            preset to use. All `.sf2` files should contain at least one
+            preset. When given default `None` value, will print available
+            presets and select the first preset. Note presets are
+            1-indexed.
+
+        Returns:
+          sfpre_dict (:obj:`dict`): dictionary of data required to load
+            soundfont samples in to the `Sampler`, including raw `samples`,
+            `sample_rate`, `original_pitch` of the samples, the `min_note`
+            and `max_note` in midi values to use the sample, and the
+           `sample_map`, assigning each sample to a note.
+        """
+        minmidi = np.inf
+        maxmidi = -np.inf
+        stdvel = 100
+        sampdat = {}
+        sratedat = {}
+        krangedat = {}
+        mapsamps = {}
+        opitchdat = {}
+
+        # iterate through preset 'bags' containing 
+        # sample sets associated to each note
+        for bag in sfpreset.bags:
+            isvelstd = True
+            inst = bag.instrument
+            vr = bag.velocity_range
+            if vr:
+                isvelstd = (vr[0] <= stdvel) and (vr[1] >= stdvel)
+            # we support a fixed velocity, choose value stdvel
+            # as standard, so only want bags of samples 
+            # associated with that range
+            if not isvelstd:
+                continue
+            if inst:
+                # if bag is not empty, iterate through samples
+                for sbag in inst.bags:
+                # for i in range(len(inst.samples)):
+                    samp = sbag.sample
+                    if not samp:
+                        # if sbag not associated with a sample, skip
+                        continue
+                    # don't support stereo samples, due to spatialisation
+                    # in strauss. Only read in mono or left channel samples.  
+                    if samp.is_left or samp.is_mono:
+                        tune = 0
+                        ftun = 0
+                        if sbag.tuning:
+                            tune += sbag.tuning
+                        if sbag.fine_tuning:
+                            tune += sbag.fine_tuning/100
+                        sample = np.frombuffer(samp.raw_sample_data, dtype='int16')
+                        note = samp.original_pitch
+                        if sbag.base_note:
+                            note = sbag.base_note
+                        name = samp.name
+                        keys = np.array(sbag.key_range)
+                        minmidi = min(minmidi, keys[0])
+                        maxmidi = max(maxmidi, keys[1])
+                        for i in range(keys[0], keys[1]+1):
+                            if i not in mapsamps:
+                                mapsamps[i] = []
+                            mapsamps[i].append(name)
+                        opitchdat[name] = note-tune
+                        sratedat[name] = samp.sample_rate
+                        sampdat[name] = sample
+        return {'samples': sampdat, 'sample_rate': sratedat, 'original_pitch': opitchdat,
+               'min_note': minmidi, 'max_note': maxmidi, 'sample_map': mapsamps}
+
+    def reconstruct_samples(self, sfpre_dict):
+        """Interpolate, combine and resample soundfont samples for each note,
+           and load into the `Sampler`.
+
+           Args:
+             sfpre_dict (:obj:`dict`): dictionary of data required to load
+               soundfont samples in to the `Sampler`, including raw `samples`,
+               `sample_rate`, `original_pitch` of the samples, the `min_note`
+               and `max_note` in midi values to use the sample, and the
+               `sample_map`, assigning each sample to a note.
+        
+           Return:
+             sampdict (:obj:`dict`): output dictionary of mapped notes, with
+               values of arrays of sample values at the samplerate of the
+               `Generator`.
+        """
+        minkey = sfpre_dict['min_note']
+        maxkey = sfpre_dict['max_note']
+        smap = sfpre_dict['sample_map']
+        sampdict = {}
+        
+        for i in range(max(minkey,16), min(maxkey, 115)+1):
+            wave_stack = []
+            maxlen = 0
+            for nme in smap[i]:
+                # print((i-sfpre_dict['original_pitch'][nme])/12.)
+                semi_shift = pow(2, (i-sfpre_dict['original_pitch'][nme])/12.)
+                srate = sfpre_dict['sample_rate'][nme]
+                samp = sfpre_dict['samples'][nme]
+                vals = utils.resample(semi_shift*srate, self.samprate, samp)
+                maxlen = max(maxlen, vals.size)
+                wave_stack.append(vals)
+            compwave = np.zeros(maxlen, dtype='int16')
+            nwave = len(wave_stack)
+            for wave in wave_stack:
+                compwave[:wave.size] += wave//nwave
+            nte = notes.mkey_to_note(i)
+            sampdict[nte] = compwave # return notes using sharps
+            if nte[1] == '#':
+                # if a sharp, also assign flat...
+                sampdict[nte.replace('#','b')] = compwave
+            # outname = f'../../example_wavs/out_{nte}.wav'
+            # write(outname, samprate, compwave)
+        return sampdict
+            
     def load_samples(self):
         """Load audio samples into the sampler.
 
@@ -582,15 +767,18 @@ class Sampler(Generator):
         self.samples = {}
         self.samplens = {}
         for note in self.sampdict.keys():
-            rate_in, wavobj = wavfile.read(self.sampdict[note])
-            # If it doesn't match the required rate, resample and re-write
-            if rate_in != self.samprate:
-                wavobj = utils.resample(rate_in, self.samprate, wavobj)
-            # force to mono array, else convert values to float
-            if wavobj.ndim > 1:
-                wavdat = np.mean(wavobj.data, axis=1)
+            if isinstance(self.sampdict[note], str):
+                rate_in, wavobj = wavfile.read(self.sampdict[note])
+                # If it doesn't match the required rate, resample and re-write
+                if rate_in != self.samprate:
+                    wavobj = utils.resample(rate_in, self.samprate, wavobj)
+                # force to mono array, else convert values to float
+                if wavobj.ndim > 1:
+                    wavdat = np.mean(wavobj.data, axis=1)
+                else:
+                    wavdat = np.array(wavobj.data, dtype='float64')
             else:
-                wavdat = np.array(wavobj.data, dtype='float64')
+                wavdat = self.sampdict[note].astype('float64')
             # remove DC term 
             dc = wavdat.mean()
             wavdat -= dc

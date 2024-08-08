@@ -16,6 +16,7 @@ import numpy as np
 from strauss.generator import Sampler
 import IPython.display as ipd
 import os
+from pathlib import Path
 
 
 # **Collate the notes we are using to represent each planet and their orbital periods, as well as the length of each sonification**
@@ -88,8 +89,7 @@ system = "stereo"
 
 
 # set up sampler
-dirname = os.path.dirname(__file__)
-sampler = Sampler(os.path.join(dirname, "../data/samples/solar_system"))
+sampler = Sampler(Path("..", "data", "samples", "solar_system"))
 
 # we want to loop the orchestral samples
 sampler.modify_preset({'looping':'forward', # looping style
@@ -155,7 +155,7 @@ soni.hear()
 # 
 # NOTE: Change `"../../FILENAME.wav"` to your filepath of choice. By default, the sound file is normalised to that of the highest amplitude sample, but can be set to a lower normalisation by setting the `master_volume` parameter to a value between `0.` and `1.`.
 
-# soni.save("../../FILENAME.wav", master_volume=1.0)
+# soni.save(Path("..", "..", "FILENAME.wav"), master_volume=1.0)
 
 
 
