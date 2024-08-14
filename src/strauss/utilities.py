@@ -8,6 +8,8 @@ from io import StringIO
 import sys
 from pathlib import Path
 
+# Some utility classes (these may graduate to somewhere else eventually)
+
 class NoSoundDevice:
     """
     drop-in replacement for sounddevice module if not working,
@@ -17,7 +19,52 @@ class NoSoundDevice:
         self.err = err
     def play(self, audio, rate, blocking=1):
         raise self.err
-        
+
+class Equaliser:
+    def __init__(self):
+
+        self.factor_rms = None
+        parpath = Path(f"{Path(__file__).parent}","data","params.csv")
+        # Read in parameters for ISO 226:2024 standard.
+        pars = np.genfromtxt(parpath, delimiter=',', names=True)
+        self.parfuncs = {}
+        for c in pars.dtype.names:
+            if c == 'freq':
+                continue
+            self.parfuncs[c] = interp1d(np.log10(pars['freq']),
+                                        pars[c],
+                                        fill_value='extrapolate')
+            
+    def get_relative_loudness_norm(self, freq, phon=70.):
+        """
+        Relative normalisation of sound frequencies
+        To compensate for pereceptual loudness, following
+        the ISO 226:2024 standard.
+
+        Args:
+          freq (:obj:`array-like`) audio frequencies in Hz
+          phon (:obj:`float`) listening level for a 1 kHz
+            note 
+
+        Returns:
+          rnorm (:obj:`array-like`) volume normalisation
+            for spectra
+        """
+        lfreq = np.log10(freq)
+        L_U = self.parfuncs['L_U'](lfreq)
+        alpha_f = self.parfuncs['alpha_f'](lfreq)
+        T_f = self.parfuncs['T_f'](lfreq)
+
+        A = pow(4e-10, 0.3 - alpha_f)
+        B = pow(10., (phon)*3e-2) - pow(10, 7.2e-2)
+        C = pow(10., alpha_f * 0.1*(T_f + L_U))
+
+        L_f = 10*np.log10(A*B + C)/alpha_f - L_U
+        norm = pow(10., (L_f - phon)/20)
+        rnorm = norm/norm.max()
+        return rnorm
+
+    
 # a load of utility functions used by STRAUSS
 
 def nested_dict_reassign(fromdict, todict):

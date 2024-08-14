@@ -950,14 +950,14 @@ class Spectralizer(Generator):
     """Spectralizer generator class
     """
     def __init__(self, params=None, samprate=48000):
-
         # default synth preset
         self.gtype = 'spec'
         self.preset = getattr(presets, self.gtype).load_preset()
         self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
 
+        self.eq = utils.Equaliser()
         self.freqwarn = True
-        
+
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
 
@@ -1043,7 +1043,16 @@ class Spectralizer(Generator):
             # the frequency bound indices which the spectrum will be mapped into
             mindx = int(params['min_freq'] * duration * buffer_factor)
             maxdx = int(params['max_freq'] * duration * buffer_factor)
-            
+
+            if params['equal_loudness_normalisation']:
+                freqs =  np.linspace(params['min_freq'], params['max_freq'], len(spectrum))
+                norm = self.eq.get_relative_loudness_norm(freqs)
+                if not self.eq.factor_rms:
+                    self.eq.factor_rms = []
+                rms1 = np.sqrt(np.mean(spectrum**2))
+                spectrum *= norm
+                self.eq.factor_rms.append(np.sqrt(np.mean(spectrum**2))/rms1)
+                
             # hardcode phase randomisation for now
             phases = 2*np.pi*np.random.random(new_nlen)
             
