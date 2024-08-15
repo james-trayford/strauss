@@ -1,3 +1,3 @@
 include src/strauss/presets/*/*.yml
 include src/strauss/presets/*/*/*.yml
-recursive-include src/strauss/data *
+include src/strauss/data/*.csv
