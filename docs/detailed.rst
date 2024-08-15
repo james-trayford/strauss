@@ -30,3 +30,13 @@ Sonification
 ************
    .. automodule:: strauss.sonification
       :members:
+
+Utilities
+*********
+   .. automodule:: strauss.utilities
+      :members:
+
+Text-to-Speech
+**************
+   .. automodule:: strauss.tts_caption
+      :members:
