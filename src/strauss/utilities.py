@@ -21,18 +21,29 @@ class NoSoundDevice:
     Drop-in replacement for sounddevice module if not working,
     so we can still use other functionality.
 
-    Attributes:
-      err (:obj:`Exception`): Error message from trying to import
-        sounddevice
+    Attributes
+    ----------
+    err : Exception
+    	Error message from trying to import sounddevice
+
+    Methods
+    -------
+    play(*args, **kwargs)
+    	Dummy function replacing `sounddevice.play` when `
+    	`sounddevice` is unavailable to raise self.err
     """
     def __init__(self, err):
         self.err = err
     def play(self, *args, **kwargs):
-        """Dummy function replacing `sounddevice.play` when unavailable.
+        """
+        Dummy function replacing `sounddevice.play` when `                                  `sounddevice` is unavailable to raise self.err
 
-        Args:
-          *args: arguments (ignored)
-          **kwargs: keyword-only arguments (ignored)
+        Parameters
+        ----------
+        *args
+          arguments (ignored)
+        **kwargs
+          keyword-only arguments (ignored)
         """
         raise self.err
 
@@ -88,11 +99,13 @@ def nested_dict_reassign(fromdict, todict):
     Recurse through dictionaries and sub-dictionaries in
     `fromdict` and reassign equivalent values in `todict`
 
-    Args
-     fromdict (:obj:`dict`): Dictionary containing values
-      to assign
-     todict (:obj:`dict`): Dictionary containing values
-      to be reassigned
+    Parameters
+    ----------
+    fromdict : dict
+      Dictionary containing values to assign
+    todict : dict
+      Dictionary containing values to be reassigned
+    
     """
     for k, v in fromdict.items():
         if isinstance(v, dict):
@@ -108,11 +121,12 @@ def nested_dict_fill(fromdict, todict):
     `fromdict` and assign to any entries missing from
     `todict` 
     
-    Args:
-     fromdict (:obj:`dict`): Dictionary containing values
-      to assign
-    todict (:obj:`dict`): Dictionary containing values to
-      be reassigned
+    Parameters
+    ----------
+    fromdict : dict
+      Dictionary containing values to assign
+    todict : dict
+      Dictionary containing values to be reassigned
     """
     for k, v in fromdict.items():
         if k not in todict:
@@ -128,13 +142,14 @@ def nested_dict_idx_reassign(fromdict, todict, idx):
     iterables in `fromdict` and index value idx to assign
     or replact value in todict
     
-    Args:
-     fromdict (:obj:`dict`): Dictionary containing values
-      to assign
-     todict (:obj:`dict`): Dictionary containing values
-      to be reassigned
-     idx (:obj:`dict`): Index value for retrieving value
-      from iterables
+    Parameters
+    ----------
+    fromdict : dict
+      Dictionary containing values to assign
+    todict : dict
+      Dictionary containing values to be reassigned
+    idx : int
+      index value for retrieving value from iterables
     """
     for k, v in fromdict.items():
         if isinstance(v, dict):
@@ -149,12 +164,16 @@ def reassign_nested_item_from_keypath(dictionary, keypath, value):
     Reassign item in a nested dictionary to value using keypath syntax,
     to traverse multiple dictionaries
 
-    Args:
-     dictionary (:obj:`dict`): dict object to reassign values within
-     keypath (:obj:`str`): Using filepath syntax on given OS to
-       traverse dictionary, i.e 'a/b/c' ('a\\b\\c') corresponds to
-       dict['a']['b']['c'] on Unix (Windows).
-     value: value to reassign dictionary value with
+    Parameters
+    ----------
+    dictionary : dict
+      dict object to reassign values within
+    keypath : str
+      Using filepath syntax on given OS to traverse dictionary, i.e
+      'a/b/c' ('a\\b\\c') corresponds to dict['a']['b']['c'] on Unix
+      (Windows)
+    value :  
+      value to reassign dictionary value with
     """
     p = Path(keypath)
     keylist = list(p.parts)
@@ -166,10 +185,11 @@ def linear_to_nested_dict_reassign(fromdict, todict):
     Iterate through a linear dictionary to reassign nested values
     using keypaths (d1['a/b/c'] -> d2['a']['b']['c'], d1['a']->d2['a'])
 
-    Args:
-     fromdict (:obj:`dict`):
+    Parameters
+    ----------
+    fromdict : dict
       Dictionary containing values to assign
-     todict (:obj:`dict`):
+    todict : dict
       Dictionary containing values to be reassigned    
     """
     for k, v in fromdict.items():
