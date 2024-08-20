@@ -12,12 +12,33 @@ from pathlib import Path
 
 class NoSoundDevice:
     """
-    drop-in replacement for sounddevice module if not working,
-    so can still use other functionality.
+    Drop-in replacement for sounddevice module if not working,
+    so we can still use other functionality.
+
+    Attributes
+    ----------
+    err : Exception
+    	Error message from trying to import sounddevice
+
+    Methods
+    -------
+    play(*args, **kwargs)
+    	Dummy function replacing `sounddevice.play` when `
+    	`sounddevice` is unavailable to raise self.err
     """
     def __init__(self, err):
         self.err = err
-    def play(self, audio, rate, blocking=1):
+    def play(self, *args, **kwargs):
+        """
+        Dummy function replacing `sounddevice.play` when `                                  `sounddevice` is unavailable to raise self.err
+
+        Parameters
+        ----------
+        *args
+          arguments (ignored)
+        **kwargs
+          keyword-only arguments (ignored)
+        """
         raise self.err
 
 class Equaliser:
@@ -68,7 +89,18 @@ class Equaliser:
 # a load of utility functions used by STRAUSS
 
 def nested_dict_reassign(fromdict, todict):
-    """recurse through dictionaries and sub-dictionaries"""
+    """
+    Recurse through dictionaries and sub-dictionaries in
+    `fromdict` and reassign equivalent values in `todict`
+
+    Parameters
+    ----------
+    fromdict : dict
+      Dictionary containing values to assign
+    todict : dict
+      Dictionary containing values to be reassigned
+
+    """
     for k, v in fromdict.items():
         if isinstance(v, dict):
             # recurse through nested dictionaries
@@ -78,7 +110,18 @@ def nested_dict_reassign(fromdict, todict):
             todict[k] = v
 
 def nested_dict_fill(fromdict, todict):
-    """recurse through dictionaries and sub-dictionaries"""
+    """
+    Recurse through dictionaries and sub-dictionaries in
+    `fromdict` and assign to any entries missing from
+    `todict` 
+    
+    Parameters
+    ----------
+    fromdict : dict
+      Dictionary containing values to assign
+    todict : dict
+      Dictionary containing values to be reassigned
+    """
     for k, v in fromdict.items():
         if k not in todict:
             # assign todict value
@@ -88,7 +131,20 @@ def nested_dict_fill(fromdict, todict):
             nested_dict_fill(todict[k], v)
             
 def nested_dict_idx_reassign(fromdict, todict, idx):
-    """recurse through dictionaries and sub-dictionaries"""
+    """
+    Recurse through dictionaries and sub-dictionaries of
+    iterables in `fromdict` and index value idx to assign
+    or replact value in todict
+    
+    Parameters
+    ----------
+    fromdict : dict
+      Dictionary containing values to assign
+    todict : dict
+      Dictionary containing values to be reassigned
+    idx : int
+      index value for retrieving value from iterables
+    """
     for k, v in fromdict.items():
         if isinstance(v, dict):
             # recurse through nested dictionaries
@@ -99,10 +155,19 @@ def nested_dict_idx_reassign(fromdict, todict, idx):
 
 def reassign_nested_item_from_keypath(dictionary, keypath, value):
     """
-    dictionary: dict, dict object to reassign values of
-    keypath: str, 'a/b/c' corresponds to dict['a']['b']['c'] 
-             or (for Windows systems): str, 'a\b\c' corresponds to dict['a']['b']['c'] 
-    value: any, value to reassign dictionary value with
+    Reassign item in a nested dictionary to value using keypath syntax,
+    to traverse multiple dictionaries
+
+    Parameters
+    ----------
+    dictionary : dict
+      dict object to reassign values within
+    keypath : str
+      Using filepath syntax on given OS to traverse dictionary, i.e
+      'a/b/c' ('a\\b\\c') corresponds to dict['a']['b']['c'] on Unix
+      (Windows)
+    value :  
+      value to reassign dictionary value with
     """
     p = Path(keypath)
     keylist = list(p.parts)
@@ -110,34 +175,80 @@ def reassign_nested_item_from_keypath(dictionary, keypath, value):
     get_item(dictionary, keylist[:-1])[keylist[-1]] = value
             
 def linear_to_nested_dict_reassign(fromdict, todict):
-    """iterate through a linear dictionary to reassign nested values
-    using keypaths (d1['a/b/c'] -> d2['a']['b']['c'], d1['a']->d2['a'])"""
+    """
+    Iterate through a linear dictionary to reassign nested values
+    using keypaths (d1['a/b/c'] -> d2['a']['b']['c'], d1['a']->d2['a'])
+
+    Parameters
+    ----------
+    fromdict : dict
+      Dictionary containing values to assign
+    todict : dict
+      Dictionary containing values to be reassigned    
+    """
     for k, v in fromdict.items():
         reassign_nested_item_from_keypath(todict, k, v)
             
 def const_or_evo_func(x):
-    """if x is callable, return x, else provide a function that returns x"""
+    """
+    If x is callable, return x, else provide a function that just
+    returns x
+
+    Args:
+      x: input value, either a numerical value or a
+      function
+    """
     if callable(x):
         return x
     else:
         return lambda y: y*0 + x
 
 def const_or_evo(x,t):
-    """if x is callable, return x(t), else return x"""
+    """
+    If x is callable, return x(t), else return x
+
+    Args:
+      x: input value, either a numerical value or a
+      function
+      t (numerical): values to evaluate x function
+    """
     if callable(x):
         return x(t)
     else:
         return x
 
 def rescale_values(x, oldlims, newlims):
-    """ rescale x values to range limits such that 0-1 is mapped to limits[0]-limits[1] """
+    """
+    Rescale x values defined by limits oldlims to new limits newlims
+
+    Args:
+      x (array-like): Array of input values
+      oldlims (:obj:`tuple`): tuple representing the original limits
+      of `x` (low, high)
+      newlims (:obj:`tuple`): tuple representing the new limits
+
+    Returns:
+      x_rs (array-like): Rescaled array
+    """
     olo, ohi = oldlims
     nlo, nhi = newlims
     descale = np.clip((x - olo) / (ohi-olo), 0 , 1)
     return (nhi-nlo)*descale + nlo
     
 def resample(rate_in, samprate, wavobj):
-    """ resample audio from original samplerate to required samplerate """
+    """
+    Resample audio from original samplerate to required samplerate
+
+    Args:
+      rate_in (:obj:`int`) sample rate of input wave object
+      samprate (:obj:`int`) desired sample rate for output
+      wavobj (:obj:`tuple`) sample rate, sample array tuple, output
+      by `scipy.io.wavfile` function
+
+    Returns:
+      new_wavobj (:obj:`tuple`) as `wavobj`, with new sample rate
+      and resampled sample values
+    """
     duration = wavobj.shape[0] / rate_in
 
     time_old  = np.linspace(0, duration, wavobj.shape[0])
@@ -150,13 +261,17 @@ def resample(rate_in, samprate, wavobj):
 
 @contextmanager
 def suppress_stdout_stderr():
-    """A context manager that redirects stdout and stderr to devnull"""
+    """
+    A context manager that redirects stdout and stderr to devnull
+    """
     with open(devnull, 'w') as fnull:
         with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
             yield (err, out)
             
 class Capturing(list):
-    """ Context manager for handling stdout (see https://stackoverflow.com/a/16571630) """
+    """
+    Context manager for handling stdout (see https://stackoverflow.com/a/16571630)
+    """
     def __enter__(self):
         self._stdout = sys.stdout
         sys.stdout = self._stringio = StringIO()
