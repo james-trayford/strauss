@@ -1158,9 +1158,9 @@ class Spectralizer(Generator):
             if hasattr(params['cutoff'], "__iter__"):
                 # if static cutoff, use minimum buffer count
                 sstream.bufferize(sstream.length/4)
-        else:
-            # 30 ms buffer (hardcoded for now)
-            sstream.bufferize(0.03)
+            else:
+                # 30 ms buffer (hardcoded for now)
+                sstream.bufferize(0.03)
             sstream.filt_sweep(getattr(filters, params['filter_type']),
                                utils.const_or_evo_func(params['cutoff']))
         return sstream    
