@@ -45,7 +45,6 @@ import os
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
 
-
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object
 #   allowing ADSR volume and filter enveloping, LFO implementation etc.
@@ -53,10 +52,39 @@ warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, sk
 #   musical choices and uses these to generate sound, but can be interfaced with directly.
 
 def forward_loopsamp(s, start, end):
+    """Produce array of sample indices for looping a sample forward.
+
+    Sample indices between values `start` and `end` that will loop the sample
+    such that it loops "forward", i.e. start, start+1, ..., end-1, end, start,
+    ... etc.
+
+    Args:
+      s (:obj:`ndarray`): array of input sample indices
+      start (:obj:`int`): Index of sample after which looping should commence
+      end (:obj:`int`): Index of sample after which audio loops
+
+    Returns:
+      out (:obj:`ndarray`): array of output sample indices
+    """
     delsamp = end-start
     return np.piecewise(s, [s < start, s >= start],
                         [lambda x: x, lambda x: (x-start)%(delsamp) + start])
 def forward_back_loopsamp(s, start, end):
+    """Produce array of sample indices for looping a sample forward-back.
+
+    Sample indices between values `start` and `end` that will loop the sample
+    such that it loops "forward-back", i.e. `start, start+1, ..., end-1, end,
+    end-1, ..., start+1, start, start+1, ...` etc.
+    ... etc.
+
+    Args:
+      s (:obj:`ndarray`): array of input sample indices
+      start (:obj:`int`): Index of sample after which looping should commence
+      end (:obj:`int`): Index of sample after which audio loops
+
+    Returns:
+      out (:obj:`ndarray`): array of output sample indices
+    """
     delsamp = end-start
     return np.piecewise(s, [s < start, s >= start],
                         [lambda x: x, lambda x: end - abs((x-start)%(2*(delsamp)) - (delsamp))])
@@ -66,16 +94,44 @@ class Generator:
 
     Generators have common initialisation and methods that are
     defined by this parent class.
-    
-    Args:
+
+    Attributes:
+      samprate (:obj:`int`): Samples per second of audio stream (Hz)
+      audbuff (:obj:`int`): Samples per audio buffer
+      preset (:obj:`dict`): Dictionary of parameters defining the
+        generator.
+
+    Methods:
+      load_preset(self, preset='default'):
+        Load parameters from a preset YAML file.
+      modify_preset(self, parameters, cleargroup=[])
+        Modify parameters within current preset
+      preset_details(self, term="*"):
+        Print the names and descriptions of presets
+      envelope(self, samp, params, etype='volume')
+        Envelope function for modulating a single note
+      env_segment_curve(self, t, t1, y0, k)
+        Formula for segments of the envelope function
+      sine(self, s,f,p)
+        Sine-wave oscillator
+      saw(self,s,f,p)
+        Square-wave oscillator
+      tri(self,s,f,p)
+        Triangle-wave oscillator
+      noise(self,s,f,p)
+        White noise oscillator
+      lfo(self, samp, sampfrac, params, ltype='pitch')
+        Low-Frequency oscillator (LFO)
+    """
+    def __init__(self, params={}, samprate=48000):
+        """
+        Args:
     	params (`optional`, :obj:`dict`): any generator parameters
     	  that differ from the generator :obj:`preset`, where keys and
     	  values are parameters names and values respectively. 
     	samprate (`optional`, :obj:`int`): the sample rate of
   	  the generated audio in samples per second (Hz)
-    """
-    def __init__(self, params={}, samprate=48000):
-        """universal generator initialisation"""
+        """
         self.samprate = samprate
 
         # samples per buffer (use 30Hz as minimum)
@@ -86,7 +142,7 @@ class Generator:
             self.preset = self.modify_preset(params)
 
     def load_preset(self, preset='default'):
-        """ load parameters from a preset YAML file.
+        """Load parameters from a preset YAML file.
 
         Wrapper method for the :obj:`presets.synth.load_preset` or
         :obj:`presets.sampler.load_preset` functions. Always load the
@@ -113,7 +169,7 @@ class Generator:
             self.modify_preset(preset)
 
     def modify_preset(self, parameters, cleargroup=[]):
-        """modify parameters within current preset
+        """Modify parameters within current preset
 
         method allows user to tweak generator parameters directly,
         using a dictionary of parameters and their values. subgroups
@@ -136,7 +192,7 @@ class Generator:
                         del self.preset[grp][k]
             
     def preset_details(self, term="*"):
-        """ Print the names and descriptions of presets
+        """Print the names and descriptions of presets
 
         Wrapper for preset_details function. lists the name and description
         of built-in presets with names matching the search term.
@@ -148,7 +204,7 @@ class Generator:
         getattr(presets, self.gtype).preset_details(name=term)
 
     def envelope(self, samp, params, etype='volume'):
-        """ Envelope function for modulating a single note
+        """Envelope function for modulating a single note
 
         The envelope function takes the pre-defined envelope
         parameters for the specified envelope type and returns the
@@ -216,7 +272,7 @@ class Generator:
         return lvl*env
 
     def env_segment_curve(self, t, t1, y0, k):
-        """formula for segments of the envelope function
+        """Formula for segments of the envelope function
         
         Function to evaluate the segments of the envelope, allowing
         for curvature, i.e. concave & convex envelope segments.
@@ -281,7 +337,7 @@ class Generator:
           s (:obj:`array`-like): sample index
           f (:obj:`float`): samples per cycle
           p (:obj:`float` or :obj:`str`): if numerical, phase in units
-            of cycles, :obj:`'random'` indicates randomised.
+            of cycles :obj:`'random'` indicates randomised.
         Returns:
           v (:obj:`array`-like): values for each sample
         """
@@ -334,7 +390,6 @@ class Generator:
         env_dict = {}
         lfo_key = f'{ltype}_lfo'
         lfo_params = params[lfo_key]
-
         
         env_dict['note_length'] = params['note_length']
         env_dict['lfo_envelope'] = lfo_params
@@ -372,19 +427,22 @@ class Synthesizer(Generator):
     the preset, and linearly combined to produce the sound. defines
     attribute :obj:`self.gtype = 'synth'`.
 
-    Args:
-    	params (`optional`, :obj:`dict`): any generator parameters
-    	  that differ from the generator :obj:`preset`, where keys and
-    	  values are parameters names and values respectively. 
-    	samprate (`optional`, :obj:`int`): the sample rate of
-  	  the generated audio in samples per second (Hz)
+    Attributes:
+      gtype (:obj:`str`): Generator type
 
     Todo:
     	* Add other synthesiser types, aside from additive (e.g. FM,
     	  vector, wavetable)? 
     """
     def __init__(self, params=None, samprate=48000):
-
+        """
+        Args:
+    	  params (`optional`, :obj:`dict`): any generator parameters
+    	    that differ from the generator :obj:`preset`, where keys
+            and values are parameters names and values respectively. 
+    	  samprate (`optional`, :obj:`int`): the sample rate of
+  	    the generated audio in samples per second (Hz)
+        """
         # default synth preset
         self.gtype = 'synth'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -406,6 +464,10 @@ class Synthesizer(Generator):
         specifying randomisation (:obj:`'random'`). Sets the
         :obj:`self.generate` method, using the
         :obj:`self.combine_oscs`.
+
+        Note:
+          This is deprecated and will likely be removed from future
+          versions
         """
         # oscdict = self.preset['oscillators']
         # self.osclist = []
@@ -427,6 +489,9 @@ class Synthesizer(Generator):
     def modify_preset(self, parameters, clear_oscs=True):
         """Synthesizer-specific wrapper for the modify_preset method.
 
+        This gives control over whether or not to clear the arbitrary
+        number of oscillators for synthesizer.
+        
         Args:
           parameters (:obj:`dict`): keys and items are the preset
             parameter names and new values. Nested dictionaries are
@@ -948,6 +1013,8 @@ class Sampler(Generator):
 
 class Spectralizer(Generator):
     """Spectralizer generator class
+
+    
     """
     def __init__(self, params=None, samprate=48000):
 
