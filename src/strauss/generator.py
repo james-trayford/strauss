@@ -428,7 +428,7 @@ class Synthesizer(Generator):
     attribute :obj:`self.gtype = 'synth'`.
 
     Attributes:
-      gtype (:obj:`str`): Generator type
+      gtype (:obj:`str`): Generator type 
 
     Todo:
     	* Add other synthesiser types, aside from additive (e.g. FM,
@@ -621,22 +621,9 @@ class Sampler(Generator):
     controlling how these defines
     attribute :obj:`self.gtype = 'sampler'`.
 
-    Args:
-        sampfiles (`required`, :obj:`str`): string pointing to samples
-          to load. This can either point to a directory containing
-          samples, where `"path/to/samples"` contains files named
-          as `samples_A#4.wav` (ie. `<lowest_directory>_<note>.wav`),
-          or a *Soundfont* file, with extension `.sf2`.
-    	params (`optional`, :obj:`dict`): any generator parameters
-    	  that differ from the generator :obj:`preset`, where keys and
-    	  values are parameters names and values respectively. 
-    	samprate (`optional`, :obj:`int`): the sample rate of
-  	  the generated audio in samples per second (Hz)
-        sf_preset (`optional`, :obj:`int`) if using a *Soundfont*
-          (`.sf2`) file, this is the number of the preset to use.
-          All `.sf2` files should contain at least one preset. When
-          given default `None` value, will print available presets
-          and select the first preset. Note presets are 1-indexed.
+    Attributes:
+      gtype (:obj:`str`): Generator type 
+    
     Todo:
     	* Add zone mapping for samples (e.g. allow a sample to define
           a range of notes played at different speeds).
@@ -647,6 +634,24 @@ class Sampler(Generator):
     """
 
     def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None):
+        """
+        Args:
+          sampfiles (`required`, :obj:`str`): string pointing to samples
+            to load. This can either point to a directory containing
+            samples, where `"path/to/samples"` contains files named
+            as `samples_A#4.wav` (ie. `<lowest_directory>_<note>.wav`),
+            or a *Soundfont* file, with extension `.sf2`.
+    	  params (`optional`, :obj:`dict`): any generator parameters
+    	    that differ from the generator :obj:`preset`, where keys and
+    	    values are parameters names and values respectively. 
+    	  samprate (`optional`, :obj:`int`): the sample rate of
+  	    the generated audio in samples per second (Hz)
+          sf_preset (`optional`, :obj:`int`) if using a *Soundfont*
+            (`.sf2`) file, this is the number of the preset to use.
+            All `.sf2` files should contain at least one preset. When
+            given default `None` value, will print available presets
+            and select the first preset. Note presets are 1-indexed.
+        """
         # default sampler preset
         self.gtype = 'sampler'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -1014,10 +1019,29 @@ class Sampler(Generator):
 class Spectralizer(Generator):
     """Spectralizer generator class
 
-    
-    """
-    def __init__(self, params=None, samprate=48000):
+    This generator class synthesises sound from a spectrum input
+    using an *inverse Fast Fourier Transform* (iFFT) algorithm.
+    Defining a minimum and maximum frequency in Hz, input spectrum
+    is interpolated between these points such that the output
+    audio signal has the requested length. Phases are randomised
+    to avoid phase correlations.
 
+    Attributes:
+      gtype (:obj:`str`): Generator type 
+
+    Todo:
+    	* Add other synthesiser types, aside from additive (e.g. FM,
+    	  vector, wavetable)? 
+        """
+    def __init__(self, params=None, samprate=48000):
+        """
+        Args:
+    	  params (`optional`, :obj:`dict`): any generator parameters
+    	    that differ from the generator :obj:`preset`, where keys
+            and values are parameters names and values respectively. 
+    	  samprate (`optional`, :obj:`int`): the sample rate of
+  	    the generated audio in samples per second (Hz)
+        """
         # default synth preset
         self.gtype = 'spec'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -1030,6 +1054,25 @@ class Spectralizer(Generator):
 
     def spectrum_to_signal(self, spectrum, phases, new_nlen, mindx, maxdx, interp_type):
         """ Convert the input spectrum into sound signal
+        
+        Performs the inverse fast fourier transform to produce spectral
+        sonification.
+        
+        Args:
+          spectrum (:obj:`ndarray`): Values of the spectrum, ordered
+            from high to low frequency
+          phases (:obj:`ndarray`): Array of values of `[0,2*numpy.pi]`
+            representing the complex number argument
+          new_nlen (:obj:`int`): Number of samples needed to enclose
+            the output signal.
+          mindx (:obj:`int`): Index in total Fourier transform
+            represnting the minimum audio frequency
+          maxdx (:obj:`int`): Index in total Fourier transform
+            represnting the maximum audio frequency
+          interp_type (:obj:`str`): Interpolation approach, either
+            `"sample"` interpolating between samples, or
+            `"preserve_power"` where cumulative power is interpolated
+            and then differentiated to avoid missing power.
         """        
 
         # NOTE: interpolation around a delta function can lead to splitting power between adjacent
@@ -1184,7 +1227,6 @@ class Spectralizer(Generator):
                   
             sstream.consolidate_buffers()
             
-
         sstream.values /= abs(sstream.values).max()
         
         # get volume envelope
