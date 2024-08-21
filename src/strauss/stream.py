@@ -26,8 +26,7 @@ class Stream:
         wrapper to initialise Buffers subclass
       consolidate_buffers()
         wrapper to reassign stream values to consolidated stream
-      filt_sweep(self, ffunc, fmap, qmap=lambda x:x*0 + 0.1,
-                 flo=20, fhi=2.205e4, qlo=0.5, qhi=10)
+      filt_sweep(self, ffunc, fmap, **kwargs)
         Apply time varying filter to buffered stream
       get_sampfracs()
         Get fractional position of the sample in total stream duration
