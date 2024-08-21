@@ -1,4 +1,4 @@
->import numpy as np
+import numpy as np
 import wavio
 import matplotlib.pyplot as plt
 from scipy.signal.windows import hann
