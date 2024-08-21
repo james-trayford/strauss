@@ -64,6 +64,7 @@ Filters
    .. automodule:: strauss.filters
       :members:
       :show-inheritance:
+
 Text-to-Speech
 ==============
    .. automodule:: strauss.tts_caption

@@ -101,13 +101,34 @@ class Generator:
       preset (:obj:`dict`): Dictionary of parameters defining the
         generator.
 
+    Methods:
+      load_preset(self, preset='default'):
+        Load parameters from a preset YAML file.
+      modify_preset(self, parameters, cleargroup=[])
+        Modify parameters within current preset
+      preset_details(self, term="*"):
+        Print the names and descriptions of presets
+      envelope(self, samp, params, etype='volume')
+        Envelope function for modulating a single note
+      env_segment_curve(self, t, t1, y0, k)
+        Formula for segments of the envelope function
+      sine(self, s,f,p)
+        Sine-wave oscillator
+      saw(self,s,f,p)
+        Square-wave oscillator
+      tri(self,s,f,p)
+        Triangle-wave oscillator
+      noise(self,s,f,p)
+        White noise oscillator
+      lfo(self, samp, sampfrac, params, ltype='pitch')
+        Low-Frequency oscillator (LFO)
     """
     def __init__(self, params={}, samprate=48000):
         """
         Args:
     	params (`optional`, :obj:`dict`): any generator parameters
     	  that differ from the generator :obj:`preset`, where keys and
-    	  values are parameter's names and values respectively. 
+    	  values are parameter names and values respectively. 
     	samprate (`optional`, :obj:`int`): the sample rate of
   	  the generated audio in samples per second (Hz)
         """
@@ -407,7 +428,7 @@ class Synthesizer(Generator):
     attribute :obj:`self.gtype = 'synth'`.
 
     Attributes:
-      gtype (:obj:`str`): Generator type 
+      gtype (:obj:`str`): Generator type
 
     Todo:
     	* Add other synthesiser types, aside from additive (e.g. FM,
@@ -1000,7 +1021,11 @@ class Sampler(Generator):
 
 class Spectralizer(Generator):
     """Spectralizer generator class
+    
+    """
+    def __init__(self, params=None, samprate=48000):
 
+    """
     This generator class synthesises sound from a spectrum input
     using an *inverse Fast Fourier Transform* (iFFT) algorithm.
     Defining a minimum and maximum frequency in Hz, input spectrum
@@ -1014,7 +1039,7 @@ class Spectralizer(Generator):
     Todo:
     	* Add other synthesiser types, aside from additive (e.g. FM,
     	  vector, wavetable)? 
-        """
+    """
     def __init__(self, params=None, samprate=48000):
         """
         Args:
