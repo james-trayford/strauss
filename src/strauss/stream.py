@@ -245,6 +245,6 @@ class Buffers:
         padded_stream += self.buffs_tile.flatten()
         flat_olaps    = self.buffs_olap.flatten()
         padded_stream[self._nsamp_halfbuff:-self._nsamp_halfbuff] += flat_olaps
-`
+
         # remove padding on returning reconstructed stream
         return padded_stream[:-self.nsamp_pad]
