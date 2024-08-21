@@ -20,6 +20,7 @@ Generator
 *********
    .. automodule:: strauss.generator
       :members:
+      :show-inheritance:
 	 
 Channels
 ********
@@ -36,6 +37,21 @@ Utilities
    .. automodule:: strauss.utilities
       :members:
 
+Stream
+******
+   .. automodule:: strauss.stream
+      :members:
+
+Notes
+*****
+   .. automodule:: strauss.notes
+      :members:
+      
+Filters
+*******
+   .. automodule:: strauss.filters
+      :members:
+	 
 Text-to-Speech
 **************
    .. automodule:: strauss.tts_caption
