@@ -37,28 +37,29 @@ class Score:
     	D9_3 | Gmaj7_2"` plays each chord for 20s each. Chaining the 
     	same chord can be used to change intervals,
     	(e.g. :obj:`chord_sequence = "F_3 | F_3 | C_4"` plays F for
-    	40s and C for 20s.)
- 
-    Args:
-      chord_sequence: (:obj:`str` or :obj:`list`): The chord or chord
-    	sequence used for the sonification. If a string, parse using
-    	:obj:`parse_chord_sequence`. If a :obj:`list`, each entry is
-    	a :obj:`list` of strings or floats, representing the notes of a
-        chord. notes are represented as strings using scientific
-    	notation, e.g. :obj:`[['C3','E3', 'G3'], ['C3', 'F3', 'A4']]`. If
-    	floats, take values as note frequency in Hz. NOTE: currently
-    	only supported in compination with the :obj:`Synthesiser`
-    	generator class.
-      length: (:obj:`str` or :obj:`float`): the length of the
-    	sonification. If a string, parse minutes and seconds from
-    	format 'Xm Y.Zs'. If a float read as seconds.
-      pitch_binning (optional, :obj:`str`): pitch binning mode - choose
-        from 'adaptive', where sources are binned by the pitch mapping
-        such that each interval is represented the same fraction of the
-        time, and 'uniform' where the pitch binning is based on uniform
-        size bins in the mapped pitch parameter. 
+    	40s and C for 20s.) 
     """
     def __init__(self, chord_sequence, length, pitch_binning='adaptive'):
+        """
+        Args:
+         chord_sequence: (:obj:`str` or :obj:`list`): The chord or chord
+    	  sequence used for the sonification. If a string, parse using
+    	  :obj:`parse_chord_sequence`. If a :obj:`list`, each entry is
+    	  a :obj:`list` of strings or floats, representing the notes of a
+          chord. notes are represented as strings using scientific
+    	  notation, e.g. :obj:`[['C3','E3', 'G3'], ['C3', 'F3', 'A4']]`.
+          If floats, take values as note frequency in Hz. NOTE: currently
+    	  only supported in compination with the :obj:`Synthesiser`
+    	  generator class.
+         length: (:obj:`str` or :obj:`float`): the length of the
+          sonification. If a string, parse minutes and seconds from
+    	  format 'Xm Y.Zs'. If a float read as seconds.
+         pitch_binning (optional, :obj:`str`): pitch binning mode - choose
+          from 'adaptive', where sources are binned by the pitch mapping
+          such that each interval is represented the same fraction of the
+          time, and 'uniform' where the pitch binning is based on uniform
+          size bins in the mapped pitch parameter. 
+        """
         # check types to handle score length correctly
         if isinstance(length, str):
             regex = "([0-9]*)m\s*([0-9]*.[0-9]*)s"
@@ -97,8 +98,8 @@ def parse_chord_sequence(chord_sequence):
 
     Returns:
       note_list (:obj:`list(list)`): the chord sequence represented as
-    	a list of lists, where each sub-list is a chord comprised of
-    	strings representing each note in scentific notation (e.g. 'A4') 
+      a list of lists, where each sub-list is a chord comprised of
+      strings representing each note in scentific notation (e.g. 'A4') 
     """
     chord_list = chord_sequence.split("|")
     note_list = []

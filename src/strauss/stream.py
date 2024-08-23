@@ -1,9 +1,17 @@
+"""  The :obj:`stream` submodule: representing the sound signal
+
+Containing the ``Stream`` class to house the ``Sonificiation`` audio
+signal for each channel in the ``Channels`` object. This can be
+split into uniform segments or `buffers` via the ``Buffers`` object,
+for processing.
+
+To Do:
+  * implement filter Q-parameter mapping
+"""
 import numpy as np
 import wavio
 import matplotlib.pyplot as plt
 from scipy.signal.windows import hann
-# To Do
-# - implement filter Q-parameter mapping
 
 class Stream:
     """
@@ -20,20 +28,6 @@ class Stream:
       samples (:obj:`ndarray`): Indices of each sample
       samptype (:obj:`ndarray`): Time in seconds each sample occurs
       buffers (:obj:`Buffers`): Buffered stream if generated
-    
-    Methods:
-      bufferize(bufflength=0.1)
-        wrapper to initialise Buffers subclass
-      consolidate_buffers()
-        wrapper to reassign stream values to consolidated stream
-      filt_sweep(self, ffunc, fmap, **kwargs)
-        Apply time varying filter to buffered stream
-      get_sampfracs()
-        Get fractional position of the sample in total stream duration
-      save_wav(filename)
-        Save audio stream to wav file, specified by filename
-      reset()
-        Zero audio stream and buffers if present  
     """
     def __init__(self, length, samprate=44100, ltype='seconds'):
         """ 
@@ -175,9 +169,6 @@ class Buffers:
         enclosing the stream (number of buffers x samples per buffer)
       buffs_olap (:obj:`ndarray`) 2d array of overlap buffers,
         allowing for cross fading 
-    Methods:
-      to_stream():
-        Reconstruct stream by cross-fading buffers
     """
     def __init__(self, stream, bufflength=0.1):
         """
