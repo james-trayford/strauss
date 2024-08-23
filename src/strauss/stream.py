@@ -5,7 +5,7 @@ signal for each channel in the ``Channels`` object. This can be
 split into uniform segments or `buffers` via the ``Buffers`` object,
 for processing.
 
-To Do:
+Todo:
   * implement filter Q-parameter mapping
 """
 import numpy as np

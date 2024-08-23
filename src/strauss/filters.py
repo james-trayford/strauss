@@ -4,7 +4,7 @@ These are audio filters that can be applied to the audio signal in
 frequency space to attenuate (filter out) frequencies. These can be
 applied to individual ``Buffers`` as an evolvable parameter.
 
-To do:
+Todo:
   * Support More Filter Types
   * Implement resonance or `'Q'` variation
 """
