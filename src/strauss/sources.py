@@ -15,7 +15,7 @@ Attributes:
    param_lim_dict (:obj:`dict`): Dictionary combining `mappable` (keys) and 
 	`param_limits` (items).
 
-Todo:
+To do:
     * Store mappable, evolvable and parameter ranges in YAML files (cleaner). 
     * Specialised Event and Object child classes (eg. spectralisation).
 """

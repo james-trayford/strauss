@@ -99,7 +99,8 @@ def parse_chord_sequence(chord_sequence):
     Returns:
       note_list (:obj:`list(list)`): the chord sequence represented as
       a list of lists, where each sub-list is a chord comprised of
-      strings representing each note in scientific pitch notation (e.g. 'A4') 
+      strings representing each note in scientific pitch notation
+      (e.g. 'A4') 
     """
     chord_list = chord_sequence.split("|")
     note_list = []

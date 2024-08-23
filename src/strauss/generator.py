@@ -101,27 +101,6 @@ class Generator:
       preset (:obj:`dict`): Dictionary of parameters defining the
         generator.
 
-    Methods:
-      load_preset(self, preset='default'):
-        Load parameters from a preset YAML file.
-      modify_preset(self, parameters, cleargroup=[])
-        Modify parameters within current preset
-      preset_details(self, term="*"):
-        Print the names and descriptions of presets
-      envelope(self, samp, params, etype='volume')
-        Envelope function for modulating a single note
-      env_segment_curve(self, t, t1, y0, k)
-        Formula for segments of the envelope function
-      sine(self, s,f,p)
-        Sine-wave oscillator
-      saw(self,s,f,p)
-        Square-wave oscillator
-      tri(self,s,f,p)
-        Triangle-wave oscillator
-      noise(self,s,f,p)
-        White noise oscillator
-      lfo(self, samp, sampfrac, params, ltype='pitch')
-        Low-Frequency oscillator (LFO)
     """
     def __init__(self, params={}, samprate=48000):
         """
