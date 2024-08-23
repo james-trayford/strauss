@@ -5,11 +5,6 @@ including the :obj:`audio_channels` which defines arrays of microphone
 objects that are channeled to different speakers in the sonification
 output.
 
-Todo:
-  * Allow microphones to have a :obj:`polar` as well as :obj:`azimuth`
-    value, to place them anywhere on a sphere around a listener.
-  * parameterise the :obj:`"soundsphere"` standard setup, for VR
-    applications (in development).
 """
 
 import numpy as np
