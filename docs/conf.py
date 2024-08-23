@@ -40,7 +40,6 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest',
 #'recommonmark',
 #              'sphinx_markdown_tables'
 
-
 print(extensions)
 
 # Add any paths that contain templates here, relative to this directory.
