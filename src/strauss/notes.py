@@ -1,3 +1,19 @@
+"""The :obj:`notes` submodule: translating musical note representations
+
+This submodule contains functions for translating between different
+representations of musical notes or musical chords, and representative
+sound frequencies and MIDI notes.
+
+Attributes:
+  tuneC0 (:obj:`float`): The frequency in Hz of the ``C0`` musical
+    note
+  notecount (:obj:`int`): Semitone offset above C in an octave
+  notesharps (:obj:`list`): Names of musical notes using sharp notation
+  noteflats (:obj:`list`): Names of musical notes using flat notation.
+  semitone_dict (:obj:`dict`): Dictionary of note names to semitone
+    offsets above C.
+"""
+
 import numpy as np
 import pychord as chrd
 import re
@@ -21,7 +37,7 @@ def parse_note(notename):
 
     Args:
       notename (:obj:`str`): scientific pitch name, in format
-      <note><octave>, e.g. 'Ab4', 'E3' or 'F#2'
+        <note><octave>, e.g. 'Ab4', 'E3' or 'F#2'
 
     Returns:
       out (numerical): Frequency of note in Hertz
@@ -38,13 +54,13 @@ def parse_chord(chordname, rootoct=3):
     `pychord` library
 
     Args:
-      chordname (:obj:`str`): Standard chord name, e.g. 'A7'
-      or 'Dm7add9' etc.
+      chordname (:obj:`str`): Standard chord name, e.g. `'A7'`
+        or `'Dm7add9'` etc.
       rootoct (:obj:`int`): Octave number
 
     Returns:
       out (:obj:`ndarray`) array of frequencies constituting
-      chord
+        chord
     """
     chord = chrd.Chord(chordname)
     notes = chord.components_with_pitch(rootoct)
@@ -60,12 +76,12 @@ def chord_notes(chordname, rootoct=3):
     library
 
     Args:
-      chordname (:obj:`str`): Standard chord name, e.g. 'A7'
-      or 'Dm7add9' etc.
+      chordname (:obj:`str`): Standard chord name, e.g. `'A7'`
+        or `'Dm7add9'` etc.
       rootoct (:obj:`int`): Octave number
 
     Returns:
-      out (:obj:`list`) list of note names constituting chord
+      out (:obj:`list`): list of note names constituting chord
     """
     chord = chrd.Chord(chordname)
     notes = chord.components_with_pitch(int(rootoct))
@@ -80,8 +96,8 @@ def mkey_to_note(val):
       val (:obj:`int`): MIDI key value
 
     Returns:
-      out (:obj:`str`) scientific pitch name, in format
-      <note><octave>, e.g. 'E3' or 'F#2'
+      out (:obj:`str`): scientific pitch name, in format
+        `<note><octave>`, e.g. `'E3'` or `'F#2'`
     """
     from strauss.notes import notesharps
     octv = val // 12 - 1

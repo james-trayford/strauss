@@ -43,22 +43,6 @@ class Sonification:
     sonification for saving or playing in the :obj:`jupyter-notebook`
     environment 
 
-    Args:
-      score (:class:`~strauss.score.Score`): Sonification :obj:`Score`
-    	object 
-      sources (:class:`~strauss.sources.Source`): Sonification
-    	:obj:`Sources` child object (:class:`~strauss.sources.Events`
-    	or :class:`~strauss.sources.Objects`)  
-      generator (:class:`~strauss.generator.Generator`): Sonification
-    	:obj:`Generator` child object
-    	(:class:`~strauss.generator.Synthesizer` or
-    	:class:`~strauss.generator.Sampler`)
-      audio_setup (:obj:`str`) The requested audio setup preset to
-    	pass to :class:`~strauss.channels.audio_channels`
-      samprate (:obj:`int`) Integer sample rate in samples per second
-        (Hz), typically :obj:`44100` or :obj:`48000` for most audio
-    	applications
-      ttsmodel (:obj:`str`) The text-to-speech model used for captions. 
 
     Todo:
       * Support custom audio setups here too.
@@ -66,6 +50,25 @@ class Sonification:
     def __init__(self, score, sources, generator, audio_setup='stereo',
                  caption=None, samprate=48000,
                  ttsmodel=Path('tts_models','en','jenny', 'jenny')):
+        """
+        Args:
+         score (:class:`~strauss.score.Score`): Sonification :obj:`Score`
+    	  object 
+         sources (:class:`~strauss.sources.Source`): Sonification
+    	  :obj:`Sources` child object (:class:`~strauss.sources.Events`
+    	  or :class:`~strauss.sources.Objects`)  
+         generator (:class:`~strauss.generator.Generator`): Sonification
+    	  :obj:`Generator` child object
+    	  (:class:`~strauss.generator.Synthesizer` or
+    	  :class:`~strauss.generator.Sampler`)
+         audio_setup (:obj:`str`) The requested audio setup preset to
+    	  pass to :class:`~strauss.channels.audio_channels`
+         samprate (:obj:`int`) Integer sample rate in samples per second
+          (Hz), typically :obj:`44100` or :obj:`48000` for most audio
+    	  applications
+         ttsmodel (:obj:`str` or :obj:`PosixPath`) file path to the
+          text-to-speech model used for captions. 
+        """
 
         # sampling rate in Hz
         self.samprate = samprate
@@ -112,8 +115,8 @@ class Sonification:
 
         Args:
           downsamp (optional, :obj:`int`): Optionally downsample
-          sources for multi-source sonifications for a quicker test
-          render by some integer factor.
+           sources for multi-source sonifications for a quicker test
+           render by some integer factor.
         """
 
         # first determine if time is provided, if not assume all start at zero
@@ -265,10 +268,6 @@ class Sonification:
             output to screen 
           master_volume (:obj:`float`) Amplitude of the largest volume
             peak, from 0-1
-
-        Todo:
-          * Either find a way to avoid the need to unscramble channle
-        	order, or find alternative to save wav files
         """
         # setup list to house wav stream data 
         inputs = [None]*len(self.out_channels)
@@ -310,7 +309,7 @@ class Sonification:
         print("Saved.")
 
     def save(self, fname, master_volume=1.):
-        """ Save render as a combined multi-channel wav file 
+        """ Save render as a combined multi-channel wav file.
         
         Can use this function to save sonification of any audio_setup
         to a 32-bit depth WAV using `scipy.io.wavfile`
@@ -396,8 +395,14 @@ class Sonification:
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
         
     def hear(self):
-        """ Play audio directly to the sound device, for command-line
-            playback.
+        """ Play audio directly to the sound device, for command-line playback.
+
+        If available, use the ``sounddevice`` module to stream the sonification to
+        the sound device directly (speakers, headphones, etc.) via the underlying
+        ``PortAudio`` C-library. if unavaialable, raise error.
+
+        Todo:
+          * Add more options to control the streamed audio
         """
 
         channels = []
@@ -434,6 +439,14 @@ class Sonification:
                   "\t 'sudo apt-get install libportaudio2.'\n")
 
     def _make_seamless(self, overlap_dur=0.05):
+        """ Make a seamlessly looping audio signal.
+
+        Audio signal is made seamless by cross-fading end of signal back into start
+        over a duration (in seconds) defined by ``overlap_dur``
+
+        Args:
+          overlap_dur (:obj:`float`): cross-fade duration in seconds.        
+        """
         self.loop_channels = {}
         buffsize = int(overlap_dur*self.samprate)
         ramp = np.linspace(0,1, buffsize+1)

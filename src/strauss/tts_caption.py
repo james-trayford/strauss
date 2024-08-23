@@ -1,3 +1,10 @@
+"""The :obj:`tts_caption` submodule: tool for generating spoken captions
+
+This uses text-to-speech via the the ``TTS`` module to allow captions
+represented as strings to be converted to spoken audio to precede the
+sonification.
+"""
+
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import numpy as np

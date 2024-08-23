@@ -101,27 +101,6 @@ class Generator:
       preset (:obj:`dict`): Dictionary of parameters defining the
         generator.
 
-    Methods:
-      load_preset(self, preset='default'):
-        Load parameters from a preset YAML file.
-      modify_preset(self, parameters, cleargroup=[])
-        Modify parameters within current preset
-      preset_details(self, term="*"):
-        Print the names and descriptions of presets
-      envelope(self, samp, params, etype='volume')
-        Envelope function for modulating a single note
-      env_segment_curve(self, t, t1, y0, k)
-        Formula for segments of the envelope function
-      sine(self, s,f,p)
-        Sine-wave oscillator
-      saw(self,s,f,p)
-        Square-wave oscillator
-      tri(self,s,f,p)
-        Triangle-wave oscillator
-      noise(self,s,f,p)
-        White noise oscillator
-      lfo(self, samp, sampfrac, params, ltype='pitch')
-        Low-Frequency oscillator (LFO)
     """
     def __init__(self, params={}, samprate=48000):
         """
@@ -711,8 +690,11 @@ class Sampler(Generator):
         self.load_samples()
 
     def get_sfpreset_samples(self, sfpreset):
-        """Reading samples from a soundfont file along with metadata to
-           scale and tune notes.
+        """Reading samples from a soundfont file along with metadata.
+
+        Read in the audio samples from a ``.sf2`` file to populate
+        available notes, mapping the MIDI key values to musical notes,
+        scaling and tuning samples as appropriate.
 
         Args:
           sf_preset (`optional`, :obj:`int`) The number of the *Soundfont*
@@ -723,10 +705,10 @@ class Sampler(Generator):
 
         Returns:
           sfpre_dict (:obj:`dict`): dictionary of data required to load
-            soundfont samples in to the `Sampler`, including raw `samples`,
-            `sample_rate`, `original_pitch` of the samples, the `min_note`
-            and `max_note` in midi values to use the sample, and the
-           `sample_map`, assigning each sample to a note.
+          soundfont samples in to the `Sampler`, including raw `samples`,
+          `sample_rate`, `original_pitch` of the samples, the `min_note`
+          and `max_note` in midi values to use the sample, and the
+          `sample_map`, assigning each sample to a note.
         """
         minmidi = np.inf
         maxmidi = -np.inf
@@ -798,8 +780,8 @@ class Sampler(Generator):
         
            Return:
              sampdict (:obj:`dict`): output dictionary of mapped notes, with
-               values of arrays of sample values at the samplerate of the
-               `Generator`.
+             values of arrays of sample values at the samplerate of the
+             `Generator`.
         """
         minkey = sfpre_dict['min_note']
         maxkey = sfpre_dict['max_note']
@@ -879,7 +861,7 @@ class Sampler(Generator):
 
         Returns:
           s_new (:obj:`array`-like): new sample indices to create a
-            forward-looping effect
+          forward-looping effect
         """
         delsamp = end-start
         return np.piecewise(s, [s < start, s >= start],
@@ -899,7 +881,7 @@ class Sampler(Generator):
 
         Returns:
           s_new (:obj:`array`-like): new sample indices to create a
-            back and forth looping effect
+          back and forth looping effect
         
         """
         delsamp = end-start
@@ -1074,10 +1056,6 @@ class Spectralizer(Generator):
             `"preserve_power"` where cumulative power is interpolated
             and then differentiated to avoid missing power.
         """        
-
-        # NOTE: interpolation around a delta function can lead to splitting power between adjacent
-        # frequencies and result in an artificial beating. This can be avoided by choosing values
-        # a length that places the spectrum on the grid exactly
         
         if interp_type == "sample":
             ps = np.interp(np.linspace(0,1,maxdx-mindx), np.linspace(0, 1, spectrum.size), spectrum)
@@ -1116,7 +1094,6 @@ class Spectralizer(Generator):
             (not nested, see :meth:`strauss.generator.modify_preset`)
             where group members are indicated using :obj:`'/'`
             notation (e.g. :obj:`{'volume_envelope/A': 0.5, ...`).
-
         """
         samprate = self.samprate
         audbuff = self.audbuff
