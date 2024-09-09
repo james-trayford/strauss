@@ -14,4 +14,15 @@ oscillators:
     detune: 0.
     phase: 'random'
 
-  
+_meta:
+  name: preset name
+  description: full description
+  oscillators: >-
+    Oscillator information
+  oscillators:
+    osc1:
+      form: waveform, choose from ['saw', 'square', 'sine', 'tri', 'noise']
+      level: intrinsic volume
+      detune: change in tuning as a percentage of the input frequency
+      phase: phase
+ 

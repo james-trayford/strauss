@@ -20,4 +20,21 @@ pitch_hi: 36
 pitch_lo: 0
 pitch_shift: 0.
 
-  
+_meta:
+  name: preset name
+  description: full description
+  oscillators: >-
+    Oscillator information.
+  oscillators:
+    osc1:
+      form: waveform, choose from ['saw', 'square', 'sine', 'tri', 'noise']
+      level: intrinsic volume
+      detune: change in tuning as a percentage of the input frequency
+      phase: phase
+  pitch_hi: >-
+    pitch range maximum in semitones
+  pitch_lo: >-
+    pitch range minimum in semitones
+  pitch_shift: >-   
+    default shift in semitones
+

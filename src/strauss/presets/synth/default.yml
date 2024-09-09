@@ -109,3 +109,94 @@ pitch_hi: 0.1
 pitch_lo: 0
 pitch_shift: 0.
 
+_meta:
+  name: preset name
+  description: full description
+  oscillators: >-
+    Oscillator information. Oscillator are denoted osc<n> with n=3 by default.
+  oscillators:
+    osc1:
+      form: waveform, choose from ['saw', 'square', 'sine', 'tri', 'noise']
+      level: intrinsic volume
+      detune: change in tuning as a percentage of the input frequency
+      phase: phase
+    osc2:
+      form: waveform, choose from ['saw', 'square', 'sine', 'tri', 'noise']
+      level: intrinsic volume
+      detune: change in tuning as a percentage of the input frequency
+      phase: phase
+    osc3:
+      form: waveform, choose from ['saw', 'square', 'sine', 'tri', 'noise']
+      level: intrinsic volume
+      detune: change in tuning as a percentage of the input frequency
+      phase: phase
+
+  note_length: >-
+    Numerical note length in s
+  volume_envelope: >-
+    Define the note volume envelope applied to the samples.
+    A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'.
+  volume_envelope:
+    A: Attack
+    D: Decay
+    S: Sustain
+    R: Release
+    Ac: ""
+    Dc: ""
+    Rc: ""
+    level: ""
+  filter: >-
+    Do we apply a filter?
+  filter_type: >-
+    filter type
+  cutoff: >-
+    filter cutoff
+  pitch_lfo: >-
+    or apply 'vibrato'?
+  pitch_lfo:
+    use: switch feature on or off
+    wave: type of waveform
+    amount: amount
+    freq: frequency
+    freq_shift: frequency shift
+    phase: random
+    A: Attack
+    D: Decay
+    S: Sustain
+    R: Release
+    Ac: ""
+    Dc: ""
+    Rc: ""
+    level: ""
+  volume_lfo: >-
+    or apply 'tremolo'?
+  volume_lfo:
+    use: switch feature on or off
+    wave: type of waveform
+    amount: amount
+    freq: frequency
+    freq_shift: frequency shift
+    phase: random
+    A: Attack
+    D: Decay
+    S: Sustain
+    R: Release
+    Ac: ""
+    Dc: ""
+    Rc: ""
+    level: ""
+  volume: >-
+    Master Volume
+  pitch: >-
+    Default pitch selection
+  azimuth: >-
+    azimuth coordinate for center panning
+  polar: >-
+    polar coordinate for center panning
+  pitch_hi: >-
+    pitch range maximum in semitones
+  pitch_lo: >-
+    pitch range minimum in semitones
+  pitch_shift: >-   
+    default shift in semitones
+

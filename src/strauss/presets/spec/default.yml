@@ -100,3 +100,85 @@ pitch_hi: 0.1
 pitch_lo: 0
 pitch_shift: 0.
 
+_meta:
+  name: preset name
+  description: full description
+  note_length: >-
+    Numerical note length in s
+  volume_envelope: >-
+    Define the note volume envelope applied to the samples.
+    A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'.
+  volume_envelope:
+    A: Attack
+    D: Decay
+    S: Sustain
+    R: Release
+    Ac: ""
+    Dc: ""
+    Rc: ""
+    level: ""
+  filter: >-
+    Do we apply a filter?
+  filter_type: >-
+    filter type
+  cutoff: >-
+    filter cutoff
+  pitch_lfo: >-
+    or apply 'vibrato'?
+  pitch_lfo:
+    use: switch feature on or off
+    wave: type of waveform
+    amount: amount
+    freq: frequency
+    freq_shift: frequency shift
+    phase: random
+    A: Attack
+    D: Decay
+    S: Sustain
+    R: Release
+    Ac: ""
+    Dc: ""
+    Rc: ""
+    level: ""
+  volume_lfo: >-
+    or apply 'tremolo'?
+  volume_lfo:
+    use: switch feature on or off
+    wave: type of waveform
+    amount: amount
+    freq: frequency
+    freq_shift: frequency shift
+    phase: random
+    A: Attack
+    D: Decay
+    S: Sustain
+    R: Release
+    Ac: ""
+    Dc: ""
+    Rc: ""
+    level: ""
+  volume: >-
+    Master Volume
+  interpolation_type: >-
+    How to interpolate and resample in the spectrum. "sample": interpolate spectrum values directly; "preserve_power": integrate, interpolate then differentiate to avoid missing power in narrow features.
+  regen_phases: >-
+    For an evolving spectrum, do we regenerate phases for each buffer, or keep the same? These have differing effects.
+  fit_spec_multiples: >-
+    Whether or not to generate IFFT such that the spectrum sample points are hit exactly.
+  min_freq: >-
+    Minimum frequency in Hz
+  max_freq: >-
+    Maximum frequency in Hz
+  pitch: >-
+    Default pitch selection
+  azimuth: >-
+    azimuth coordinate for center panning
+  polar: >-
+    polar coordinate for center panning
+  pitch_hi: >-
+    pitch range maximum in semitones
+  pitch_lo: >-
+    pitch range minimum in semitones
+  pitch_shift: >-   
+    default shift in semitones
+
