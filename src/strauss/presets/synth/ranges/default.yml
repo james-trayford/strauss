@@ -45,3 +45,42 @@ polar_unit: 'unitless'
 # pitch range and default shift in semitones
 pitch_shift: [0., 36.]
 pitch_shift_unit: 'semitones'
+
+_meta:
+  note_length: >-
+    Numerical note length 
+  note_length_units: >-
+    Units for numerical note length, e.g. seconds
+  volume_envelope: >-
+    define the note volume envelope applied to the samples
+    A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
+  volume_envelope:
+    A: Attack
+    D: Decay
+    S: Sustain
+    R: Release
+    Ac: ""
+    Dc: ""
+    Rc: ""
+    level: ""
+    A_unit: units for Attack
+    D_unit: units for Decay
+    S_unit: units for Sustain
+    R_unit: units for Release
+    Ac_unit: units for Ac
+    Dc_unit: units for Dc
+    Rc_unit: units for Rc
+    level_unit: units for level
+  cutoff: filter cutoff
+  cutoff_unit: units for filter cutoff
+  volume: Master volume
+  volume_unit: Units for master volume
+  pitch: Default pitch selection
+  pitch_unit: Units for Default pitch selection
+  azimuth: azimuth coordinate for center panning
+  azimuth_unit: units for azimuth coordinate for center panning
+  polar: polar coordinate for center panning
+  polar_unit: units for polar coordinate for center panning
+  pitch_shift: default shift in semitones
+  pitch_shift_unit: units for default shift in semitones
+
