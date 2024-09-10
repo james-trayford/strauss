@@ -20,6 +20,7 @@ The code aims to make rich and evocative sonification straightforward, with a nu
    start
    elements
    detailed
+   presets
    examples
    todo
   
