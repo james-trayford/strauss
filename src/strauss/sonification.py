@@ -16,7 +16,7 @@ Todo:
 from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
-from .tts_caption import render_caption
+from .tts_caption import render_caption, get_ttsMode
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -51,8 +51,7 @@ class Sonification:
       * Support custom audio setups here too.
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
-                 caption=None, samprate=48000,
-                 ttsmodel=Path('tts_models','en','jenny', 'jenny')):
+                 caption=None, samprate=48000, ttsmodel=None):
         """
         Args:
          score (:class:`~strauss.score.Score`): Sonification :obj:`Score`
@@ -77,7 +76,7 @@ class Sonification:
         self.samprate = samprate
         
         # tts model name
-        self.ttsmodel = str(ttsmodel)
+        self.ttsmodel = ttsmodel
         
         # caption
         self.caption = caption
@@ -191,11 +190,25 @@ class Sonification:
 
         # produce mono audio of caption, if one is provided
         if str(self.caption or '').strip():
+            ttsMode = get_ttsMode() # determine if using coqui-ai or pyttsx3
+
             # use a temporary directory to ensure caption file cleanup
             with tempfile.TemporaryDirectory() as cdir:
                 cpath = Path(cdir, 'caption.wav')
-                render_caption(self.caption, self.samprate,
-                               self.ttsmodel, cpath)
+                if ttsMode == 'coqui-ai':
+                    if self.ttsmodel == None:
+                        self.ttsmodel = Path('tts_models','en','jenny', 'jenny')
+                    else:
+                        pass
+                    render_caption(self.caption, self.samprate,
+                               str(self.ttsmodel), cpath)
+                else:
+                    if self.ttsmodel == None:
+                        self.ttsmodel = {}
+                    else:
+                        pass
+                    render_caption(self.caption, self.samprate,
+                               self.ttsmodel, str(cpath))
                 rate_in, wavobj = wavfile.read(cpath)
                 wavobj = np.array(wavobj)
             # Set up the Stream objects for TTS
