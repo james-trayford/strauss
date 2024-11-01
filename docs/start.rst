@@ -1,12 +1,12 @@
 Getting Started
 ^^^^^^^^^^^^^^^
 
-This walkthrough will take you through a clean install of the code, including optional dependencies and trying your first sonification
+This walkthrough will take you through a clean install of the code, including optional dependencies and trying your first sonification.
 
 Installation
 ************
 
-the Strauss code can be downloaded from **GitHub** at `the repository url <https://github.com/james-trayford/strauss.git>`_
+The Strauss code can be downloaded from **GitHub** at `the repository url <https://github.com/james-trayford/strauss.git>`_.
 
 Using :code:`git` make a copy of the STRAUSS repository via SSH,
 
@@ -40,9 +40,9 @@ where the :code:`-e` option allows a local install, such that you can modify and
 Example jupyter notebooks
 *************************
 
-There are a number of example applications of Strauss in the :code:`example` subdirectory of the :code:`strauss` repo. These are in Python Notebook (:code:`.ipynb`) format for an interactive, step-by-step .
+There are a number of example applications of Strauss in the :code:`example` subdirectory of the :code:`strauss` repo. These are in Python Notebook (:code:`.ipynb`) format for an interactive, step-by-step. They are also provided in Python script format (:code:`.py`).
 
-In order to run the exampes, first ensure that :code:`jupyter` is installed on your system. These were developed in :code:`jupyter-lab`, which can also be installed using pip, as.
+In order to run the Notebook examples, first ensure that :code:`jupyter` is installed on your system. These were developed in :code:`jupyter-lab`, which can also be installed using pip, as
 
 .. code-block:: bash
   
@@ -53,10 +53,10 @@ Then, running :code:`jupyter-lab` in the :code:`strauss` should initiate the :co
 Running some examples
 *********************
 
-From the :code:`jupyter-lab` interface, a good starting point is the :code:`SonifyingData1D.ipynb` notebook. demonstrating various method of representing a single 1D dataset sonically, using a single :code:`Object`-type source representation. The code and instruction cells provide a step-by-step gude to setting up, rendering and saving a sonification with Strauss.
+From the :code:`jupyter-lab` interface, a good starting point is the :code:`SonifyingData1D.ipynb` Notebook. This demonstrates various methods of representing a single 1D dataset sonically, using a single :code:`Object`-type source representation. The code and instruction cells provide a step-by-step gude to setting up, rendering and saving a sonification with Strauss.
 
-For a multivariate :code:`Event`-type sonification, the :code:`StarsAppearing.ipynb` notebook provides a step-by-step example, and demonstrates realistic stereo imaging for panoramic data. The output from this example was used in the `*Audible Universe* 2021 planetarium show <www.audibletour.net>`_.
+For a multivariate :code:`Event`-type sonification, the :code:`StarsAppearing.ipynb` notebook provides a step-by-step example, and demonstrates realistic stereo imaging for panoramic data. The output from this example was used in the `"Audio Universe: Tour of the Solar System" 2021 planetarium show <https://www.audiouniverse.org/education/shows/tour-of-the-solar-system>`_.
 
-For a multivariate, multi-source example using an :code:`Object`-type source representation, see ...
+For a multivariate, multi-source example using an :code:`Object`-type source representation, see the :code:`PlanetaryOrbits.ipynb` Notebook, the output of which was also used in the "Audio Universe: Tour of the Solar System" planetarium show.
 
-In addition to the above-mentioned examples, there are a number of other notebooks, each representing the diverse applications and uses of the Strauss code to sonify data in different ways. A more detailed overview of the example notebooks can be found in  :ref:`examples`.
+In addition to the above-mentioned examples, there are a number of other Notebooks, each representing the diverse applications and uses of the Strauss code to sonify data in different ways. A more detailed overview of the example Notebooks and scripts can be found in  :ref:`examples`.
