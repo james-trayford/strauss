@@ -46,14 +46,14 @@ class Score:
     	  sequence used for the sonification. If a string, parse using
     	  :obj:`parse_chord_sequence`. If a :obj:`list`, each entry is
     	  a :obj:`list` of strings or floats, representing the notes of a
-          chord. notes are represented as strings using scientific
+          chord. notes are represented as strings using scientific pitch
     	  notation, e.g. :obj:`[['C3','E3', 'G3'], ['C3', 'F3', 'A4']]`.
           If floats, take values as note frequency in Hz. NOTE: currently
-    	  only supported in compination with the :obj:`Synthesiser`
+    	  only supported in combination with the :obj:`Synthesiser`
     	  generator class.
          length: (:obj:`str` or :obj:`float`): the length of the
           sonification. If a string, parse minutes and seconds from
-    	  format 'Xm Y.Zs'. If a float read as seconds.
+    	  format 'Xm Y.Zs'. If a float, read as seconds.
          pitch_binning (optional, :obj:`str`): pitch binning mode - choose
           from 'adaptive', where sources are binned by the pitch mapping
           such that each interval is represented the same fraction of the
@@ -99,7 +99,7 @@ def parse_chord_sequence(chord_sequence):
     Returns:
       note_list (:obj:`list(list)`): the chord sequence represented as
       a list of lists, where each sub-list is a chord comprised of
-      strings representing each note in scentific notation (e.g. 'A4') 
+      strings representing each note in scientific pitch notation (e.g. 'A4') 
     """
     chord_list = chord_sequence.split("|")
     note_list = []
