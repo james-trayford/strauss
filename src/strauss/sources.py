@@ -149,7 +149,7 @@ class Source:
         function (x' = x by default), descaling by the x' upper and
         lower limits and rescaling to the sonification parameter
         limits. These values are stored for non-evolving parameters,
-        while for evolving properties are converted to interpolation
+        while for evolving properties they are converted to interpolation
         functions. 
 
         Args:
