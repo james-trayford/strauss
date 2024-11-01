@@ -1,4 +1,4 @@
-"""STRAUSS (Sonification Tools and Resources for Astronomer Using Sound Synthesis)
+"""STRAUSS (Sonification Tools and Resources for Analysis Using Sound Synthesis)
 
 This module provides a toolkit for *sonification*, i.e. the representation of data using sound."""
 
