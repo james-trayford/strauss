@@ -26,7 +26,7 @@ class mic:
       mic_type (:obj:`str`): Type of microphone, choose from
     	:obj:`"directional"` (collects using a cardioid antenna pattern),
     	:obj:`"omni"` (collects sound from all directions equally) and
-    	:obj:`"mute"` (collects no sound useful for e.g. muting
+    	:obj:`"mute"` (collects no sound, useful for e.g. muting
     	auxillary channels)
       label (:obj:`str`): A label for the mic
       channel (:obj:`int`) The index of the channel, corresponding to
@@ -60,11 +60,11 @@ class audio_channels:
     
     Args:
       setup (:obj:`str`): Type of audio setup. Supported options are
-        :obj:`"mono"`, :obj:`"stereo"`, :obj:`"5p1"` and
-        :obj:`"7p1"`, or :obj:`"custom"`. 
+        :obj:`"mono"`, :obj:`"stereo"`, :obj:`"5.1"` and
+        :obj:`"7.1"`, or :obj:`"custom"`. 
       custom_setup (:obj:`dict`): Dictionary defining a customised
     	audio setup, containing keys for :obj:`"azimuths"`, :obj:`"types"`
-    	and :obj:`"labels"`, containing lists parametrising the first
+    	and :obj:`"labels"`, containing lists parameterising the first
     	three arguments of the :class:`mic` object, respectively
     	in the order of their channel index. Also optionally an forder
     	list to unscramble any channel order scrambling done by ffmpeg
