@@ -1,7 +1,7 @@
 """ The :obj:`generator` submodule: creating sounds for the sonification.
 
 This submodule handles the actual generation of sound for the
-sonfication, after parametrisation by the :obj:`Sources` and musical
+sonification, after parameterisation by the :obj:`Sources` and musical
 choices dictated by the :obj:`Score`.
 
 Todo:
@@ -107,7 +107,7 @@ class Generator:
         Args:
     	params (`optional`, :obj:`dict`): any generator parameters
     	  that differ from the generator :obj:`preset`, where keys and
-    	  values are parameters names and values respectively. 
+    	  values are parameter's names and values respectively. 
     	samprate (`optional`, :obj:`int`): the sample rate of
   	  the generated audio in samples per second (Hz)
         """
@@ -130,7 +130,7 @@ class Generator:
         :obj:`preset`
 
         Args:
-          preset (:obj:`str`): name of the preset. built-in presets
+          preset (:obj:`str`): name of the preset. Built-in presets
             can be named directly and looks to import the preset from
             the :obj:`<MODULE_PATH>/presets/<GENERATOR>/` directory as
             :obj:`<preset>.yml`, where :obj:`<GENERATOR>` is either
@@ -350,7 +350,7 @@ class Generator:
         cycles or :obj:`'random'` to indicate randomised.
 
         Note:
-          To modulate the frequency of an ocillator, use the
+          To modulate the frequency of an oscillator, use the
           :obj:`freq_shift` parameter, rather than :obj:`freq`
 
         Args:
@@ -436,7 +436,7 @@ class Synthesizer(Generator):
     def setup_oscillators(self):
         """Setup and consolidate oscs into a two-variable function.
 
-        Reads the parametrisation of each oscillator from the preset,
+        Reads the parameterisation of each oscillator from the preset,
         specifying their waveform (:obj:`wave`), relative amplitude
         (:obj:`level`), detuning in cents (:obj:`det`) and
         :obj:`phase`, either a number in units of cycles, or a string
@@ -492,7 +492,7 @@ class Synthesizer(Generator):
         Args:
           s (:obj:`array`-like): Sample index
           f (:obj:`float` or :obj:`str`): If numerical, frequency in
-            cycles per second, if string, note name in scientific
+            cycles per second, if string, note name in scientific pitch
             notation (e.g. :obj:`'A4'`)
         Returns:
           tot (:obj:`array`-like): values for each sample
@@ -596,8 +596,8 @@ class Sampler(Generator):
     """Sampler generator class
 
     This generator class generates sound using pre-loaded audio
-    samples, representing d`ifferent notes. Presets define parameters
-    controlling how these defines
+    samples, representing different notes. Presets define parameters
+    controlling these defines
     attribute :obj:`self.gtype = 'sampler'`.
 
     Attributes:
@@ -817,7 +817,7 @@ class Sampler(Generator):
 
         Read audio samples in from a specified directory or via a
         dictionary of filepaths, generate interpolation functions for
-        each, and assign them to a named note in scientific notation
+        each, and assign them to a named note in scientific pitch notation
         (e.g. :obj:`'A4'`).
         """
         self.samples = {}
