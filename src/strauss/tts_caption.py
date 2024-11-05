@@ -13,10 +13,15 @@ import re
 import ffmpeg as ff
 import os
 import warnings
+class NoTTSAPI(Exception):
+    # except when no API key is found for coqui-TTS module
+    pass
 try:
     from TTS.api import TTS
     ttsMode = 'coqui-TTS'
-except (OSError, ModuleNotFoundError) as sderr:
+    if not os.environ.get("COQUI_STUDIO_TOKEN"):
+        raise NoTTSAPI
+except (OSError, ModuleNotFoundError, NoTTSAPI) as sderr:
     try:
       import pyttsx3
       ttsMode = 'pyttsx3'
@@ -36,7 +41,7 @@ except (OSError, ModuleNotFoundError) as sderr:
                 "Reinstalling strauss with 'pip install strauss[TTS]' will give you access to this function\n"
                 "If you run into issues with the TTS package, you can also install pyttsx3 with the command\n" 
                 "'pip install pyttsx3'.")
-    
+
 class TTSIsNotSupported(Exception):
     pass
 
