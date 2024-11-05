@@ -12,12 +12,11 @@ import strauss.utilities as utils
 import re
 import ffmpeg as ff
 import os
-
+import warnings
 try:
     from TTS.api import TTS
     ttsMode = 'coqui-TTS'
 except (OSError, ModuleNotFoundError) as sderr:
-    # print('Coqui TTS not found. Trying to import pyttsx3...')
     try:
       import pyttsx3
       ttsMode = 'pyttsx3'
@@ -25,8 +24,9 @@ except (OSError, ModuleNotFoundError) as sderr:
           def __init__(*args, **kwargs):
               pass
           def list_models(self):
-              getVoices(True)
-      # print('pyttsx3 has been successfully imported.')
+              return getVoices(True)
+      warnings.warn("Default TTS module coqui not found, using pyttsx3 instead. Note this is platform \n"
+                    "dependent and still problematic for linux-based systems (using the espeak engine)")
     except (OSError, ModuleNotFoundError) as sderr:
       ttsMode = 'None'
       # print('No supported text-to-speech packages have been found.')
@@ -91,8 +91,9 @@ def render_caption(caption, samprate, model, caption_path):
       samprate (:obj:`int`): samples per second
       model (:obj:`str` for Coqui-AI; :obj:`dict` for pyttsx3): for Coqui-AI: 
         valid name of TTS voice from the underlying TTS module; for pyttsx3:
-        dictionary with keys of 'rate' (percent of speed), 'volume' (float from 0 to 1), 
-        and/or 'voices' (string identifying the chosen voice)
+        dictionary with keys of 'rate' (percent of speed, signed int16),
+        'volume' (float from 0 to 1), and/or 'voice' (the voice 'id' that can
+        be chosen from the list given by the TTS.list_models() function).
       caption_path (:obj:`str`): filepath for spoken caption output
     '''
 
@@ -115,23 +116,16 @@ def render_caption(caption, samprate, model, caption_path):
 
       # check what model info was set; if none were
       # specified, use defaults
-      for key in ['rate','volume','voices']:
+      for key in ['rate','volume','voice']:
           if key in model.keys():
               engine.setProperty(key, model[key])
           else:
               pass
 
-      engine.save_to_file(caption, caption_path)
-
-      try:
-          # TODO: explore why NSS triggers error hear without catching
-          engine.runAndWait()
-      except Exception as e:
-          print(e)
-          if engine._inLoop:
-              engine.endLoop()
-          pass
-
+      engine.save_to_file(caption, caption_path, name='caption')
+      # note the current PyPI release ()
+      engine.runAndWait()
+      
     else:
        # initialise dummy TTS class to raise error.
        TTS()
@@ -147,7 +141,6 @@ def render_caption(caption, samprate, model, caption_path):
         os.rename(caption_path, cpre)
         ff.input(cpre).output(caption_path).run(quiet=1)
         rate_in, wavobj = wavfile.read(caption_path)
-
         
     # If it doesn't match the required rate, resample and re-write
     if rate_in != samprate:
