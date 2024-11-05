@@ -32,8 +32,9 @@ except (OSError, ModuleNotFoundError, NoTTSAPI) as sderr:
           raise TTSIsNotSupported("strauss has not been installed with text-to-speech support. \n"
                 "This is not installed by default, due to some specific module requirements of the TTS module.\n"
                 "Reinstalling strauss with 'pip install strauss[TTS]' will give you access to this function\n"
-                "If you run into issues with the TTS package, you can also install pyttsx3 with the command\n" 
-                "'pip install pyttsx3'.")
+                "If you run into issues with the TTS package, you can also install pyttsx3. Currently the most\n" 
+                "compatible version is npt published on PyPI, but you can install from the git repo with \n"
+                "'pip install git+https://github.com/nateshmbhat/pyttsx3.git'.")
 
 class TTSIsNotSupported(Exception):
     pass
