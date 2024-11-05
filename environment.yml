@@ -18,6 +18,7 @@ dependencies:
     - sf2utils
     - sphinx
     - tqdm
+    - "--editable=git+https://github.com/nateshmbhat/pyttsx3.git"
     - pyttsx3
     - wavio
     - wheel
