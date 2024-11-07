@@ -18,7 +18,8 @@ dependencies:
     - sf2utils
     - sphinx
     - tqdm
-    - TTS
+    - "--editable=git+https://github.com/nateshmbhat/pyttsx3.git#egg=pyttsx3"
+    - pyttsx3
     - wavio
     - wheel
     - sounddevice
