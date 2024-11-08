@@ -32,9 +32,9 @@ def render_caption(caption, samprate, model, caption_path):
     Args:
       caption (:obj:`str`): script to be spoken by the TTS voice
       samprate (:obj:`int`): samples per second
-      model (:obj:`str`): valid name of TTS voice from the underying TTS
+      model (:obj:`str`): valid name of TTS voice from the underlying TTS
         module
-      model (:obj:`str`): valid name of TTS voice from the underying TTS
+      model (:obj:`str`): valid name of TTS voice from the underlying TTS
         module
       caption_path (:obj:`str`): filepath for spoken caption output
     '''
