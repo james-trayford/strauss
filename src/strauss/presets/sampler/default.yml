@@ -131,7 +131,9 @@ _meta:
     Rc: ""
     level: ""
   volume_lfo:
-    _doc: define the note volume envelope applied to the samples A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
+    _doc: >-
+      define the note volume envelope applied to the samples A,D,S & R
+      correspond to 'attack', 'decay', 'sustain' and 'release'
     use: switch feature on or off
     wave: type of waveform
     amount: amount
