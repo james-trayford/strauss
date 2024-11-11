@@ -86,6 +86,7 @@ pitch_lo: 0
 pitch_shift: 0.
 
 _meta:
+  _doc: A top-level documentation string for the generator's defaults
   name: preset name
   description: full description
   note_length: >-
@@ -97,9 +98,6 @@ _meta:
     If looping, start and end point of loop in seconds.
   loop_end: >-
     If loop_end is longer than the sample, clip to end of the sample.
-  volume_envelope: >-
-    define the note volume envelope applied to the samples
-    A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
   volume_envelope:
     A: Attack
     D: Decay
@@ -132,9 +130,8 @@ _meta:
     Dc: ""
     Rc: ""
     level: ""
-  volume_lfo: >-
-    or apply 'tremolo'?
   volume_lfo:
+    _doc: define the note volume envelope applied to the samples A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
     use: switch feature on or off
     wave: type of waveform
     amount: amount
