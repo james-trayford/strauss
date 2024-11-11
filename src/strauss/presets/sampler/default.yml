@@ -164,18 +164,3 @@ _meta:
     Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
         negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
     level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note
-  volume: >-
-    Master Volume of generator.
-  pitch: >-
-    Default pitch selection (used by all generators)
-  azimuth: >-
-    azimuth coordinate for spatialising audio into differing channels
-  polar: >-
-    polar coordinate for spatialising audio into differing channels
-  pitch_hi: >-
-    pitch range maximum in semitones
-  pitch_lo: >-
-    pitch range minimum in semitones
-  pitch_shift: >-   
-    default shift in semitones
-
