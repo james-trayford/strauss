@@ -113,9 +113,9 @@ _meta:
     filter type
   cutoff: >-
     filter cutoff
-  pitch_lfo: >-
-    or apply 'vibrato'?
   pitch_lfo:
+    _doc: >-
+      or apply 'vibrato'?
     use: switch feature on or off
     wave: type of waveform
     amount: amount
