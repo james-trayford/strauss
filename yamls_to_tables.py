@@ -48,11 +48,11 @@ def yaml_traverse(metadict, valdict, rdict, headlev=1):
                 # unspecified => '-'
                 rdict[k+"_unit"] = '-'
             # print(f"|`{k}` |  _{metadict[k]}_ | `{str(valdict[k]).strip()}` | `{rdict[k]}` | {rdict[k+'_unit']}")
-            tabstr += f"|`{k}` |  _{str(metadict[k]).strip()}_ | {valdict[k]} | `{rdict[k]}` | {rdict[k+'_unit']}\n"
+            tabstr += f"| `{k}` | {str(metadict[k]).strip()} | {valdict[k]} | `{rdict[k]}` | {rdict[k+'_unit']}\n"
             if k not in rdict:
                 rdict[k] = {}
         return f'{topstr}{tabstr}{secstr}'
-
+    
     else:
         return
 
@@ -63,3 +63,4 @@ for f in glob(str(p)):
     print(f"\n# {generators[p.parents[0].name]}\n")
     ystr = yaml_traverse(ydat['_meta'], ydat, rdat, 2)
     print(ystr)
+    print('---')
