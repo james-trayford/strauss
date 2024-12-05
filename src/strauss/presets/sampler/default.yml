@@ -86,76 +86,99 @@ pitch_lo: 0
 pitch_shift: 0.
 
 _meta:
-  _doc: A top-level documentation string for the generator's defaults
-  name: preset name
-  description: full description
+  _doc: >-
+    The `Sampler` generator type can be used to modify and play audio samples (sound recordings) .
+  name: Preset name
+  description: Full description of the parameters selected for this preset, e.g. looping, volume and pitch envelopes, filters, etc.
   note_length: >-
-    Numerical note length in s or "sample" for the sample length or "none"
-    to last to the end of the 
+    Numerical note length in seconds, or "sample" for the sample length, or "none"
+    to last to the end of the sonification.
   looping: >-
-    "off" for no looping "forward" to loop forward "forwardback" to loop back and forth
+    Option to play the sample on a loop. "off" for no looping "forward" to loop forwards, "forwardback" to play the loop back and forth
   loop_start: >-
-    If looping, start and end point of loop in seconds.
+    If looping, starting point of loop in seconds.
   loop_end: >-
-    If loop_end is longer than the sample, clip to end of the sample.
+    If looping, ending point of loop in seconds. If loop_end is longer than the sample, clip to end of the sample.
   volume_envelope:
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
-    Ac: ""
-    Dc: ""
-    Rc: ""
-    level: ""
+    _doc: >-
+      Define the note volume envelope applied to the samples
+    A: Attack, how long it takes for a tone to sound after it"'"s triggered
+    D: Decay, how long it takes for the tones attack to die down after it"'"s triggered
+    S: Sustain, the volume/level of the sound while it"'"s being triggered
+    R: Release, how long the tone takes to go silent after the trigger is released
+    Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
+    Dc: Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
+    Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note.
   filter: >-
-    Do we apply a filter?
+    Apply a frequency filter to to the audio signal. Values are 'on' or 'off'. A filter affects the timbre by filtering out certain harmonics
   filter_type: >-
-    filter type
+    Low pass filter (only allows frequencies lower than your cutoff to pass through)
+    High pass filter (only allows frequencies higher than your cutoff to pass through)
   cutoff: >-
+<<<<<<< HEAD
     filter cutoff
   pitch_lfo:
     _doc: >-
       or apply 'vibrato'?
+=======
+    The cutoff frequency (or "knee") of the filter, beyond which frequencies are attenuated. as a fraction of the maximum frequency
+  pitch_lfo:
+    _doc: >-
+      Controls for the "'Low Frequency Oscillator'"" (LFO) used to modulate pitch of notes at rhythmic
+        frequencies. In music this is often referred to a "'vibrato'".
+>>>>>>> e3d6432 (Added metadata to Sampler default.yaml)
     use: switch feature on or off
-    wave: type of waveform
-    amount: amount
-    freq: frequency
-    freq_shift: frequency shift
-    phase: random
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
-    Ac: ""
-    Dc: ""
-    Rc: ""
-    level: ""
+    wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
+        (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
+    amount: the amplitude of the maximal pitch oscillation from the underlying pitch
+    freq: Base frequency of the LFO oscillations.
+    freq_shift: Shift relative to the base LFO frequency.
+    phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle
+    A: Attack, how long it takes for a tone to sound after it’s triggered
+    D: Decay, how long it takes for the tone’s attack to die down after it’s triggered
+    S: Sustain, the volume/level of the sound while it’s being triggered
+    R: Release, how long the tone takes to go silent after the trigger is released
+    Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
+    Dc: Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
+    Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note.
   volume_lfo:
     _doc: >-
-      define the note volume envelope applied to the samples A,D,S & R
-      correspond to 'attack', 'decay', 'sustain' and 'release'
-    use: switch feature on or off
-    wave: type of waveform
-    amount: amount
-    freq: frequency
-    freq_shift: frequency shift
-    phase: random
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
-    Ac: ""
-    Dc: ""
-    Rc: ""
-    level: ""
+      Controls for the `'Low Frequency Oscillator'` (LFO) used to modulate volume of notes at rhythmic
+        frequencies. In music this is often referred to as `'tremolo'`.
+    use: switch volume LFO effects on or off
+    wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
+        (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
+    amount: the amplitude of the maximal pitch oscillation from the underlying pitch
+    freq: Base frequency of the LFO oscillations.
+    freq_shift: Shift relative to the base LFO frequency
+    phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle.
+    A: Attack, how long it takes for a tone to sound after it’s triggered
+    D: Decay, how long it takes for the tone’s attack to die down after it’s triggered
+    S: Sustain, the volume/level of the sound while it’s being triggered
+    R: Release, how long the tone takes to go silent after the trigger is released
+    Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
+    Dc: Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
+    Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note
   volume: >-
-    Master Volume
+    Master Volume of generator.
   pitch: >-
-    Default pitch selection
+    Default pitch selection (used by all generators)
   azimuth: >-
-    azimuth coordinate for center panning
+    azimuth coordinate for spatialising audio into differing channels
   polar: >-
-    polar coordinate for center panning
+    polar coordinate for spatialising audio into differing channels
   pitch_hi: >-
     pitch range maximum in semitones
   pitch_lo: >-
