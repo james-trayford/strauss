@@ -29,7 +29,7 @@ cutoff: [0., 1.]
 cutoff_unit: 'unitless'
 
 # Master volume
-volume: [0,1.]
+volume: [0., 1.]
 volume_unit: 'unitless' 
 
 # frequency limits in Hz
@@ -44,13 +44,56 @@ pitch_unit: 'unitless'
 
 # center panning:
 phi: [0., 1.]
-phi_unit: 'unitless'
+phi_unit: 'half-cycles (π)'
 theta: [0.,1.]
-theta_unit: 'unitless'
+theta_unit: 'cycles (2π)'
 
 # pitch range and default shift in semitones
-pitch_shift: [0., 36.]
+pitch_shift: [0., 24.]
 pitch_shift_unit: 'semitones'
+
+# Do we apply a filter, and if so specify the cutoff and filter type
+filter: "off"
+filter_type: "LPF1"
+cutoff: 1.
+
+# or 'vibrato'
+pitch_lfo:
+  amount: [0, 2] 
+  freq: [1,12]
+  freq_shift: [0,3]
+  A: [1e-2, 10]
+  D: [1e-2, 10]
+  S: [0, 1]
+  R: [1e-2, 10]
+  freq_unit: "Hz"
+  amount_unit: "semitones"	
+
+volume_lfo:
+  amount: [0, 1] 
+  freq: [1,12]
+  freq_shift: [0,3]
+  A: [1e-2, 10]
+  D: [1e-2, 10]
+  S: [0, 1]
+  R: [1e-2, 10]
+  freq_unit: "Hz"
+  amount_unit: "fraction"	
+
+  use: off
+  wave: 'sine'
+  amount: 0.5
+  freq: 3
+  freq_shift: 0
+  phase: 'random'
+  A: 0.
+  D: 0.1
+  S: 1.
+  R: 0.
+  Ac: 0.
+  Dc: 0.
+  Rc: 0.
+  level: 1
 
 _meta:
   note_length: >-
