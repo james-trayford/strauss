@@ -119,18 +119,11 @@ _meta:
     Low pass filter (only allows frequencies lower than your cutoff to pass through)
     High pass filter (only allows frequencies higher than your cutoff to pass through)
   cutoff: >-
-<<<<<<< HEAD
-    filter cutoff
-  pitch_lfo:
-    _doc: >-
-      or apply 'vibrato'?
-=======
     The cutoff frequency (or "knee") of the filter, beyond which frequencies are attenuated. as a fraction of the maximum frequency
   pitch_lfo:
     _doc: >-
       Controls for the "'Low Frequency Oscillator'"" (LFO) used to modulate pitch of notes at rhythmic
         frequencies. In music this is often referred to a "'vibrato'".
->>>>>>> e3d6432 (Added metadata to Sampler default.yaml)
     use: switch feature on or off
     wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
         (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
