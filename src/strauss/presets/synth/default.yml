@@ -110,29 +110,33 @@ pitch_lo: 0
 pitch_shift: 0.
 
 _meta:
-  name: preset name
-  description: full description
+  _doc: >-
+    The `Synth` generator type can be used to synthesise sound using mathmatically
+    generated waveforms or `oscillators`. The preset can be used to modify the relative
+    frequency, phase and amplitude of these oscillators.
+  name: Name of the preset
+  description: Full description of the preset purpose and parameters.
   oscillators: >-
     Oscillator information. Oscillator are denoted osc<n> with n=3 by default.
   oscillators:
     osc1:
-      form: waveform, choose from ['saw', 'square', 'sine', 'tri', 'noise']
-      level: intrinsic volume
-      detune: change in tuning as a percentage of the input frequency
-      phase: phase
+      form: Type of waveform used for oscillator 1, choose from ['saw', 'square', 'sine', 'tri', 'noise']
+      level: Intrinsic volume
+      detune: Change in tuning as a percentage of the input frequency
+      phase: The phase of the oscillator, defined in terms of fraction of a whole cycle
     osc2:
-      form: waveform, choose from ['saw', 'square', 'sine', 'tri', 'noise']
-      level: intrinsic volume
-      detune: change in tuning as a percentage of the input frequency
-      phase: phase
+      form: Type of waveform used for oscillator 2, choose from ['saw', 'square', 'sine', 'tri', 'noise']
+      level: Intrinsic volume
+      detune: Change in tuning as a percentage of the input frequency
+      phase: The phase of the oscillator, defined in terms of fraction of a whole cycle
     osc3:
-      form: waveform, choose from ['saw', 'square', 'sine', 'tri', 'noise']
-      level: intrinsic volume
-      detune: change in tuning as a percentage of the input frequency
-      phase: phase
+      form: Type of waveform used for oscillator 3, choose from ['saw', 'square', 'sine', 'tri', 'noise']
+      level: Intrinsic volume
+      detune: Change in tuning as a percentage of the input frequency
+      phase: The phase of the oscillator, defined in terms of fraction of a whole cycle
 
   note_length: >-
-    Numerical note length in s
+    Numerical note length in seconds
   volume_envelope: >-
     Define the note volume envelope applied to the samples.
     A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'.
@@ -141,58 +145,79 @@ _meta:
     D: Decay
     S: Sustain
     R: Release
-    Ac: ""
-    Dc: ""
-    Rc: ""
-    level: ""
+    Ac: >-
+        "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
+    Dc: >-
+        "Curvature" of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
+    Rc: >-
+        "Curvature" of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+
+    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note
   filter: >-
-    Do we apply a filter?
+    Do we apply a frequency filter to the audio signal? This can be used to change the balance of frequencies and manipulate the 'timbre' of a note
   filter_type: >-
-    filter type
+    Choose from available filter types 
   cutoff: >-
-    filter cutoff
-  pitch_lfo: >-
-    or apply 'vibrato'?
+    The cut-off frequency (or `knee`) of the filter, beyond which frequencies are attenuated.
+    Specified between 0 and 1 as a fraction of the audible range of notes we can hear (E0 to D#10). 
   pitch_lfo:
-    use: switch feature on or off
-    wave: type of waveform
-    amount: amount
-    freq: frequency
-    freq_shift: frequency shift
-    phase: random
+    _doc: >-
+        Controls for the 'Low Frequency Oscillator' (LFO) used to modulate pitch of notes at rhythmic
+        frequencies. In music this is often referred to a 'vibrato'   
+    use: Switch pitch LFO effects on or off
+    wave: >-
+        Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
+        (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
+    amount: the amplitude of the maximal pitch oscillation from the underlying pitch
+    freq: Base frequency of the LFO oscillations.
+    freq_shift: shift relative to the bae LFO frequency
+    phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle
     A: Attack
     D: Decay
     S: Sustain
     R: Release
-    Ac: ""
-    Dc: ""
-    Rc: ""
-    level: ""
-  volume_lfo: >-
-    or apply 'tremolo'?
+    Ac: >-
+        "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow, negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
+    Dc: >-
+        "Curvature" of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow, negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
+    Rc: >-
+        "Curvature" of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow, negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+
+    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note
   volume_lfo:
-    use: switch feature on or off
-    wave: type of waveform
-    amount: amount
-    freq: frequency
-    freq_shift: frequency shift
-    phase: random
+    _doc: >-
+        Controls for the 'Low Frequency Oscillator' (LFO) used to modulate volume of notes at rhythmic
+        frequencies. In music this is often referred to as 'tremolo'.
+    use: Switch pitch LFO effects on or off
+    wave: >-
+        Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
+        (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
+    amount: the amplitude of the maximal pitch oscillation from the underlying pitch
+    freq: Base frequency of the LFO oscillations.
+    freq_shift: shift relative to the bae LFO frequency
+    phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle
     A: Attack
     D: Decay
     S: Sustain
     R: Release
-    Ac: ""
-    Dc: ""
-    Rc: ""
-    level: ""
+    Ac: >-
+        "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow, negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
+    Dc: >-
+        "Curvature" of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow, negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
+    Rc: >-
+        "Curvature" of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow, negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note
   volume: >-
-    Master Volume
+    Master Volume of synthesizer
   pitch: >-
     Default pitch selection
   azimuth: >-
-    azimuth coordinate for center panning
+    azimuth coordinate for spatialising audio into differing channels
   polar: >-
-    polar coordinate for center panning
+    polar coordinate for spatialising audio into differing channels
   pitch_hi: >-
     pitch range maximum in semitones
   pitch_lo: >-
