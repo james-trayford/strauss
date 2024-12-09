@@ -67,7 +67,7 @@ pitch_lfo:
   S: [0, 1]
   R: [1e-2, 10]
   freq_unit: "Hz"
-  amount_unit: "semitones"	
+  amount_unit: "semitones"
 
 volume_lfo:
   amount: [0, 1] 
@@ -78,8 +78,7 @@ volume_lfo:
   S: [0, 1]
   R: [1e-2, 10]
   freq_unit: "Hz"
-  amount_unit: "fraction"	
-
+  amount_unit: "fraction"
   use: off
   wave: 'sine'
   amount: 0.5
