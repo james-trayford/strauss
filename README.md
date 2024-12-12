@@ -11,9 +11,9 @@
 
 Access the [full documentation here](https://strauss.readthedocs.io/) *(under construction!)* and read more about the associated [Audio Universe project here](https://www.audiouniverse.org/).
 
-*STRAUSS* is  [PyPI hosted package](https://pypi.org/project/strauss/) and can be installed directly via `pip`:
+*STRAUSS* is  [PyPI hosted package](https://pypi.org/project/strauss/) and `pip` can be used for the default installation:
 
-`pip install strauss`
+`pip install 'strauss[default]'`
 
 For a standard install (without text-to speech support).
 
@@ -51,7 +51,7 @@ and activate the environment with
 
 *STRAUSS* can also be installed with text-to-speech (TTS) support, allowing audio captioning of sonifications and future accessibility features, via the [TTS module](https://github.com/coqui-ai/TTS). Due to the specific module requirements of this module, install can sometimes lead to incompatibilities with other modules and be slower, so is packaged with *STRAUSS* as an optional extra. If you'd like to use these features, its easy to directly from PyPI:
 
-`pip install strauss[TTS]`
+`pip install 'strauss[TTS]'`
 
 or if you're working from a local copy of the repository, as above, use
 
