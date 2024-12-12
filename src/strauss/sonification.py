@@ -19,7 +19,6 @@ from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
 from .tts_caption import render_caption
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import sys
 import os
 import ffmpeg as ff
@@ -34,6 +33,10 @@ try:
     import sounddevice as sd
 except (OSError, ModuleNotFoundError) as sderr:
     sd = NoSoundDevice(sderr)
+try:
+    from tqdm import tqdm
+except ModuleNotFoundError:
+    tqdm = list
 
 class Sonification:
     """Representing the overall sonification

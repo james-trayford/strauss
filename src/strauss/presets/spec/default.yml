@@ -78,6 +78,12 @@ interpolation_type: 'sample'
 # These have differing effects 
 regen_phases: true
 
+# Whether or not to generate IFFT such that the spectrum sample points are hit exactly 
+fit_spec_multiples: true
+
+# Do we equalise the spectra for equal loudness?
+equal_loudness_normalisation: false
+
 # frequency limits in Hz
 min_freq: 50.
 max_freq: 2000.

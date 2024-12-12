@@ -22,8 +22,12 @@ from . import utilities as utils
 from . import filters
 import numpy as np
 import scipy
-# use FFTW backend in scipy
-#scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
+# can we use FFTW backend in scipy?
+try:
+    import pyfftw
+    scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
+except (OSError, ModuleNotFoundError):
+    pass
 from scipy.fft import fft, ifft, fftfreq
 import glob
 import copy
@@ -946,14 +950,14 @@ class Spectralizer(Generator):
     """Spectralizer generator class
     """
     def __init__(self, params=None, samprate=48000):
-
         # default synth preset
         self.gtype = 'spec'
         self.preset = getattr(presets, self.gtype).load_preset()
         self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
 
+        self.eq = utils.Equaliser()
         self.freqwarn = True
-        
+
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
 
@@ -1028,15 +1032,27 @@ class Spectralizer(Generator):
             spectra_multiples = (discrete_freqs - 1)/(spectrum.size - 1)
             
             # the minimum factor by which to increase the stream length to accomodate spectra in whole number multiples
-            buffer_factor = np.ceil(spectra_multiples)/spectra_multiples
-
+            if params['fit_spec_multiples']:
+                buffer_factor = np.ceil(spectra_multiples)/spectra_multiples
+            else:
+                buffer_factor = 1
+                
             # number of samples to generate including buffer
             new_nlen = int(buffer_factor * nlength)
         
             # the frequency bound indices which the spectrum will be mapped into
             mindx = int(params['min_freq'] * duration * buffer_factor)
             maxdx = int(params['max_freq'] * duration * buffer_factor)
-            
+
+            if params['equal_loudness_normalisation']:
+                freqs =  np.linspace(params['min_freq'], params['max_freq'], len(spectrum))
+                norm = self.eq.get_relative_loudness_norm(freqs)
+                if not self.eq.factor_rms:
+                    self.eq.factor_rms = []
+                rms1 = np.sqrt(np.mean(spectrum**2))
+                spectrum *= norm
+                self.eq.factor_rms.append(np.sqrt(np.mean(spectrum**2))/rms1)
+                
             # hardcode phase randomisation for now
             phases = 2*np.pi*np.random.random(new_nlen)
             
@@ -1142,9 +1158,9 @@ class Spectralizer(Generator):
             if hasattr(params['cutoff'], "__iter__"):
                 # if static cutoff, use minimum buffer count
                 sstream.bufferize(sstream.length/4)
-        else:
-            # 30 ms buffer (hardcoded for now)
-            sstream.bufferize(0.03)
+            else:
+                # 30 ms buffer (hardcoded for now)
+                sstream.bufferize(0.03)
             sstream.filt_sweep(getattr(filters, params['filter_type']),
                                utils.const_or_evo_func(params['cutoff']))
         return sstream    
