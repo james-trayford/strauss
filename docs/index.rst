@@ -1,4 +1,5 @@
-.. strauss documentation master file, created by
+.. strauss
+   documentation master file, created by
    sphinx-quickstart on Tue Oct 26 14:56:02 2021.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
@@ -19,10 +20,11 @@ The code aims to make rich and evocative sonification straightforward, with a nu
    motivation
    start
    elements
+   params
    detailed
    examples
    todo
-  
+   
 Indices and tables
 ==================
 

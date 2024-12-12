@@ -1,13 +1,14 @@
-
+# --- hide: start ---
 import yaml
+import os
 from glob import glob
 from pathlib import Path
+
 
 generators = {'spec' : "`Spectraliser` Generator",
               'synth' : "`Synthesiser` Generator",
               'sampler' : "`Sampler` Generator"}
 
-# p = Path(__file__)
 p = Path("src", "strauss", "presets", "*", "default.yml")
 
 def read_yaml(filename):
@@ -56,11 +57,17 @@ def yaml_traverse(metadict, valdict, rdict, headlev=1):
     else:
         return
 
-for f in glob(str(p)):
-    p = Path(f)
-    ydat = read_yaml(p)
-    rdat = read_yaml(p.parents[0] / "ranges" / "default.yml")
-    print(f"\n# {generators[p.parents[0].name]}\n")
-    ystr = yaml_traverse(ydat['_meta'], ydat, rdat, 2)
-    print(ystr)
-    print('---')
+with open('docs/tables.md', 'w') as outfile:
+    for f in glob(str(p)):
+        p = Path(f)
+        ydat = read_yaml(p)
+        rdat = read_yaml(p.parents[0] / "ranges" / "default.yml")
+        # print(f"\n# {generators[p.parents[0].name]}\n")
+        ystr = yaml_traverse(ydat['_meta'], ydat, rdat, 2)
+        # print(ystr)
+        # print('---')
+        outfile.write(f"\n# {generators[p.parents[0].name]}\n")
+        outfile.write(ystr)
+        outfile.write('---')
+
+# --- hide: stop ---
