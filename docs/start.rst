@@ -1,26 +1,12 @@
 Getting Started
 ^^^^^^^^^^^^^^^
 
-This walkthrough will take you through a clean install of the code, including optional dependencies and trying your first sonification.
+This walkthrough will take you through a clean install of the code, including optional dependencies and trying your first sonification. There are also example notebooks available on `Google Colab <https://colab.research.google.com/github/james-trayford/strauss/blob/colab_examples/>`_ which you can run without installing Strauss on your local system.
 
 Installation
 ************
 
-The Strauss code can be downloaded from **GitHub** at `the repository url <https://github.com/james-trayford/strauss.git>`_.
-
-Using :code:`git` make a copy of the STRAUSS repository via SSH,
-
-.. code-block:: bash
-  
-  git clone git@github.com:james-trayford/strauss.git strauss
-
-or HTTPS if you don't have SSH keys set up,
-
-.. code-block:: bash
-
-  git clone https://github.com/james-trayford/strauss.git strauss
-
-throughout the documentation, I will refer to this as the **strauss repo** or **code directory**.
+Strauss can be installed in three different ways, depending on whether you want to develop the code or simply use it as it is. It can be installed using pip install, with or without the option for development, or you can clone it from the GitHub repository.
 
 if you just want to use the code, STRAUSS may then be installed using pip, as
 
@@ -37,12 +23,28 @@ If you want to develop the code, you can instead use
 
 where the :code:`-e` option allows a local install, such that you can modify and run the source code on the fly without needing to reinstall each time.
 
-Example jupyter notebooks
-*************************
+Alternatively, the Strauss code can be downloaded from **GitHub** at `the repository url <https://github.com/james-trayford/strauss.git>`_
 
-There are a number of example applications of Strauss in the :code:`example` subdirectory of the :code:`strauss` repo. These are in Python Notebook (:code:`.ipynb`) format for an interactive, step-by-step. They are also provided in Python script format (:code:`.py`).
+Using :code:`git` make a copy of the STRAUSS repository via SSH,
 
-In order to run the Notebook examples, first ensure that :code:`jupyter` is installed on your system. These were developed in :code:`jupyter-lab`, which can also be installed using pip, as
+.. code-block:: bash
+  
+  git clone git@github.com:james-trayford/strauss.git strauss
+
+or HTTPS if you don't have SSH keys set up,
+
+.. code-block:: bash
+
+  git clone https://github.com/james-trayford/strauss.git strauss
+
+throughout the documentation, I will refer to this as the **strauss repo** or **code directory**.
+
+Example jupyter notebooks/scripts
+*********************************
+
+There are a number of example applications of Strauss in the :code:`example` subdirectory of the :code:`strauss` repo. These are in Python Notebook (:code:`.ipynb`) format for an interactive, step-by-step experience. They are also provided in Python script format (.py) in the :code:`examples` directory. The Python scripts can be run from the command line.
+
+In order to run the notebook examples, first ensure that :code:`jupyter` is installed on your system. These were developed in :code:`jupyter-lab`, which can also be installed using pip, as:
 
 .. code-block:: bash
   
