@@ -202,7 +202,7 @@ class Buffers:
         self.nsamp_padstream = self._nbuffs * self._nsamp_buff
         self.nsamp_pad = self.nsamp_padstream-stream._nsamp_stream
         self._olap_pad = self.nsamp_pad-self._nsamp_halfbuff
-        self._olap_lim = min(stream._nsamp_stream, stream._nsamp_stream+self.olap_pad)
+        self._olap_lim = min(stream._nsamp_stream, stream._nsamp_stream+self._olap_pad)
         
         # construct tile and overlap buffer arrays
         self.buffs_tile = np.pad(stream.values, (0,self.nsamp_pad)
