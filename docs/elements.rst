@@ -23,7 +23,7 @@ Source Class
 
 The :code:`Source` classes in Strauss are so named because they act as `sources of sound` in the sonification. Sources are used to represent the input data, by mapping this data to properties of sound (volume, position, frequency, etc). The choice of how to set up the sources depends on the data being sonified, and what the user wants to convey. For this, Strauss defines two generic classes that inherit the parent :code:`Source` class; :code:`Events` and :code:`Objects`, described below.
 
-**Full documentation of the mappable parameters are coming soon!** See :obj:`./examples` for example mappings in jupyter notebooks.
+**Full documentation of the mappable parameters is coming soon!** See :obj:`./examples` for example mappings in jupyter notebooks.
 
 `Events`
 ''''''''

@@ -36,7 +36,13 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest',
               'sphinx.ext.ifconfig', 'sphinx.ext.viewcode',
               'sphinx.ext.inheritance_diagram',
               'sphinx.ext.autosummary','sphinx.ext.coverage',
-              'sphinx.ext.napoleon', "myst_parser"]
+              'sphinx.ext.napoleon', "myst_parser",
+              'sphinxcontrib.jquery']
+
+html_js_files = [
+    'js/custom.js'
+]
+
 #'recommonmark',
 #              'sphinx_markdown_tables'
 
