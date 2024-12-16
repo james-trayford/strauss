@@ -428,7 +428,7 @@ class Synthesizer(Generator):
     attribute :obj:`self.gtype = 'synth'`.
 
     Attributes:
-      gtype (:obj:`str`): Generator type
+      gtype (:obj:`str`): Generator type 
 
     Todo:
     	* Add other synthesiser types, aside from additive (e.g. FM,
@@ -1021,11 +1021,7 @@ class Sampler(Generator):
 
 class Spectralizer(Generator):
     """Spectralizer generator class
-    
-    """
-    def __init__(self, params=None, samprate=48000):
 
-    """
     This generator class synthesises sound from a spectrum input
     using an *inverse Fast Fourier Transform* (iFFT) algorithm.
     Defining a minimum and maximum frequency in Hz, input spectrum
@@ -1040,6 +1036,7 @@ class Spectralizer(Generator):
     	* Add other synthesiser types, aside from additive (e.g. FM,
     	  vector, wavetable)? 
     """
+
     def __init__(self, params=None, samprate=48000):
         """
         Args:
