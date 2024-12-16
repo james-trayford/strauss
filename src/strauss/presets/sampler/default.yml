@@ -124,7 +124,7 @@ _meta:
     _doc: >-
       Controls for the `'Low Frequency Oscillator'` (LFO) used to modulate pitch of notes at rhythmic
         frequencies. In music this is often referred to a `'vibrato'`.
-    use: switch feature on or off
+    use: Switch feature on or off
     wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
         (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
     amount: the amplitude of the maximal pitch oscillation from the underlying pitch
@@ -149,7 +149,7 @@ _meta:
     use: switch volume LFO effects on or off
     wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
         (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
-    amount: the amplitude of the maximal pitch oscillation from the underlying pitch
+    amount: The amplitude of the maximal pitch oscillation from the underlying pitch
     freq: Base frequency of the LFO oscillations.
     freq_shift: Shift relative to the base LFO frequency
     phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle.
@@ -169,13 +169,13 @@ _meta:
   pitch: >-
     Default pitch selection (used by all generators)
   azimuth: >-
-    azimuth coordinate for spatialising audio into differing channels
+    Azimuth coordinate for spatialising audio into differing channels
   polar: >-
-    polar coordinate for spatialising audio into differing channels
+    Polar coordinate for spatialising audio into differing channels
   pitch_hi: >-
-    pitch range maximum in semitones
+    Pitch range maximum in semitones
   pitch_lo: >-
-    pitch range minimum in semitones
+    Pitch range minimum in semitones
   pitch_shift: >-   
-    default shift in semitones
+    Default shift in semitones
 

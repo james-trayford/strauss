@@ -111,27 +111,27 @@ pitch_shift: 0.
 
 _meta:
   _doc: >-
-    The `Synth` generator type can be used to synthesise sound using mathmatically
+    The `Synth` generator type can be used to synthesise sound using mathematically
     generated waveforms or `oscillators`. The preset can be used to modify the relative
     frequency, phase and amplitude of these oscillators.
   name: Name of the preset
   description: Full description of the preset purpose and parameters.
-  oscillators: >-
-    Oscillator information. Oscillator are denoted osc<n> with n=3 by default.
   oscillators:
+    _doc: >-
+      Oscillator information. Oscillator are denoted osc<n> with n=3 by default.
     osc1:
       form: Type of waveform used for oscillator 1, choose from ['saw', 'square', 'sine', 'tri', 'noise']
-      level: Intrinsic volume
+      level: Amplitude of the oscillator from 0 to 1, contolling maximum volume of the note
       detune: Change in tuning as a percentage of the input frequency
       phase: The phase of the oscillator, defined in terms of fraction of a whole cycle
     osc2:
       form: Type of waveform used for oscillator 2, choose from ['saw', 'square', 'sine', 'tri', 'noise']
-      level: Intrinsic volume
+      level: Amplitude of the oscillator from 0 to 1, contolling maximum volume of the note
       detune: Change in tuning as a percentage of the input frequency
       phase: The phase of the oscillator, defined in terms of fraction of a whole cycle
     osc3:
       form: Type of waveform used for oscillator 3, choose from ['saw', 'square', 'sine', 'tri', 'noise']
-      level: Intrinsic volume
+      level: Amplitude of the oscillator from 0 to 1, contolling maximum volume of the note
       detune: Change in tuning as a percentage of the input frequency
       phase: The phase of the oscillator, defined in terms of fraction of a whole cycle
 
@@ -141,10 +141,10 @@ _meta:
     Define the note volume envelope applied to the samples.
     A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'.
   volume_envelope:
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
+    A: Attack, how long it takes for a tone to sound after it’s triggered
+    D: Decay, how long it takes for the tone’s attack to die down after it’s triggered
+    S: Sustain, the volume/level of the sound while it’s being triggered
+    R: Release, how long the tone takes to go silent after the trigger is released
     Ac: >-
         "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
         negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
@@ -171,14 +171,14 @@ _meta:
     wave: >-
         Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
         (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
-    amount: the amplitude of the maximal pitch oscillation from the underlying pitch
+    amount: The amplitude of the maximal pitch oscillation from the underlying pitch
     freq: Base frequency of the LFO oscillations.
-    freq_shift: shift relative to the bae LFO frequency
+    freq_shift: Shift relative to the bae LFO frequency
     phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
+    A: Attack, how long it takes for a tone to sound after it’s triggered
+    D: Decay, how long it takes for the tone’s attack to die down after it’s triggered
+    S: Sustain, the volume/level of the sound while it’s being triggered
+    R: Release, how long the tone takes to go silent after the trigger is released
     Ac: >-
         "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow, negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
     Dc: >-
@@ -199,10 +199,10 @@ _meta:
     freq: Base frequency of the LFO oscillations.
     freq_shift: shift relative to the bae LFO frequency
     phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
+    A: Attack, how long it takes for a tone to sound after it’s triggered
+    D: Decay, how long it takes for the tone’s attack to die down after it’s triggered
+    S: Sustain, the volume/level of the sound while it’s being triggered
+    R: Release, how long the tone takes to go silent after the trigger is released
     Ac: >-
         "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow, negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
     Dc: >-
@@ -215,13 +215,13 @@ _meta:
   pitch: >-
     Default pitch selection
   azimuth: >-
-    azimuth coordinate for spatialising audio into differing channels
+    Azimuth coordinate for spatialising audio into differing channels
   polar: >-
-    polar coordinate for spatialising audio into differing channels
+    Polar coordinate for spatialising audio into differing channels
   pitch_hi: >-
-    pitch range maximum in semitones
+    Pitch range maximum in semitones
   pitch_lo: >-
-    pitch range minimum in semitones
+    Pitch range minimum in semitones
   pitch_shift: >-   
-    default shift in semitones
+    Default shift in semitones
 
