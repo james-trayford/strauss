@@ -19,13 +19,15 @@ def read_yaml(filename):
         #     print(err)
     return yamldict
 
+tstr1 = "\n| Parameter | Description | Default Value | Default Range | Unit |\n"
+tstr2 = "| ----------- | ----------- | ----------- | ----------- | ----------- |\n"
+
 def yaml_traverse(metadict, valdict, rdict, headlev=1):
     if hasattr(metadict, 'keys'):
+        starttab = 1
         topstr = ''
         tabstr = ''
         secstr = ''
-        tabstr += "\n| Parameter | Description | Default Value | Default Range | Unit |\n"
-        tabstr += "| ----------- | ----------- | ----------- | ----------- | ----------- |\n"
                 
         for k in metadict.keys():
             # print (f">>>>>> {k}")
@@ -49,6 +51,9 @@ def yaml_traverse(metadict, valdict, rdict, headlev=1):
                 # unspecified => '-'
                 rdict[k+"_unit"] = '-'
             # print(f"|`{k}` |  _{metadict[k]}_ | `{str(valdict[k]).strip()}` | `{rdict[k]}` | {rdict[k+'_unit']}")
+            if starttab:     
+                tabstr = tstr1 + tstr2 + tabstr
+                starttab = 0
             tabstr += f"| `{k}` | {str(metadict[k]).strip()} | {valdict[k]} | `{rdict[k]}` | {rdict[k+'_unit']}\n"
             if k not in rdict:
                 rdict[k] = {}
