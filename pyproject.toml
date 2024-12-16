@@ -5,6 +5,7 @@ requires = [
     "numpy",
     "pandas",
     "pychord",	
+    "pyyaml",
     "scipy",
     "setuptools>=42",
     "sf2utils",

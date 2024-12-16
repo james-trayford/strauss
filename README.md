@@ -9,13 +9,19 @@
 
 ## Getting Started
 
-Access the [full documentation here](https://strauss.readthedocs.io/) *(under construction!)* and read more about the associated [Audio Universe project here](https://www.audiouniverse.org/).
+Access the [full documentation here](https://strauss.readthedocs.io/) and read more about the associated [Audio Universe project here](https://www.audiouniverse.org/).
 
 *STRAUSS* is  [PyPI hosted package](https://pypi.org/project/strauss/) and can be installed directly via `pip`:
 
 `pip install strauss`
 
 For a standard install (without text-to speech support).
+
+For development purposes, you can instead use:
+
+`pip install -e .`
+
+where the `-e` option allows a local install, such that you can modify and run the source code on the fly without needing to reinstall each time. 
 
 If you would like access to all the resources and explore the code directly, make a copy of the *STRAUSS* repository via SSH,
 
@@ -30,12 +36,6 @@ and install *STRAUSS* from your local repository using `pip`
 `cd strauss`
 
 `pip install .`
-
-For development purposes, you can instead use:
-
-`pip install -e .`
-
-where the `-e` option allows a local install, such that you can modify and run the source code on the fly without needing to reinstall each time. 
 
 We recommend using a conda environment to avoid package conflicts. Type
 

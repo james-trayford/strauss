@@ -46,7 +46,7 @@ mappable = ['polar',
             'volume_lfo/amount',
             'pitch_lfo/freq',
             'pitch_lfo/freq_shift',
-            'pitch_lfo/amount']
+            'pitch_lfo/amount']     
 
 evolvable = ['polar',
              'azimuth',
@@ -79,10 +79,10 @@ param_limits = [(0,1),#np.pi),
                 (1e-2, 10),
                 (1,12),
                 (0,3),
-                (0,2),
+                (0,1),
                 (1,12),
                 (0,3),
-                (0,1)]
+                (0,2)]     
 
 param_lim_dict = dict(zip(mappable, param_limits))
 
