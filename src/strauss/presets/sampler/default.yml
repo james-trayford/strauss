@@ -91,10 +91,10 @@ _meta:
   name: Preset name
   description: Full description of the parameters selected for this preset, e.g. looping, volume and pitch envelopes, filters, etc.
   note_length: >-
-    Numerical note length in seconds, or "sample" for the sample length, or "none"
+    Numerical note length in seconds, or `'sample'` for the sample length, or `'none'`
     to last to the end of the sonification.
   looping: >-
-    Option to play the sample on a loop. "off" for no looping "forward" to loop forwards, "forwardback" to play the loop back and forth
+    Option to play the sample on a loop. `'off'` for no looping `'forward'` to loop forwards, `'forwardback'` to play the loop back and forth
   loop_start: >-
     If looping, starting point of loop in seconds.
   loop_end: >-
@@ -102,9 +102,9 @@ _meta:
   volume_envelope:
     _doc: >-
       Define the note volume envelope applied to the samples
-    A: Attack, how long it takes for a tone to sound after it"'"s triggered
-    D: Decay, how long it takes for the tones attack to die down after it"'"s triggered
-    S: Sustain, the volume/level of the sound while it"'"s being triggered
+    A: Attack, how long it takes for a tone to sound after it’s triggered
+    D: Decay, how long it takes for the tones attack to die down after it’s triggered
+    S: Sustain, the volume/level of the sound while it’s being triggered
     R: Release, how long the tone takes to go silent after the trigger is released
     Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
         negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
@@ -119,11 +119,11 @@ _meta:
     Low pass filter (only allows frequencies lower than your cutoff to pass through)
     High pass filter (only allows frequencies higher than your cutoff to pass through)
   cutoff: >-
-    The cutoff frequency (or "knee") of the filter, beyond which frequencies are attenuated. as a fraction of the maximum frequency
+    The cutoff frequency (or `'knee'`) of the filter, beyond which frequencies are attenuated. as a fraction of the maximum frequency
   pitch_lfo:
     _doc: >-
-      Controls for the "'Low Frequency Oscillator'"" (LFO) used to modulate pitch of notes at rhythmic
-        frequencies. In music this is often referred to a "'vibrato'".
+      Controls for the `'Low Frequency Oscillator'` (LFO) used to modulate pitch of notes at rhythmic
+        frequencies. In music this is often referred to a `'vibrato'`.
     use: switch feature on or off
     wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
         (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
