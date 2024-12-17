@@ -36,7 +36,6 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest',
               'sphinx.ext.inheritance_diagram',
               'sphinx.ext.autosummary','sphinx.ext.coverage',
               'sphinx.ext.napoleon', "myst_parser",
-              "sphinx_exec_code"]
               "sphinx_exec_code"]#, 'sphinxcontrib.jquery']
 
 html_js_files = [
