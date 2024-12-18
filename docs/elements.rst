@@ -76,14 +76,14 @@ This class instead **generates audio additively using mathematical functions** v
 
 A special case of the :code:`Synthesiser`, this generator synthesises sound from an input spectrum, via an inverse Fast Fourier Transform (IFFT), with randomised phases. The user can specify the audible frequency range that the ‘spectralised’ audio is mapped over.
 
-.. _channels
+.. _channels:
 
 Channels Class
 **************
 
 Once sound has been produced for each :code: `source`, the final step is to mix the audio down into some multi-channel audio format. The :code:`Channels` class essentially represents a bank of virtual microphones, with 3D antennae patterns, that each correspond to a channel in the output file.
 
-.. _sonification
+.. _sonification:
 
 Sonification Class
 ******************
