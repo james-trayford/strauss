@@ -67,6 +67,8 @@ html_theme = 'nature'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+myst_footnote_transition = False
+
 # html_theme_options = {
 #     'page_width': '1200px'
 # }
