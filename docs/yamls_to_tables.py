@@ -63,6 +63,8 @@ def yaml_traverse(metadict, valdict, rdict, headlev=1):
         return
 
 with open('docs/tables.md', 'w') as outfile:
+    l = len(glob(str(p)))
+    i = 0
     for f in glob(str(p)):
         p = Path(f)
         ydat = read_yaml(p)
@@ -73,6 +75,8 @@ with open('docs/tables.md', 'w') as outfile:
         # print('---')
         outfile.write(f"\n# {generators[p.parents[0].name]}\n")
         outfile.write(ystr)
-        outfile.write('---')
+        if i < l-1:
+            outfile.write('---')
+            i += 1
 
 # --- hide: stop ---

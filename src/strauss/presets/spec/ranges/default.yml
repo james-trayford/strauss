@@ -23,7 +23,54 @@ volume_envelope:
   Dc_unit: 'unitless'
   Rc_unit: 'unitless'
   level_unit: 'unitless'    
-  
+
+volume_lfo:
+  A: [1e-2, 20.]
+  D: [1e-2, 20.]
+  S: [0., 1.]
+  R: [1e-2, 20]
+  Ac: [-1. ,1.]
+  Dc: [-1. ,1.]
+  Rc: [-1. ,1.]
+  level: [0., 1.]
+  amount: [0, 1]
+  freq: [1., 12.]
+  freq_shift: [0., 3.]
+  A_unit: 'seconds'
+  D_unit: 'seconds'
+  S_unit: 'unitless'
+  R_unit: 'seconds'
+  Ac_unit: 'unitless'
+  Dc_unit: 'unitless'
+  Rc_unit: 'unitless'
+  level_unit: 'unitless'    
+  freq_unit: 'Hz'
+  freq_shift_unit: 'octave'
+
+pitch_lfo:
+  A: [1e-2, 20.]
+  D: [1e-2, 20.]
+  S: [0., 1.]
+  R: [1e-2, 20]
+  Ac: [-1. ,1.]
+  Dc: [-1. ,1.]
+  Rc: [-1. ,1.]
+  level: [0., 1.]
+  amount: [0, 2]
+  freq: [1., 12.]
+  freq_shift: [0., 3.]
+  A_unit: 'seconds'
+  D_unit: 'seconds'
+  S_unit: 'unitless'
+  R_unit: 'seconds'
+  Ac_unit: 'unitless'
+  Dc_unit: 'unitless'
+  Rc_unit: 'unitless'
+  level_unit: 'unitless'
+  amount_unit: 'semitones'
+  freq_unit: 'Hz'
+  freq_shift_unit: 'octave'
+
 # filter cutoff 
 cutoff: [0., 1.]
 cutoff_unit: 'unitless'

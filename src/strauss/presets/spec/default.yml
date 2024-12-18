@@ -106,30 +106,29 @@ _meta:
     any frequency range to an audible range, and generating a representative sound signal (using
     an [IFFT approach](https://docs.scipy.org/doc/scipy/reference/generated/scipy.fft.ifft.html)).
     In this approach, narrow spikes become tones at their frequency position, a sloped continuum
-    becomes coloured noise, etc.
+    becomes coloured noise, etc. _Note_: this generator must take a `spectrum` input, as an array,
+    representing 'flux' or 'power' values of a spectrum, arranged from lowest to highest frequncy.
   name: name for a particular preset.
   description: full description of what a preset does.
   note_length: >-
     Numerical note length
   volume_envelope: >-
-    Define the note volume envelope applied to the samples.
-    A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'.
   volume_envelope:
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
-    Ac: >-
-        "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
+    _doc : >-
+      Define the note volume envelope applied to the samples A,D,S & R correspond to 'attack',
+      'decay', 'sustain' and 'release'. _'ADSR'_ is a common parametrisation in sound synthesis,
+      Find out more e.g. [at this link](https://blg.native-instruments.com/adsr-explained/)
+    A: Attack, how long it takes for a sound to rise to 100% of the `level` after it’s triggered.
+    D: Decay, how long it takes for the sounds volume to die down to the `Sustain` value after the `Attack` period.
+    S: Sustain, the volume level (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
+    R: Release, how long the tone takes to finally die away once the note is released.
+    Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
         negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
-    Dc: >-
-        "Curvature" of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+    Dc: Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
         negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
-    Rc: >-
-        "Curvature" of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+    Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
         negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
-
-    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note
+    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note.
   filter: >-
     Do we apply a frequency filter to the audio signal? This can be used to change the balance of frequencies and manipulate
     the 'timbre' of a note
@@ -140,66 +139,58 @@ _meta:
     specified between 0 and 1 as a fraction of the audible range of notes we can hear (E0 to D#10). 
   pitch_lfo:
     _doc: >-
-        Controls for the 'Low Frequency Oscillator' (LFO) used to modulate pitch of notes at rhythmic
-        frequencies. In music this is often referred to a 'vibrato'   
-    use: Switch pitch LFO effects on or off
-    wave: >-
-        Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
+      Controls for the `'Low Frequency Oscillator'` (LFO) used to modulate pitch of notes at rhythmic
+        frequencies. In music this is often referred to as `'vibrato'`. 
+    use: Switch feature on or off
+    wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
         (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
     amount: the amplitude of the maximal pitch oscillation from the underlying pitch
     freq: Base frequency of the LFO oscillations.
-    freq_shift: shift relative to the bae LFO frequency
+    freq_shift: Shift relative to the base LFO frequency.
     phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
-    Ac: >-
-        "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
+    A: Attack, how long it takes for the LFO depth to rise to 100% of the `level` after it’s triggered.
+    D: Decay, how long it takes for the LFO depth to die down to the `Sustain` value after the `Attack` period.
+    S: Sustain, the LFO depth (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
+    R: Release, how long LFO depth takes to finally die to 0 once the note is released.
+    Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
         negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
-    Dc: >-
-        "Curvature" of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+    Dc: Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
         negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
-    Rc: >-
-        "Curvature" of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+    Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
         negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+    level: Total level of the envelope from 0 to 1, contolling maximum depth of the LFO.
 
-    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note
   volume_lfo:
     _doc: >-
-        Controls for the 'Low Frequency Oscillator' (LFO) used to modulate volume of notes at rhythmic
-        frequencies. In music this is often referred to as 'tremolo'
-    use: Switch pitch LFO effects on or off
-    wave: >-
-        Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
+      Controls for the `'Low Frequency Oscillator'` (LFO) used to modulate volume of notes at rhythmic
+        frequencies. In music this is often referred to as `'tremolo'`.
+    use: switch volume LFO effects on or off
+    wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
         (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
-    amount: the amplitude of the maximal pitch oscillation from the underlying pitch
+    amount: The amplitude of the maximal volume oscillation from the underlying pitch
     freq: Base frequency of the LFO oscillations.
-    freq_shift: shift relative to the bae LFO frequency
-    phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle
-    A: Attack
-    D: Decay
-    S: Sustain
-    R: Release
-    Ac: >-
-        "Curvature" of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
+    freq_shift: Shift relative to the base LFO frequency
+    phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle.
+    A: Attack, how long it takes for the LFO depth to rise to 100% of the `level` after it’s triggered.
+    D: Decay, how long it takes for the LFO depth to die down to the `Sustain` value after the `Attack` period.
+    S: Sustain, the LFO depth (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
+    R: Release, how long LFO depth takes to finally die to 0 once the note is released.
+    Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
         negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
-    Dc: >-
-        "Curvature" of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+    Dc: Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
         negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
-    Rc: >-
-        "Curvature" of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
+    Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
         negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
-    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note
+    level: Total level of the envelope from 0 to 1, contolling maximum depth of the LFO.
   volume: >-
     Master Volume of generator
   interpolation_type: >-
     How to interpolate and resample points in the spectrum. "sample": interpolate spectrum values directly;
     "preserve_power": integrate, interpolate then differentiate to avoid missing power in narrow features.
   regen_phases: >-
-    For an evolving spectrum, do we regenerate phases for each buffer, or keep the same?
+    Boolean, for an evolving spectrum, do we regenerate phases for each buffer, or keep the same?
   fit_spec_multiples: >-
-    Whether or not to generate IFFT such that the spectrum sample points are hit exactly.
+    Boolean, whether or not to generate IFFT such that the spectrum sample points are hit exactly.
   min_freq: >-
     Minimum sound frequency used to represent the data
   max_freq: >-
@@ -207,12 +198,16 @@ _meta:
   pitch: >-
     Default pitch selection (used by all generators)
   azimuth: >-
-    azimuth coordinate for spatialising audio into differing channels
+    Azimuth coordinate for spatialising audio into differing channels
   polar: >-
-    polar coordinate for spatialising audio into differing channels
+    Polar coordinate for spatialising audio into differing channels
   pitch_hi: >-
-    pitch range maximum in semitones
+    Pitch range maximum in semitones
   pitch_lo: >-
-    pitch range minimum in semitones
+    Pitch range minimum in semitones
   pitch_shift: >-   
-    default shift in semitones
+    Default shift in semitones
+  equal_loudness_normalisation: >-
+    Boolean, whether or not the spectrum is _Equalised_ such that single tones at different frequencies should sound equally
+    loud (to the average listener, at a default loudness of 70 phon), following [ISO:226](https://www.iso.org/standard/83117.html).
+    
