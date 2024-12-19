@@ -54,9 +54,7 @@ class mic:
 class audio_channels:
     """Representing output audio channels.
 
-    Data object representing the output channels of the sonification
-    for preset common audio setups, or a custom setup. Stores an array
-    of :obj:`mic` objects for each output channel.
+    Data object representing the output channels of the sonification for preset common audio setups, or a custom setup. Common setups include `"mono"` (a single signal played back through a single speaker), `"stereo"` (two channels played back through two speakers, allowing for better separation of sound), `"5.1"` (surround sound with 5 full bandwidth channels and 1 low frequency channel, commonly used in home cinemas) and `"7.1"` (surround sound with 7 full bandwidth channels and 1 low frequency channel). Stores an array of :obj:`mic` objects for each output channel.
     
     Args:
       setup (:obj:`str`): Type of audio setup. Supported options are

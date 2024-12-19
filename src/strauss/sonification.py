@@ -40,7 +40,7 @@ class Sonification:
 
     This class combines the data sources, musical score constraints
     and generator together to generate and render the ultimate
-    sonification for saving or playing in the :obj:`jupyter-notebook`
+    sonification for saving as an audio .wav file, or playing in the :obj:`jupyter-notebook`
     environment 
 
 

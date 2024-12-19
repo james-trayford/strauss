@@ -46,8 +46,8 @@ class Score:
     	  sequence used for the sonification. If a string, parse using
     	  :obj:`parse_chord_sequence`. If a :obj:`list`, each entry is
     	  a :obj:`list` of strings or floats, representing the notes of a
-          chord. notes are represented as strings using scientific pitch
-    	  notation, e.g. :obj:`[['C3','E3', 'G3'], ['C3', 'F3', 'A4']]`.
+          chord. notes are represented as strings using `scientific pitch
+    	  notation <https://www.allaboutmusictheory.com/piano-keyboard/music-note-names/>`_, e.g. :obj:`[['C3','E3', 'G3'], ['C3', 'F3', 'A4']]`.
           If floats, take values as note frequency in Hz. NOTE: currently
     	  only supported in combination with the :obj:`Synthesiser`
     	  generator class.
