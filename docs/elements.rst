@@ -74,7 +74,7 @@ This class instead **generates audio additively using mathematical functions** v
 `Spectraliser`
 ''''''''''''''
 
-A special case of the :code:`Synthesiser`, this generator synthesises sound from an input spectrum, via an inverse Fast Fourier Transform (IFFT), with randomised phases. The user can specify the audible frequency range that the ‘spectralised’ audio is mapped over.
+A special case of the :code:`Synthesiser`, this generator synthesises sound from an input spectrum, via an inverse Fast Fourier Transform (IFFT), with randomised phases. The user can specify the audible frequency range that the ‘spectralised’ audio is mapped over. Please see `Trayford et al 2021 <https://academic.oup.com/rasti/article/2/1/387/7209921>`_ for more details.
 
 .. _channels
 
