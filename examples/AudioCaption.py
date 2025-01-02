@@ -101,9 +101,14 @@ if mode == 'coqui-tts':
                         ttsmodel=str(Path('tts_models', 'de', 'thorsten', 'vits')))
 elif mode == 'pyttsx3':
     # find a German-language voice...
+    has_voice = 0
     for v in voices:
         if v.languages[0][:2] == 'de':
+            has_voice = 1
             break
+    if not has_voice:
+        print('no language-compatible voice, using first available...')
+        v = voices[0]
     soni = Sonification(score, events, generator, system,
                         caption=caption_de,
                         ttsmodel={'voice':v.id})
