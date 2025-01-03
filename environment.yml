@@ -2,23 +2,7 @@ name: strauss
 channels:
   - anaconda
 dependencies:
-  - python=3.8
+  - python >= 3.6
   - pip
   - pip:
-    - jupyterlab
-    - ffmpeg_python
-    - ipython
-    - matplotlib
-    - numpy
-    - pandas
-    - pychord
-    - pyyaml
-    - scipy
-    - setuptools >= 4.2
-    - sf2utils
-    - sphinx
-    - tqdm
-    - TTS
-    - wavio
-    - wheel
-    - sounddevice
+    - -e ".[default]"
