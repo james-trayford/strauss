@@ -16,7 +16,7 @@ Todo:
 from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
-from .tts_caption import render_caption, get_ttsMode
+from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -68,7 +68,7 @@ class Sonification:
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
                  caption=None, samprate=48000,
-                 ttsmodel=None):
+                 ttsmodel=default_tts_voice):
 
         # sampling rate in Hz
         self.samprate = samprate
@@ -193,20 +193,9 @@ class Sonification:
             # use a temporary directory to ensure caption file cleanup
             with tempfile.TemporaryDirectory() as cdir:
                 cpath = Path(cdir, 'caption.wav')
-                if ttsMode == 'coqui-ai':
-                    if self.ttsmodel == None:
-                        self.ttsmodel = Path('tts_models','en','jenny', 'jenny')
-                    else:
-                        pass
-                    render_caption(self.caption, self.samprate,
-                               str(self.ttsmodel), cpath)
-                else:
-                    if self.ttsmodel == None:
-                        self.ttsmodel = {}
-                    else:
-                        pass
-                    render_caption(self.caption, self.samprate,
+                render_caption(self.caption, self.samprate,
                                self.ttsmodel, str(cpath))
+                
                 rate_in, wavobj = wavfile.read(cpath)
                 wavobj = np.array(wavobj)
             # Set up the Stream objects for TTS
@@ -326,7 +315,7 @@ class Sonification:
             
         print("Saved.")
 
-    def save(self, fname, master_volume=1.):
+    def save(self, fname, master_volume=1., embed_caption=True):
         """ Save render as a combined multi-channel wav file 
         
         Can use this function to save sonification of any audio_setup
@@ -336,30 +325,37 @@ class Sonification:
           fname (:obj:`str`) Filename or filepath
           master_volume (:obj:`float`) Amplitude of the largest volume
             peak, from 0-1
+          embed_caption (:obj:`bool`) Whether or not to embed caption
+            at the start of the output audio
 
         Todo:
           * Raise `scipy` issue if common 24-bit WAV can be supported
         """
+
+        channels = []
+        vmax = 0.
         
         # first pass - find max amplitude value to normalise output
-        vmax = 0.
         for c in range(len(self.out_channels)):
+            
+            channel_values = np.concatenate(int(embed_caption)*[self.caption_channels[str(c)].values,]+
+                                            [self.out_channels[str(c)].values])   
+            channels.append(channel_values)
             vmax = max(
-                abs(self.out_channels[str(c)].values.max()),
-                abs(self.out_channels[str(c)].values.min()),
+                abs(channels[c].max()),
+                abs(channels[c].min()),
                 vmax
-            )
+            ) * 1.05
 
         # normalisation for conversion to int32 bitdepth wav
         norm = master_volume * (pow(2, 31)-1) / vmax
 
         # setup array to house wav stream data 
-        chans = np.zeros((self.out_channels['0'].values.size,
-                          len(self.out_channels)), dtype="int32")
+        chans = np.zeros((channels[0].size, len(channels)), dtype="int32")
         
         # normalise and collect channels into a list
         for c in range(len(self.out_channels)):
-            vals = self.out_channels[str(c)].values
+            vals = channels[c]
             chans[:,c] = (vals*norm).astype("int32")
             
         # finally combine and write out wav file

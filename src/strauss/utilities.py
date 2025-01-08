@@ -101,7 +101,7 @@ def reassign_nested_item_from_keypath(dictionary, keypath, value):
     """
     dictionary: dict, dict object to reassign values of
     keypath: str, 'a/b/c' corresponds to dict['a']['b']['c'] 
-             or (for Windows systems): str, 'a\b\c' corresponds to dict['a']['b']['c'] 
+             or (for Windows systems): str, 'a\\b\\c' corresponds to dict['a']['b']['c'] 
     value: any, value to reassign dictionary value with
     """
     p = Path(keypath)
@@ -154,7 +154,30 @@ def suppress_stdout_stderr():
     with open(devnull, 'w') as fnull:
         with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
             yield (err, out)
-            
+
+def get_supported_coqui_voices():
+    """Show supported Coqui-AI TTS voices
+    
+    """
+    voices = []
+
+    jenny = {"id": Path('tts_models', 'en', 'jenny', 'jenny'),
+             "name": 'jenny',
+             "languages": ['en_GB'],
+             "age": None}
+    
+    voices.append(jenny)
+
+    vits = {"id": Path('tts_models', '{iso_code}', 'fairseq', 'vits'),
+            "name": 'vits-{iso_code}',
+            "languages": ['many (https://dl.fbaipublicfiles.com/mms/tts/all-tts-languages.html for iso codes)'],
+            "age": None}
+
+    voices.append(vits)
+
+    return voices
+
+    
 class Capturing(list):
     """ Context manager for handling stdout (see https://stackoverflow.com/a/16571630) """
     def __enter__(self):
