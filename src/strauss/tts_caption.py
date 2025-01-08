@@ -13,14 +13,18 @@ import re
 import ffmpeg as ff
 import os
 import warnings
+from pathlib import Path
+
+default_tts_voice = None
+
 class NoTTSAPI(Exception):
     # except when no API key is found for coqui-TTS module
     pass
 try:
     from TTS.api import TTS
-    ttsMode = 'coqui-TTS'
-    if not os.environ.get("COQUI_STUDIO_TOKEN"):
-        raise NoTTSAPI
+    ttsMode = 'coqui-tts'
+    default_tts_voice = Path('tts_models','en','jenny', 'jenny')
+    supported_voices = utils.get_supported_coqui_voices()    
 except (OSError, ModuleNotFoundError, NoTTSAPI) as sderr:
     try:
       import pyttsx3
@@ -31,7 +35,8 @@ except (OSError, ModuleNotFoundError, NoTTSAPI) as sderr:
           def list_models(self):
               return getVoices(True)
       warnings.warn("Default TTS module coqui not found, using pyttsx3 instead. Note this is platform \n"
-                    "dependent and still problematic for linux-based systems (using the espeak engine)")
+                    "dependent and can be problematic for linux-based systems (using the espeak engine)")
+      default_tts_voice = {} # i.e. system default TTS (if exists)
     except (OSError, ModuleNotFoundError) as sderr:
       ttsMode = 'None'
       # print('No supported text-to-speech packages have been found.')
@@ -40,7 +45,7 @@ except (OSError, ModuleNotFoundError, NoTTSAPI) as sderr:
                 "This is not installed by default, due to some specific module requirements of the TTS module.\n"
                 "Reinstalling strauss with 'pip install strauss[TTS]' will give you access to this function\n"
                 "If you run into issues with the TTS package, you can also install pyttsx3. Currently the most\n" 
-                "compatible version is npt published on PyPI, but you can install from the git repo with \n"
+                "compatible version is not published on PyPI, but you can install from the git repo with \n"
                 "'pip install git+https://github.com/nateshmbhat/pyttsx3.git'.")
 
 class TTSIsNotSupported(Exception):
@@ -59,20 +64,24 @@ def getVoices(info=False):
       info (:obj:`bool`): Print out voice information when True, 
       by default False
       voices (:obj:`list`): List of ``pyttsx3.voice.Voice`` objects
+      or ``dict`` objects.
+ 
   '''
   if ttsMode == 'pyttsx3':
-    engine = pyttsx3.init()
-    voices = engine.getProperty('voices')
-    if info==True:
-        print('Text-to-speech voice options')
-        for ind in range(len(voices)):
-            voiceProps = vars(voices[ind])
-            print('\nVoice index:', ind)
-            for key in voiceProps.keys():
-                print('{}: {}'.format(key, voiceProps[key]))
-    else:
-        pass
-    return voices
+      engine = pyttsx3.init()
+      voices = engine.getProperty('voices')
+      getter = vars
+  elif ttsMode == 'coqui-tts':
+      voices = supported_voices
+      getter = dict
+  if info==True:
+      print('Text-to-speech voice options')
+      for ind in range(len(voices)):
+          voiceProps = getter(voices[ind])
+          print('\nVoice index:', ind)
+          for key in voiceProps.keys():
+              print('{}: {}'.format(key, voiceProps[key]))      
+  return voices      
 
 def render_caption(caption, samprate, model, caption_path):
     '''The render_caption function generates an audio caption from text input
@@ -103,14 +112,14 @@ def render_caption(caption, samprate, model, caption_path):
       caption_path (:obj:`str`): filepath for spoken caption output
     '''
 
-    if ttsMode == 'coqui-TTS':
+    if ttsMode == 'coqui-tts':
       # TODO: do this better with logging. We can filter TTS function output, e.g. alert to downloading models...
       print('Rendering caption (this can take a while if the caption is long, or if the TTS model needs downloading)...')
       
       # capture stdout from the talkative TTS module
       with utils.Capturing() as output:
           # Load in the tts model
-          tts = TTS(model, progress_bar=False, gpu=False)
+          tts = TTS(str(model), progress_bar=False, gpu=False)
 
           # render to speech, and write as a wav file (allow )
           tts.tts_to_file(text=caption, file_path=caption_path)
