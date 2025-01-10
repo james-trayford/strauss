@@ -18,10 +18,8 @@ import strauss
 
 mode = strauss.tts_caption.ttsMode
 
-
 # What text to speech do we have?
 print(f"Available text-to-speech (TTS) is: {mode}")
-
 
 # Generate a placeholder sonification (a short sequence of glockenspiel notes) that we may want to add a caption to:
 
@@ -92,9 +90,21 @@ soni.hear()
 caption_de = "In der folgenden Tonspur wird ein Glockenspiel verwendet um Sterne mit unterschiedlichen Farben zu repräsentieren."
 
 if mode == 'coqui-tts':
+    language_index = 0 # or, pick a different index for another langauge
+    iso_codes = ['deu', 'spa', 'ita', 'pol', 'hin']
+    captions = [caption_de,
+                "En el siguiente audio, se utiliza una campana para representar estrellas de diferentes colores.",
+                "Nell'audio seguente, il suono di un campanello verra utilizzato per rappresentare stelle di diversi colori.",
+                "W następującym nagraniu dźwiękowym dzwonek reprezentuje gwiazdy w różnych kolorach.",
+                "आगे आने वाले ऑडियो में विभिन्न रंगों के तारों को दर्शाने के लिए अलग-अलग स्वरों का उपयोग किया गया है।"]
+    models = [Path('tts_models', 'de', 'thorsten', 'vits'),
+              Path('tts_models', iso_codes[1], 'fairseq', 'vits'),
+              Path('tts_models', iso_codes[3], 'fairseq', 'vits'),
+              Path('tts_models', iso_codes[4], 'fairseq', 'vits')]
+
     soni = Sonification(score, events, generator, system,
-                        caption=caption_de, 
-                        ttsmodel=Path('tts_models', 'deu', 'fairseq', 'vits'))
+                        caption=captions[language_index],
+                        ttsmodel=models[language_index])
 elif mode == 'pyttsx3':
     # find a German-language voice...
     has_voice = 0
