@@ -268,11 +268,25 @@ def get_supported_coqui_voices():
     voices.append(jenny)
 
     vits = {"id": Path('tts_models', '{iso_code}', 'fairseq', 'vits'),
-            "name": 'vits-{iso_code}',
+            "name": 'fairseq-{iso_code}',
             "languages": ['many (https://dl.fbaipublicfiles.com/mms/tts/all-tts-languages.html for iso codes)'],
             "age": None}
 
     voices.append(vits)
+
+    vits_ita = {"id": Path('tts_models', 'it', 'mai_female', 'glow-tts'),
+                "name": 'mai',
+                "languages": ['it_IT'],
+                "age": None}
+
+    voices.append(vits_ita)
+
+    thorsten = {"id": Path('tts_models', 'de', 'thorsten', 'vits'),
+                "name": 'thorsten',
+                "languages": ['de_DE'],
+                "age": None}
+
+    voices.append(thorsten)
 
     return voices
 

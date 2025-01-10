@@ -112,7 +112,9 @@ def render_caption(caption, samprate, model, caption_path):
       caption_path (:obj:`str`): filepath for spoken caption output
     '''
 
+    # TODO: allow uniform indexing and/or language querying approaches for more consistency between tts modes...
     if ttsMode == 'coqui-tts':
+
       # TODO: do this better with logging. We can filter TTS function output, e.g. alert to downloading models...
       print('Rendering caption (this can take a while if the caption is long, or if the TTS model needs downloading)...')
       
@@ -123,9 +125,9 @@ def render_caption(caption, samprate, model, caption_path):
 
           # render to speech, and write as a wav file (allow )
           tts.tts_to_file(text=caption, file_path=caption_path)
-    
+          
     elif ttsMode == 'pyttsx3':
-
+        
       # Setup voice model for pyttsx3
       engine = pyttsx3.init() # initialize object
 
