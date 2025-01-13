@@ -35,9 +35,10 @@ class Score:
     	sonification. For example for a one minute sonification
     	(:obj:`length = '1m 0s'`) the :obj:`chord_sequence = "Am7_3 |
     	D9_3 | Gmaj7_2"` plays each chord for 20s each. Chaining the 
-    	same chord can be used to change intervals,
+    	same chord can be used to change the length of these intervals,
     	(e.g. :obj:`chord_sequence = "F_3 | F_3 | C_4"` plays F for
-    	40s and C for 20s.) 
+    	40s and C for 20s, `[["C2","G3","E4"]*37+["G2","D3","B4"]*23]`
+        would play the C voicing for 37s and G voicing for 23s). 
     """
     def __init__(self, chord_sequence, length, pitch_binning='adaptive'):
         """

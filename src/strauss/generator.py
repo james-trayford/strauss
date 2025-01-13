@@ -630,6 +630,18 @@ class Sampler(Generator):
             All `.sf2` files should contain at least one preset. When
             given default `None` value, will print available presets
             and select the first preset. Note presets are 1-indexed.
+        
+        Note:
+          It is necessary to assign a note for each sample in order to
+          choose different sample based on the ``pitch`` parameter. This
+          is also the case for non-pitched sounds, following a similar
+          approach to a [keyboard sampler]
+          (https://support.apple.com/en-lk/guide/logicpro/lgcp4eecaaff/mac)
+          where each key can triggers a different chosen sample. If
+          `drumset_C1.wav` is a kick drum and `drumset_D1.wav` is a snare
+          drum for :obj:`Score` with `chord_sequence=[["C1", "D1"]]`, events
+          mapped to a higher (lower) `pitch` will sound as snare (kick) drums.
+          
         """
         # default sampler preset
         self.gtype = 'sampler'
@@ -819,6 +831,13 @@ class Sampler(Generator):
         dictionary of filepaths, generate interpolation functions for
         each, and assign them to a named note in scientific pitch notation
         (e.g. :obj:`'A4'`).
+
+        Note:
+          Notes are assigned based on a tag in the filename (see :obj:`Sampler`),
+          not by analysing the audio itself. If a tuned sample is tagged as the
+          wrong note, this will carry over to the sonification. However, this
+          allows non-pitched samples to be assigned notes and triggered.
+          
         """
         self.samples = {}
         self.samplens = {}
