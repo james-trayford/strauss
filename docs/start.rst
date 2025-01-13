@@ -59,6 +59,7 @@ From the :code:`jupyter-lab` interface, a good starting point is the :code:`Soni
 
 For a multivariate :code:`Event`-type sonification, the :code:`StarsAppearing.ipynb` notebook provides a step-by-step example, and demonstrates realistic stereo imaging for panoramic data. The output from this example was used in the `"Audio Universe: Tour of the Solar System" 2021 planetarium show <https://www.audiouniverse.org/education/shows/tour-of-the-solar-system>`_.
 
-For a multivariate, multi-source example using an :code:`Object`-type source representation, see the :code:`PlanetaryOrbits.ipynb` Notebook, the output of which was also used in the "Audio Universe: Tour of the Solar System" planetarium show.
+For a multivariate, multi-source example using an :code:`Object`-type source representation, see the :code:`PlanetaryOrbits.ipynb` Notebook, the output of which was also used in the "Audio Universe: Tour of the Solar System" planetarium show. An example of a bivariate data series sonification, described in `this paper <https://arxiv.org/abs/2311.16847>`_, can be found `here 
+<https://data.ncl.ac.uk/articles/media/Trayford_2023_STRAUSS_ICAD_examples/22241182?file=39529129>`_.
 
 In addition to the above-mentioned examples, there are a number of other Notebooks, each representing the diverse applications and uses of the Strauss code to sonify data in different ways. A more detailed overview of the example Notebooks and scripts can be found in  :ref:`examples`.
