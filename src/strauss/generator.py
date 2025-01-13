@@ -190,7 +190,7 @@ class Generator:
         envelope value at each sample. envelopes are defined by
         attack, decay, sustain and release (:obj:`'A','D','S' & 'R`)
         values, as well as segment curvatures (:obj:`'Ac','Dc', &
-        'Rc`) and a normalisation :obj:`'level'`.
+        'Rc`) and a normalisation :obj:`'level'`. See `this blog <https://emastered.com/blog/adsr-envelopes>`_ for a more detailed explanation of ADSR envelopes.
 
         Args:
           samp (:obj:`array-like`): Audio sample index
