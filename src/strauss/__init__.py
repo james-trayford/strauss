@@ -13,4 +13,4 @@ from . import sources
 from . import stream
 from . import presets
 
-__version__ = "0.1.2"
+__version__ = "0.4.0"
