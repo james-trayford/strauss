@@ -51,7 +51,10 @@ def yaml_traverse(metadict, valdict, rdict, headlev=1):
                 # unspecified => '-'
                 try:
                     float(valdict[k])
-                    rdict[k+"_unit"] = 'unitless'
+                    if not isinstance(valdict[k], bool):
+                        rdict[k+"_unit"] = 'unitless'
+                    else:
+                        rdict[k+"_unit"] = '-'
                 except ValueError:
                     rdict[k+"_unit"] = '-'
             # print(f"|`{k}` |  _{metadict[k]}_ | `{str(valdict[k]).strip()}` | `{rdict[k]}` | {rdict[k+'_unit']}")

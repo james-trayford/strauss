@@ -4,80 +4,22 @@
 note_length: [1e-2, 30.]
 note_length_unit: 'seconds'
 
-# define the note volume envelope applied to the samples
-# A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
-volume_envelope:
-  A: [1e-2, 20.]
-  D: [1e-2, 20.]
-  S: [0., 1.]
-  R: [1e-2, 20]
-  Ac: [-1. ,1.]
-  Dc: [-1. ,1.]
-  Rc: [-1. ,1.]
-  level: [0., 1.]
-  A_unit: 'seconds'
-  D_unit: 'seconds'
-  S_unit: 'unitless'
-  R_unit: 'seconds'
-  Ac_unit: 'unitless'
-  Dc_unit: 'unitless'
-  Rc_unit: 'unitless'
-  level_unit: 'unitless'    
+azimuth: [0., 1.]
+azimuth_unit: 'cycles'
+polar: [0.,1.]
+polar_unit: 'half-cycles'
 
-volume_lfo:
-  A: [1e-2, 20.]
-  D: [1e-2, 20.]
-  S: [0., 1.]
-  R: [1e-2, 20]
-  Ac: [-1. ,1.]
-  Dc: [-1. ,1.]
-  Rc: [-1. ,1.]
-  level: [0., 1.]
-  amount: [0, 1]
-  freq: [1., 12.]
-  freq_shift: [0., 3.]
-  A_unit: 'seconds'
-  D_unit: 'seconds'
-  S_unit: 'unitless'
-  R_unit: 'seconds'
-  Ac_unit: 'unitless'
-  Dc_unit: 'unitless'
-  Rc_unit: 'unitless'
-  level_unit: 'unitless'    
-  freq_unit: 'Hz'
-  freq_shift_unit: 'octave'
-
-pitch_lfo:
-  A: [1e-2, 20.]
-  D: [1e-2, 20.]
-  S: [0., 1.]
-  R: [1e-2, 20]
-  Ac: [-1. ,1.]
-  Dc: [-1. ,1.]
-  Rc: [-1. ,1.]
-  level: [0., 1.]
-  amount: [0, 2]
-  freq: [1., 12.]
-  freq_shift: [0., 3.]
-  A_unit: 'seconds'
-  D_unit: 'seconds'
-  S_unit: 'unitless'
-  R_unit: 'seconds'
-  Ac_unit: 'unitless'
-  Dc_unit: 'unitless'
-  Rc_unit: 'unitless'
-  level_unit: 'unitless'
-  amount_unit: 'semitones'
-  freq_unit: 'Hz'
-  freq_shift_unit: 'octave'
+# pitch range and default shift in semitones
+pitch_shift: [0., 24.]
+pitch_shift_unit: 'semitones'
 
 # filter cutoff 
 cutoff: [0., 1.]
-cutoff_unit: 'unitless'
+cutoff_unit: 'fraction'
 
 # Master volume
 volume: [0., 1.]
-volume_unit: 'unitless' 
+volume_unit: 'fraction' 
 
 # frequency limits in Hz
 min_freq: [20,2.2e4]
@@ -104,42 +46,72 @@ filter: "off"
 filter_type: "LPF1"
 cutoff: 1.
 
-# or 'vibrato'
-pitch_lfo:
-  amount: [0, 2] 
-  freq: [1,12]
-  freq_shift: [0,3]
-  A: [1e-2, 10]
-  D: [1e-2, 10]
-  S: [0, 1]
-  R: [1e-2, 10]
-  freq_unit: "Hz"
-  amount_unit: "semitones"
+# define the note volume envelope applied to the samples
+# A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
+volume_envelope:
+  A: [1e-2, 20.]
+  D: [1e-2, 20.]
+  S: [0., 1.]
+  R: [1e-2, 20]
+  Ac: [-1. ,1.]
+  Dc: [-1. ,1.]
+  Rc: [-1. ,1.]
+  level: [0., 1.]
+  A_unit: 'seconds'
+  D_unit: 'seconds'
+  S_unit: 'fraction'
+  R_unit: 'seconds'
+  Ac_unit: 'unitless'
+  Dc_unit: 'unitless'
+  Rc_unit: 'unitless'
+  level_unit: 'fraction'    
 
 volume_lfo:
-  amount: [0, 1] 
-  freq: [1,12]
-  freq_shift: [0,3]
-  A: [1e-2, 10]
-  D: [1e-2, 10]
-  S: [0, 1]
-  R: [1e-2, 10]
-  freq_unit: "Hz"
-  amount_unit: "fraction"
-  use: off
-  wave: 'sine'
-  amount: 0.5
-  freq: 3
-  freq_shift: 0
-  phase: 'random'
-  A: 0.
-  D: 0.1
-  S: 1.
-  R: 0.
-  Ac: 0.
-  Dc: 0.
-  Rc: 0.
-  level: 1
+  A: [1e-2, 20.]
+  D: [1e-2, 20.]
+  S: [0., 1.]
+  R: [1e-2, 20]
+  Ac: [-1. ,1.]
+  Dc: [-1. ,1.]
+  Rc: [-1. ,1.]
+  level: [0., 1.]
+  amount: [0, 1]
+  freq: [1., 12.]
+  freq_shift: [0., 3.]
+  A_unit: 'seconds'
+  D_unit: 'seconds'
+  S_unit: 'fraction'
+  R_unit: 'seconds'
+  Ac_unit: 'unitless'
+  Dc_unit: 'unitless'
+  Rc_unit: 'unitless'
+  level_unit: 'fraction'    
+  freq_unit: 'Hz'
+  freq_shift_unit: 'octave'
+
+pitch_lfo:
+  A: [1e-2, 20.]
+  D: [1e-2, 20.]
+  S: [0., 1.]
+  R: [1e-2, 20]
+  Ac: [-1. ,1.]
+  Dc: [-1. ,1.]
+  Rc: [-1. ,1.]
+  level: [0., 1.]
+  amount: [0, 2]
+  freq: [1., 12.]
+  freq_shift: [0., 3.]
+  A_unit: 'seconds'
+  D_unit: 'seconds'
+  S_unit: 'fraction'
+  R_unit: 'seconds'
+  Ac_unit: 'unitless'
+  Dc_unit: 'unitless'
+  Rc_unit: 'unitless'
+  level_unit: 'fraction'
+  amount_unit: 'semitones'
+  freq_unit: 'Hz'
+  freq_shift_unit: 'octave'
 
 _meta:
   note_length: >-

@@ -102,17 +102,17 @@ _meta:
   volume_envelope:
     _doc: >-
       Define the note volume envelope applied to the samples. _'ADSR'_ is a common parametrisation in sound synthesis,
-      find out more e.g. [at this link](https://blg.native-instruments.com/adsr-explained/)
+      find out more e.g. [at this link]( https://learnmusicproduction.in/blogs/music-production-and-audio-engineering/adsr-fundamentals-in-music-everything-you-need-to-know).
     A: Attack, how long it takes for a sound to rise to 100% of the `level` after it’s triggered.
     D: Decay, how long it takes for the sounds volume to die down to the `Sustain` value after the `Attack` period.
     S: Sustain, the volume level (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
     R: Release, how long the tone takes to finally die away once the note is released.
-    Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
-        negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
-    Dc: Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
-        negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
-    Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
-        negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+    Ac: Curvature of the attack portion of the envelope. Values from -1 to 1, positive indicates increases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear attack, increasing at a constant rate.
+    Dc: Curvature of the Decay portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear decay, decreasing at a constant rate.
+    Rc: Curvature of the release portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear release, decreasing at a constant rate.
     level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note.
   filter: >-
     Apply a frequency filter to to the audio signal. Values are 'on' or 'off'. A filter affects the timbre by filtering out certain harmonics
@@ -136,12 +136,12 @@ _meta:
     D: Decay, how long it takes for the LFO depth to die down to the `Sustain` value after the `Attack` period.
     S: Sustain, the LFO depth (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
     R: Release, how long LFO depth takes to finally die to 0 once the note is released.
-    Ac: Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
-        negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
-    Dc: Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
-        negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
-    Rc: Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
-        negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+    Ac: Curvature of the attack portion of the envelope. Values from -1 to 1, positive indicates increases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear attack, increasing at a constant rate.
+    Dc: Curvature of the Decay portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear decay, decreasing at a constant rate.
+    Rc: Curvature of the release portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear release, decreasing at a constant rate.
     level: Total level of the envelope from 0 to 1, contolling maximum depth of the LFO.
   volume_lfo:
     _doc: >-
@@ -159,14 +159,14 @@ _meta:
     S: Sustain, the LFO depth (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
     R: Release, how long LFO depth takes to finally die to 0 once the note is released.
     Ac: >-
-      Curvature of the attack portion of a note. Values from -1 to 1, positive indicates increases quickly then slow,
-      negative slowly then quick. a value of 0 is a linear attack, increasing in volume at a constant rate.
+      Curvature of the attack portion of the envelope. Values from -1 to 1, positive indicates increases quickly then slow,
+      negative slowly then quick. a value of 0 is a linear attack, increasing at a constant rate.
     Dc: >-
-      Curvature of the Decay portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
-      negative slowly then quick. a value of 0 is a linear decay, decreasing in volume at a constant rate.
+      Curvature of the Decay portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+      negative slowly then quick. a value of 0 is a linear decay, decreasing at a constant rate.
     Rc: >-
-      Curvature of the release portion of a note. Values from -1 to 1, positive indicates decreases quickly then slow,
-      negative slowly then quick. a value of 0 is a linear release, decreasing in volume at a constant rate.
+      Curvature of the release portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+      negative slowly then quick. a value of 0 is a linear release, decreasing at a constant rate.
     level: Total level of the envelope from 0 to 1, contolling maximum depth of the LFO.
   volume: >-
     Master Volume of generator.
