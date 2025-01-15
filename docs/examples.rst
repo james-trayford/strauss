@@ -25,7 +25,7 @@ Earth System (:code:`EarthSystem.ipynb`)
 ****************************************
 The *Earth System* sonification represents the ratio of ocean to land along lines of longitude as the Earth spins through three rotation cycles. We use the Strauss :code:`Synthesiser` to generate chords. A low pass filter is employed to generate a brighter sound to represent a high water fraction and a duller sound for high land fraction. 
 
-A video of this sequence is available starting at 2:17 in `this video <https://www.youtube.com/watch?v=h1muFAEMmOs>`_.
+A video of this sequence is available starting at 2:17 in `this video <https://youtu.be/h1muFAEMmOs?si=W-KphgRAk0GPeAqJ&t=137>`_.
 The code is available in a `Google Colab notebook <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/EarthSystem.ipynb>`_.
 
 
