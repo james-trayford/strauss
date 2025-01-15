@@ -1,7 +1,7 @@
 """ The :obj:`generator` submodule: creating sounds for the sonification.
 
 This submodule handles the actual generation of sound for the
-sonfication, after parametrisation by the :obj:`Sources` and musical
+sonification, after parameterisation by the :obj:`Sources` and musical
 choices dictated by the :obj:`Score`.
 
 Todo:
@@ -45,7 +45,6 @@ import os
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
 
-
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object
 #   allowing ADSR volume and filter enveloping, LFO implementation etc.
@@ -53,10 +52,39 @@ warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, sk
 #   musical choices and uses these to generate sound, but can be interfaced with directly.
 
 def forward_loopsamp(s, start, end):
+    """Produce array of sample indices for looping a sample forward.
+
+    Sample indices between values `start` and `end` that will loop the sample
+    such that it loops "forward", i.e. start, start+1, ..., end-1, end, start,
+    ... etc.
+
+    Args:
+      s (:obj:`ndarray`): array of input sample indices
+      start (:obj:`int`): Index of sample after which looping should commence
+      end (:obj:`int`): Index of sample after which audio loops
+
+    Returns:
+      out (:obj:`ndarray`): array of output sample indices
+    """
     delsamp = end-start
     return np.piecewise(s, [s < start, s >= start],
                         [lambda x: x, lambda x: (x-start)%(delsamp) + start])
 def forward_back_loopsamp(s, start, end):
+    """Produce array of sample indices for looping a sample forward-back.
+
+    Sample indices between values `start` and `end` that will loop the sample
+    such that it loops "forward-back", i.e. `start, start+1, ..., end-1, end,
+    end-1, ..., start+1, start, start+1, ...` etc.
+    ... etc.
+
+    Args:
+      s (:obj:`ndarray`): array of input sample indices
+      start (:obj:`int`): Index of sample after which looping should commence
+      end (:obj:`int`): Index of sample after which audio loops
+
+    Returns:
+      out (:obj:`ndarray`): array of output sample indices
+    """
     delsamp = end-start
     return np.piecewise(s, [s < start, s >= start],
                         [lambda x: x, lambda x: end - abs((x-start)%(2*(delsamp)) - (delsamp))])
@@ -66,16 +94,23 @@ class Generator:
 
     Generators have common initialisation and methods that are
     defined by this parent class.
-    
-    Args:
-    	params (`optional`, :obj:`dict`): any generator parameters
-    	  that differ from the generator :obj:`preset`, where keys and
-    	  values are parameters names and values respectively. 
-    	samprate (`optional`, :obj:`int`): the sample rate of
-  	  the generated audio in samples per second (Hz)
+
+    Attributes:
+      samprate (:obj:`int`): Samples per second of audio stream (Hz)
+      audbuff (:obj:`int`): Samples per audio buffer
+      preset (:obj:`dict`): Dictionary of parameters defining the
+        generator.
+
     """
     def __init__(self, params={}, samprate=48000):
-        """universal generator initialisation"""
+        """
+        Args:
+    	params (`optional`, :obj:`dict`): any generator parameters
+    	  that differ from the generator :obj:`preset`, where keys and
+    	  values are parameter names and values respectively. 
+    	samprate (`optional`, :obj:`int`): the sample rate of
+  	  the generated audio in samples per second (Hz)
+        """
         self.samprate = samprate
 
         # samples per buffer (use 30Hz as minimum)
@@ -86,7 +121,7 @@ class Generator:
             self.preset = self.modify_preset(params)
 
     def load_preset(self, preset='default'):
-        """ load parameters from a preset YAML file.
+        """Load parameters from a preset YAML file.
 
         Wrapper method for the :obj:`presets.synth.load_preset` or
         :obj:`presets.sampler.load_preset` functions. Always load the
@@ -95,7 +130,7 @@ class Generator:
         :obj:`preset`
 
         Args:
-          preset (:obj:`str`): name of the preset. built-in presets
+          preset (:obj:`str`): name of the preset. Built-in presets
             can be named directly and looks to import the preset from
             the :obj:`<MODULE_PATH>/presets/<GENERATOR>/` directory as
             :obj:`<preset>.yml`, where :obj:`<GENERATOR>` is either
@@ -113,7 +148,7 @@ class Generator:
             self.modify_preset(preset)
 
     def modify_preset(self, parameters, cleargroup=[]):
-        """modify parameters within current preset
+        """Modify parameters within current preset
 
         method allows user to tweak generator parameters directly,
         using a dictionary of parameters and their values. subgroups
@@ -136,7 +171,7 @@ class Generator:
                         del self.preset[grp][k]
             
     def preset_details(self, term="*"):
-        """ Print the names and descriptions of presets
+        """Print the names and descriptions of presets
 
         Wrapper for preset_details function. lists the name and description
         of built-in presets with names matching the search term.
@@ -148,14 +183,14 @@ class Generator:
         getattr(presets, self.gtype).preset_details(name=term)
 
     def envelope(self, samp, params, etype='volume'):
-        """ Envelope function for modulating a single note
+        """Envelope function for modulating a single note
 
         The envelope function takes the pre-defined envelope
         parameters for the specified envelope type and returns the
         envelope value at each sample. envelopes are defined by
         attack, decay, sustain and release (:obj:`'A','D','S' & 'R`)
         values, as well as segment curvatures (:obj:`'Ac','Dc', &
-        'Rc`) and a normalisation :obj:`'level'`.
+        'Rc`) and a normalisation :obj:`'level'`. See `this article <https://learnmusicproduction.in/blogs/music-production-and-audio-engineering/adsr-fundamentals-in-music-everything-you-need-to-know>`_ for a more detailed explanation of ADSR envelopes.
 
         Args:
           samp (:obj:`array-like`): Audio sample index
@@ -216,7 +251,7 @@ class Generator:
         return lvl*env
 
     def env_segment_curve(self, t, t1, y0, k):
-        """formula for segments of the envelope function
+        """Formula for segments of the envelope function
         
         Function to evaluate the segments of the envelope, allowing
         for curvature, i.e. concave & convex envelope segments.
@@ -281,7 +316,7 @@ class Generator:
           s (:obj:`array`-like): sample index
           f (:obj:`float`): samples per cycle
           p (:obj:`float` or :obj:`str`): if numerical, phase in units
-            of cycles, :obj:`'random'` indicates randomised.
+            of cycles :obj:`'random'` indicates randomised.
         Returns:
           v (:obj:`array`-like): values for each sample
         """
@@ -315,7 +350,7 @@ class Generator:
         cycles or :obj:`'random'` to indicate randomised.
 
         Note:
-          To modulate the frequency of an ocillator, use the
+          To modulate the frequency of an oscillator, use the
           :obj:`freq_shift` parameter, rather than :obj:`freq`
 
         Args:
@@ -334,7 +369,6 @@ class Generator:
         env_dict = {}
         lfo_key = f'{ltype}_lfo'
         lfo_params = params[lfo_key]
-
         
         env_dict['note_length'] = params['note_length']
         env_dict['lfo_envelope'] = lfo_params
@@ -372,19 +406,22 @@ class Synthesizer(Generator):
     the preset, and linearly combined to produce the sound. defines
     attribute :obj:`self.gtype = 'synth'`.
 
-    Args:
-    	params (`optional`, :obj:`dict`): any generator parameters
-    	  that differ from the generator :obj:`preset`, where keys and
-    	  values are parameters names and values respectively. 
-    	samprate (`optional`, :obj:`int`): the sample rate of
-  	  the generated audio in samples per second (Hz)
+    Attributes:
+      gtype (:obj:`str`): Generator type 
 
     Todo:
     	* Add other synthesiser types, aside from additive (e.g. FM,
     	  vector, wavetable)? 
     """
     def __init__(self, params=None, samprate=48000):
-
+        """
+        Args:
+    	  params (`optional`, :obj:`dict`): any generator parameters
+    	    that differ from the generator :obj:`preset`, where keys
+            and values are parameters names and values respectively. 
+    	  samprate (`optional`, :obj:`int`): the sample rate of
+  	    the generated audio in samples per second (Hz)
+        """
         # default synth preset
         self.gtype = 'synth'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -399,13 +436,17 @@ class Synthesizer(Generator):
     def setup_oscillators(self):
         """Setup and consolidate oscs into a two-variable function.
 
-        Reads the parametrisation of each oscillator from the preset,
+        Reads the parameterisation of each oscillator from the preset,
         specifying their waveform (:obj:`wave`), relative amplitude
         (:obj:`level`), detuning in cents (:obj:`det`) and
         :obj:`phase`, either a number in units of cycles, or a string
         specifying randomisation (:obj:`'random'`). Sets the
         :obj:`self.generate` method, using the
         :obj:`self.combine_oscs`.
+
+        Note:
+          This is deprecated and will likely be removed from future
+          versions
         """
         # oscdict = self.preset['oscillators']
         # self.osclist = []
@@ -427,6 +468,9 @@ class Synthesizer(Generator):
     def modify_preset(self, parameters, clear_oscs=True):
         """Synthesizer-specific wrapper for the modify_preset method.
 
+        This gives control over whether or not to clear the arbitrary
+        number of oscillators for synthesizer.
+        
         Args:
           parameters (:obj:`dict`): keys and items are the preset
             parameter names and new values. Nested dictionaries are
@@ -448,7 +492,7 @@ class Synthesizer(Generator):
         Args:
           s (:obj:`array`-like): Sample index
           f (:obj:`float` or :obj:`str`): If numerical, frequency in
-            cycles per second, if string, note name in scientific
+            cycles per second, if string, note name in scientific pitch
             notation (e.g. :obj:`'A4'`)
         Returns:
           tot (:obj:`array`-like): values for each sample
@@ -552,26 +596,13 @@ class Sampler(Generator):
     """Sampler generator class
 
     This generator class generates sound using pre-loaded audio
-    samples, representing d`ifferent notes. Presets define parameters
-    controlling how these defines
+    samples, representing different notes. Presets define parameters
+    controlling these defines
     attribute :obj:`self.gtype = 'sampler'`.
 
-    Args:
-        sampfiles (`required`, :obj:`str`): string pointing to samples
-          to load. This can either point to a directory containing
-          samples, where `"path/to/samples"` contains files named
-          as `samples_A#4.wav` (ie. `<lowest_directory>_<note>.wav`),
-          or a *Soundfont* file, with extension `.sf2`.
-    	params (`optional`, :obj:`dict`): any generator parameters
-    	  that differ from the generator :obj:`preset`, where keys and
-    	  values are parameters names and values respectively. 
-    	samprate (`optional`, :obj:`int`): the sample rate of
-  	  the generated audio in samples per second (Hz)
-        sf_preset (`optional`, :obj:`int`) if using a *Soundfont*
-          (`.sf2`) file, this is the number of the preset to use.
-          All `.sf2` files should contain at least one preset. When
-          given default `None` value, will print available presets
-          and select the first preset. Note presets are 1-indexed.
+    Attributes:
+      gtype (:obj:`str`): Generator type 
+    
     Todo:
     	* Add zone mapping for samples (e.g. allow a sample to define
           a range of notes played at different speeds).
@@ -582,6 +613,36 @@ class Sampler(Generator):
     """
 
     def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None):
+        """
+        Args:
+          sampfiles (`required`, :obj:`str`): string pointing to samples
+            to load. This can either point to a directory containing
+            samples, where `"path/to/samples"` contains files named
+            as `samples_A#4.wav` (ie. `<lowest_directory>_<note>.wav`),
+            or a *Soundfont* file, with extension `.sf2`.
+    	  params (`optional`, :obj:`dict`): any generator parameters
+    	    that differ from the generator :obj:`preset`, where keys and
+    	    values are parameters names and values respectively. 
+    	  samprate (`optional`, :obj:`int`): the sample rate of
+  	    the generated audio in samples per second (Hz)
+          sf_preset (`optional`, :obj:`int`) if using a *Soundfont*
+            (`.sf2`) file, this is the number of the preset to use.
+            All `.sf2` files should contain at least one preset. When
+            given default `None` value, will print available presets
+            and select the first preset. Note presets are 1-indexed.
+        
+        Note:
+          It is necessary to assign a note for each sample in order to
+          choose different sample based on the ``pitch`` parameter. This
+          is also the case for non-pitched sounds, following a similar
+          approach to a [keyboard sampler]
+          (https://support.apple.com/en-lk/guide/logicpro/lgcp4eecaaff/mac)
+          where each key can triggers a different chosen sample. If
+          `drumset_C1.wav` is a kick drum and `drumset_D1.wav` is a snare
+          drum for :obj:`Score` with `chord_sequence=[["C1", "D1"]]`, events
+          mapped to a higher (lower) `pitch` will sound as snare (kick) drums.
+          
+        """
         # default sampler preset
         self.gtype = 'sampler'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -641,8 +702,11 @@ class Sampler(Generator):
         self.load_samples()
 
     def get_sfpreset_samples(self, sfpreset):
-        """Reading samples from a soundfont file along with metadata to
-           scale and tune notes.
+        """Reading samples from a soundfont file along with metadata.
+
+        Read in the audio samples from a ``.sf2`` file to populate
+        available notes, mapping the MIDI key values to musical notes,
+        scaling and tuning samples as appropriate.
 
         Args:
           sf_preset (`optional`, :obj:`int`) The number of the *Soundfont*
@@ -653,10 +717,10 @@ class Sampler(Generator):
 
         Returns:
           sfpre_dict (:obj:`dict`): dictionary of data required to load
-            soundfont samples in to the `Sampler`, including raw `samples`,
-            `sample_rate`, `original_pitch` of the samples, the `min_note`
-            and `max_note` in midi values to use the sample, and the
-           `sample_map`, assigning each sample to a note.
+          soundfont samples in to the `Sampler`, including raw `samples`,
+          `sample_rate`, `original_pitch` of the samples, the `min_note`
+          and `max_note` in midi values to use the sample, and the
+          `sample_map`, assigning each sample to a note.
         """
         minmidi = np.inf
         maxmidi = -np.inf
@@ -728,8 +792,8 @@ class Sampler(Generator):
         
            Return:
              sampdict (:obj:`dict`): output dictionary of mapped notes, with
-               values of arrays of sample values at the samplerate of the
-               `Generator`.
+             values of arrays of sample values at the samplerate of the
+             `Generator`.
         """
         minkey = sfpre_dict['min_note']
         maxkey = sfpre_dict['max_note']
@@ -765,8 +829,15 @@ class Sampler(Generator):
 
         Read audio samples in from a specified directory or via a
         dictionary of filepaths, generate interpolation functions for
-        each, and assign them to a named note in scientific notation
+        each, and assign them to a named note in scientific pitch notation
         (e.g. :obj:`'A4'`).
+
+        Note:
+          Notes are assigned based on a tag in the filename (see :obj:`Sampler`),
+          not by analysing the audio itself. If a tuned sample is tagged as the
+          wrong note, this will carry over to the sonification. However, this
+          allows non-pitched samples to be assigned notes and triggered.
+          
         """
         self.samples = {}
         self.samplens = {}
@@ -809,7 +880,7 @@ class Sampler(Generator):
 
         Returns:
           s_new (:obj:`array`-like): new sample indices to create a
-            forward-looping effect
+          forward-looping effect
         """
         delsamp = end-start
         return np.piecewise(s, [s < start, s >= start],
@@ -829,7 +900,7 @@ class Sampler(Generator):
 
         Returns:
           s_new (:obj:`array`-like): new sample indices to create a
-            back and forth looping effect
+          back and forth looping effect
         
         """
         delsamp = end-start
@@ -948,8 +1019,31 @@ class Sampler(Generator):
 
 class Spectralizer(Generator):
     """Spectralizer generator class
+
+    This generator class synthesises sound from a spectrum input
+    using an *inverse Fast Fourier Transform* (iFFT) algorithm.
+    Defining a minimum and maximum frequency in Hz, input spectrum
+    is interpolated between these points such that the output
+    audio signal has the requested length. Phases are randomised
+    to avoid phase correlations.
+
+    Attributes:
+      gtype (:obj:`str`): Generator type 
+
+    Todo:
+    	* Add other synthesiser types, aside from additive (e.g. FM,
+    	  vector, wavetable)? 
     """
+
     def __init__(self, params=None, samprate=48000):
+        """
+        Args:
+    	  params (`optional`, :obj:`dict`): any generator parameters
+    	    that differ from the generator :obj:`preset`, where keys
+            and values are parameters names and values respectively. 
+    	  samprate (`optional`, :obj:`int`): the sample rate of
+  	    the generated audio in samples per second (Hz)
+        """
         # default synth preset
         self.gtype = 'spec'
         self.preset = getattr(presets, self.gtype).load_preset()
@@ -963,11 +1057,26 @@ class Spectralizer(Generator):
 
     def spectrum_to_signal(self, spectrum, phases, new_nlen, mindx, maxdx, interp_type):
         """ Convert the input spectrum into sound signal
+        
+        Performs the inverse fast fourier transform to produce spectral
+        sonification.
+        
+        Args:
+          spectrum (:obj:`ndarray`): Values of the spectrum, ordered
+            from high to low frequency
+          phases (:obj:`ndarray`): Array of values of `[0,2*numpy.pi]`
+            representing the complex number argument
+          new_nlen (:obj:`int`): Number of samples needed to enclose
+            the output signal.
+          mindx (:obj:`int`): Index in total Fourier transform
+            represnting the minimum audio frequency
+          maxdx (:obj:`int`): Index in total Fourier transform
+            represnting the maximum audio frequency
+          interp_type (:obj:`str`): Interpolation approach, either
+            `"sample"` interpolating between samples, or
+            `"preserve_power"` where cumulative power is interpolated
+            and then differentiated to avoid missing power.
         """        
-
-        # NOTE: interpolation around a delta function can lead to splitting power between adjacent
-        # frequencies and result in an artificial beating. This can be avoided by choosing values
-        # a length that places the spectrum on the grid exactly
         
         if interp_type == "sample":
             ps = np.interp(np.linspace(0,1,maxdx-mindx), np.linspace(0, 1, spectrum.size), spectrum)
@@ -1006,7 +1115,6 @@ class Spectralizer(Generator):
             (not nested, see :meth:`strauss.generator.modify_preset`)
             where group members are indicated using :obj:`'/'`
             notation (e.g. :obj:`{'volume_envelope/A': 0.5, ...`).
-
         """
         samprate = self.samprate
         audbuff = self.audbuff
@@ -1126,7 +1234,6 @@ class Spectralizer(Generator):
                   
             sstream.consolidate_buffers()
             
-
         sstream.values /= abs(sstream.values).max()
         
         # get volume envelope

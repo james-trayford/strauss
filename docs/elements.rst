@@ -16,14 +16,18 @@ This processing is all handled inside the :code:`Sonification` class, which can 
 
    **Figure:** Basic flow of the Strauss code, from input data to output audio.
 
+We include further descriptions below, with linked examples, which are hosted in your browser via Google's `Colab` platform.
+   
 .. _sources:
 
 Source Class
 ************
 
-The :code:`Source` classes in Strauss are so named because they act as `sources of sound` in the sonification. Sources are used to represent the input data, by mapping this data to properties of sound (volume, position, frequency, etc). The choice of how to set up the sources depends on the data being sonified, and what the user wants to convey. For this, Strauss defines two generic classes that inherit the parent :code:`Source` class; :code:`Events` and :code:`Objects`, described below.
+The :code:`Source` classes in Strauss are so named because they act as `sources of sound` in the sonification. Sources are used to represent the input data, by mapping this data to properties of sound (volume, position, frequency, etc). The choice of how to set up the sources depends on the data being sonified, and what the user wants to convey. For this, Strauss defines two generic classes that inherit the parent :code:`Source` class; :code:`Events` and :code:`Objects`, described below. 
 
-**Full documentation of the mappable parameters are coming soon!** See :obj:`./examples` for example mappings in jupyter notebooks.
+.. note::
+
+   :doc:`Full documentation of the mappable parameters can be found Here! <./params>`
 
 `Events`
 ''''''''
@@ -33,7 +37,7 @@ In this case, sounds are triggered over the duration of the sonification, with p
 
 .. note::
 
-   Some examples of :code:`Events` in scientific data could be; `stars forming, supernovae explosions, particle detections, lightning strikes, website interactions, etc...`
+   Some examples of :code:`Events` in scientific data could be; `stars forming, supernovae explosions, particle detections, lightning strikes, website interactions, etc...`, an example of the :code:`Events` source type is the `'Stars Appearing' example <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/StarsAppearing.ipynb>`_.
    
 `Objects`
 '''''''''
@@ -43,6 +47,49 @@ In this case, sound is produced continuously by the source, with the evolving pr
 
 .. note::
 
-   Some examples of :code:`Objects` in scientific data could be; `A galaxy evolving, planets orbiting, a plant growing, a glacier flowing, a climate changing etc...`   
+   Some examples of :code:`Objects` in scientific data could be; `A galaxy evolving, planets orbiting, a plant growing, a glacier flowing, a climate changing etc...` an instance of the :code:`Objects` source type is seen in `the 1D sonification example <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/SonifyingData1D.ipynb>`_.
 
 .. _score:
+
+Score Class
+***********
+
+With the audio :code:`Sources` defined, the :code:`Score` class allows us to place ‘musical’ constraints on the sound they produce to represent the underlying data. The duration of the output sonification is also specified via the Score with the timeline of the sonification scaled to fit this duration. The musical use of the score is demonstrated in examples such as `this <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/StarsAppearing.ipynb>`_ or `this <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/EarthsSystem.ipynb>`_ 
+
+.. _generator:
+
+Generator Class
+***************
+
+The :code:`Generator` class takes instruction from the two prior classes and generates audio for each individual source. This can be achieved using either the :code:`Sampler` or :code:`Synthesiser` child classes (along with the :code:`Spectraliser` special case), detailed below, with some applied examples.
+
+`Sampler`
+'''''''''
+
+This class generates audio by triggering **pre-recorded audio samples**.
+ 
+A directory of audio files is used to specify which sample to use for each note of the sampler. These samples are loaded into the sampler and are interpolated to allow arbitrary pitch shifting. Samples can also be looped in a number of ways to allow notes to sustain perpetually. Alternatively, a sound-font (`.sf2`) file can be read in, mapping samples to notes automatically `The 'Stars Appearing' example <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/StarsAppearing.ipynb>`_ exemplifies using curated samples paackaged with Strauss, while `the 'Light Curve Soundfonts' example <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/LightCurveSoundfonts.ipynb>`_ demonstrates using a sound-font.
+
+`Synthesiser`
+'''''''''''''
+
+This class instead **generates audio additively using mathematical functions** via an arbitrary number of oscillators. The strauss synthesiser supports a number of oscillator forms. This is exemplified in the `the 1D data example <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/SonifyingData1D.ipynb>`_.
+
+`Spectraliser`
+''''''''''''''
+
+A special case of the :code:`Synthesiser`, this generator synthesises sound from an input spectrum, via an inverse Fast Fourier Transform (IFFT), with randomised phases. The user can specify the audible frequency range that the ‘spectralised’ audio is mapped over. The spectraliser is used `in this example <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/SpectralData.ipynb>`_.
+
+.. _channels:
+
+Channels Class
+**************
+
+Once sound has been produced for each :code: `source`, the final step is to mix the audio down into some multi-channel audio format. The :code:`Channels` class essentially represents a bank of virtual microphones, with 3D antennae patterns, that each correspond to a channel in the output file. `The 'Stars Appearing' example <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/StarsAppearing.ipynb>`_ discuss different choices of channel set-up.
+
+.. _sonification:
+
+Sonification Class
+******************
+
+The top-level :code:`Sonification` class loads in all the above classes and produces the final sonification. Once :code:`Sources`, :code:`Score`, :code:`Generator` and :code:`Channels` classes are defined, the :code:`Sonification` class is invoked. The :code:`render()` method can then be run to produce the sonification. 

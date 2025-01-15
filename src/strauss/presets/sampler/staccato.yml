@@ -17,3 +17,18 @@ volume_envelope:
   D: 0.
   S: 1.
   R: 0.07
+  
+_meta:
+  name: preset name
+  description: full description
+  note_length: >-
+    Numerical note length in s or "sample" for the sample length or "none" to last to the end of the
+  volume_envelope: >-
+    Define the note volume envelope applied to the samples.
+    A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'.
+  volume_envelope:
+    A: Attack
+    D: Decay
+    S: Sustain
+    R: Release
+
