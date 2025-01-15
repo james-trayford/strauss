@@ -11,6 +11,7 @@ requires = [
     "sf2utils",
     "tqdm",
     "wavio",
-    "wheel"
+    "wheel",
+    "pyttsx3 @ git+https://github.com/nateshmbhat/pyttsx3.git"
 ]
 build-backend = "setuptools.build_meta"
