@@ -146,6 +146,7 @@ of the raw-text scripts, given the difficulties of using notebooks with screen r
 
 JWT acknowledges support via the STFC Early Stage Research
 & Development Grant, reference ST/X004651/1, CMH acknowledge funding from an United Kingdom
-Research and Innovation grant (code: MR/V022830/1
+Research and Innovation grant (code: MR/V022830/1). RS is supported by studentship from an
+STFC Centre of Doctoral Training in Data Intensive Science (code: ST/W006790/1).
 
 # References
