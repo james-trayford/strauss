@@ -74,6 +74,9 @@ def getVoices(info=False):
   elif ttsMode == 'coqui-tts':
       voices = supported_voices
       getter = dict
+  else:
+      getter = dict
+      voices = [{"voices": "None"}]
   if info==True:
       print('Text-to-speech voice options')
       for ind in range(len(voices)):
