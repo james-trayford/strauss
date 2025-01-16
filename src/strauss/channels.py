@@ -23,8 +23,8 @@ class mic:
       azimuth (:obj:`float`): Angular position of the microphone on the
     	horizontal plane, from 0 to 2pi with 0.5 pi being to the left
     	and 1.5 pi being to the right. In the special case of ambisonic,
-    	this is instead an index corresponding to the _Ambisonic Channel
-	Number_ (ACN)
+    	this is instead an index corresponding to the *Ambisonic Channel
+	Number* (ACN)
       mic_type (:obj:`str`): Type of microphone, choose from
     	:obj:`"directional"` (collects using a cardioid antenna pattern),
     	:obj:`"omni"` (collects sound from all directions equally) and
