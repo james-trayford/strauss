@@ -32,10 +32,10 @@ length = 6
 system = 'stereo'
 score =  Score(chords, length)
 
-maplims =  {'time': ('0', '150'),
-            'pitch' : ('0', '100'),
-           'phi':('0','100'),
-            'theta':('0','100')}
+maplims =  {'time': ('0%', '150%'),
+            'pitch' : ('0%', '100%'),
+           'phi':('0%','100%'),
+            'theta':('0%','100%')}
 
 events = Events(maplims.keys())
 

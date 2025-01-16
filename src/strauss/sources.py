@@ -25,6 +25,7 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from .utilities import rescale_values 
+import warnings
 
 mappable = ['polar',
             'azimuth',
@@ -161,8 +162,8 @@ class Source:
         	tuples indicating the lower (index 0) and upper (index
         	1) limits on the converted input data
         	values. numerical values indicate absolute limits,
-        	while strings indicate percentiles
-        	[e.g. ('10','95')]. converted data values are clipped
+        	while strings are used to indicate percentiles
+        	[e.g. ('10%','95%')]. converted data values are clipped
         	to these limits. If not provided, (0,1) is assumed.
            param_lims (:obj:`dict`, optional): dict with keys that
         	must be a subset self.mapped_quantities. Entries are
@@ -203,6 +204,12 @@ class Source:
             # scale mapped values within limits if specified
             for l in vallims:
                 if isinstance(l, str):
+                    if '%' not in l:
+                        warnings.warn("Specifying percentiles without appending a '%' character "
+                                      "(e.g. XX%) currently works but is deprecated for more "
+                                      "explicit syntax.", stacklevel=2)
+                    else:
+                        l = l.strip('%')
                     # string values notate percentile limits
                     pc = float(l)
                     buff = 1
