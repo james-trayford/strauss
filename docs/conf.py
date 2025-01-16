@@ -22,7 +22,7 @@ copyright = '2023, Dr. James Trayford'
 author = 'Dr. James Trayford'
 
 # The full version, including alpha/beta/rc tags
-release = '1.0'
+release = '1.0.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -59,13 +59,15 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'nature'
+html_theme = 'sphinx_rtd_theme'
 # html_theme_path = [sphinx_pdj_theme.get_html_theme_path()]
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+html_css_files = ['custom.css']
 
 myst_footnote_transition = False
 
