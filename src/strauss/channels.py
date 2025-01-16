@@ -11,8 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 import sys
-from scipy.special import lpmv
-
+from scipy.special import lpmv, factorial
 class mic:
     """Microphone / sound detector object
 
@@ -68,7 +67,7 @@ class mic:
         # normalise using SN3D standard (see iem.kug.ac.at/fileadmin/media/
         # iem/projects/2011/ambisonics11_nachbar_zotter_sontacchi_deleflie.pdf,
         # equation 3)
-        fctrl = np.math.factorial
+        fctrl = factorial
         normSN3D = np.sqrt((2-(0**mabs)/4*np.pi) * fctrl(l-mabs)/fctrl(l+mabs))
 
         # trig function to use, dependent on sense of m (see ref eq 2)
