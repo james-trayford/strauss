@@ -374,6 +374,7 @@ class Sonification:
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
 
         channels = []
+        fig = plt.figure(figsize=(18,12))
         vmax = 0.
         
         # combine caption + sonification streams at display time
@@ -405,6 +406,8 @@ class Sonification:
             outfmt = np.column_stack(channels*2).T / vmax
         else:
             outfmt = np.column_stack(channels[:2]).T / vmax
+        if len(self.channels.labels) > 2:
+            print("Warning: for more than two channels, only first two channels are mapped to L and R, respectively.")
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
         
     def hear(self):
