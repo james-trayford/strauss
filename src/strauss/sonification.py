@@ -314,13 +314,8 @@ class Sonification:
             
         print("Saved.")
 
-<<<<<<< HEAD
-    def save(self, fname, master_volume=1.):
-        """ Save render as a combined multi-channel wav file.
-=======
     def save(self, fname, master_volume=1., embed_caption=True):
         """ Save render as a combined multi-channel wav file 
->>>>>>> 976a2d9 (new optional AI-TTS extras using coqui-tts, some cleanup, save caption option (default on) for sonification.save)
         
         Can use this function to save sonification of any audio_setup
         to a 32-bit depth WAV using `scipy.io.wavfile`
