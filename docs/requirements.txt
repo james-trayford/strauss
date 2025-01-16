@@ -1,1 +1,1 @@
-strauss @ git+https://github.com/james-trayford/strauss.git@development
+strauss @ git+https://github.com/james-trayford/strauss.git@development#subdirectory=docs
