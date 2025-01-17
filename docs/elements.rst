@@ -54,7 +54,7 @@ In this case, sound is produced continuously by the source, with the evolving pr
 Score Class
 ***********
 
-With the audio :code:`Sources` defined, the :code:`Score` class allows us to place ‘musical’ constraints on the sound they produce to represent the underlying data. The duration of the output sonification is also specified via the Score with the timeline of the sonification scaled to fit this duration. The musical use of the score is demonstrated in examples such as `this <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/StarsAppearing.ipynb>`_ or `this <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/EarthsSystem.ipynb>`_ 
+With the audio :code:`Sources` defined, the :code:`Score` class allows us to place ‘musical’ constraints on the sound they produce to represent the underlying data. The duration of the output sonification is also specified via the Score with the timeline of the sonification scaled to fit this duration. The musical use of the score is demonstrated in examples such as `this <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/StarsAppearing.ipynb>`_ or `this <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/EarthSystem.ipynb>`_ 
 
 .. _generator:
 
