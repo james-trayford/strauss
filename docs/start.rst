@@ -6,22 +6,16 @@ This walkthrough will take you through a clean install of the code, including op
 Installation
 ************
 
-Strauss can be installed in three different ways, depending on whether you want to develop the code or simply use it as it is. It can be installed using pip install, with or without the option for development, or you can clone it from the GitHub repository.
+Strauss can be installed in different ways, depending on whether you want to develop the code or simply use it as it is. It can be installed using pip install from PyPI directly, or you can install it from a local copy of the GitHub repository, with or without the option for development.
 
-if you just want to use the code, STRAUSS may then be installed using pip, as
+.. note::
+   To use text-to-speech functionality see the further steps in the next section 
 
-.. code-block:: bash
-		
-	cd strauss
-	pip install .
-
-If you want to develop the code, you can instead use
+For basic functionality, you can install directly from PyPI with pip:
 
 .. code-block:: bash
-  
-	pip install -e .
 
-where the :code:`-e` option allows a local install, such that you can modify and run the source code on the fly without needing to reinstall each time.
+   pip install "strauss[default]"
 
 Alternatively, the Strauss code can be downloaded from **GitHub** at `the repository url <https://github.com/james-trayford/strauss.git>`_
 
@@ -37,7 +31,44 @@ or HTTPS if you don't have SSH keys set up,
 
   git clone https://github.com/james-trayford/strauss.git strauss
 
+if you just want to use the code, STRAUSS may then be installed using pip, as
+
+.. code-block:: bash
+		
+	cd strauss
+	pip install ".[default]"
+
+If you want to develop the code, you can instead use
+
+.. code-block:: bash
+  
+	pip install -e ".[default]"
+
 throughout the documentation, I will refer to this as the **strauss repo** or **code directory**.
+
+Text-to-speech
+**************
+
+Fot text-to-speech (TTS) functionality, there are a couple of options: _system_ and _AI_ text to speech.
+
+If you would like to use system AI, you will need to install the (as of writing) cutting-edge `pyttsx3` dependency, with 
+
+.. code-block:: bash
+
+   pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple/ pyttsx3==2.99
+
+If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`AI-TTS` dependency:
+
+.. code-block:: bash
+
+   pip install "strauss[AI-TTS]"
+
+or, for an install from a local repository copy:
+
+.. code-block:: bash
+
+   pip install -e ".[AI-TTS]"
+
 
 Example jupyter notebooks/scripts
 *********************************
@@ -47,8 +78,8 @@ There are a number of example applications of Strauss in the :code:`example` sub
 In order to run the notebook examples, first ensure that :code:`jupyter` is installed on your system. These were developed in :code:`jupyter-lab`, which can also be installed using pip, as:
 
 .. code-block:: bash
-  
-	pip install jupyterlab
+
+   pip install jupyterlab
 
 Then, running :code:`jupyter-lab` in the :code:`strauss` should initiate the :code:`jupyter-lab` server and open a browser window. Navigate to the :code:`examples` directory within the :code:`jupyter-lab` navigation plane, from which a number of examples can be opened and run interactively.
 
