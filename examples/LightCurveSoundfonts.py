@@ -120,8 +120,8 @@ generator.modify_preset({'note_length':0.03, # hold each note for 0.03 seconds o
 # the time needed to trigger each note - by making this more than 100%
 # we give all the notes time to ring out (setting this at 100% means
 # the final note is triggered at the momement the sonification ends)
-lims = {'time': ('0','101'),
-        'pitch': ('0','100')}
+lims = {'time': ('0%','101%'),
+        'pitch': ('0%','100%')}
 
 # set up source
 sources = Events(maps.keys())
@@ -173,8 +173,8 @@ data = {'pitch':[0,1,2,3],
         'time_evo':[x]*4,
         'cutoff':[y]*4}
 
-lims = {'time_evo': ('0','100'),
-        'cutoff': ('0','100')}
+lims = {'time_evo': ('0%','100%'),
+        'cutoff': ('0%','100%')}
 
 # set up source
 sources = Objects(data.keys())

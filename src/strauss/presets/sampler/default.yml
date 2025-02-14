@@ -85,3 +85,100 @@ pitch_hi: 36
 pitch_lo: 0
 pitch_shift: 0.
 
+_meta:
+  _doc: >-
+    The `Sampler` generator type can be used to modify and play audio samples (sound recordings) .
+  name: Preset name
+  description: Full description of the parameters selected for this preset, e.g. looping, volume and pitch envelopes, filters, etc.
+  note_length: >-
+    Numerical note length in seconds, or `'sample'` for the sample length, or `'none'`
+    to last to the end of the sonification.
+  looping: >-
+    Option to play the sample on a loop. `'off'` for no looping `'forward'` to loop forwards, `'forwardback'` to play the loop back and forth
+  loop_start: >-
+    If looping, starting point of loop in seconds.
+  loop_end: >-
+    If looping, ending point of loop in seconds. If loop_end is longer than the sample, clip to end of the sample.
+  volume_envelope:
+    _doc: >-
+      Define the note volume envelope applied to the samples. _'ADSR'_ is a common parametrisation in sound synthesis,
+      find out more e.g. [at this link]( https://learnmusicproduction.in/blogs/music-production-and-audio-engineering/adsr-fundamentals-in-music-everything-you-need-to-know).
+    A: Attack, how long it takes for a sound to rise to 100% of the `level` after it’s triggered.
+    D: Decay, how long it takes for the sounds volume to die down to the `Sustain` value after the `Attack` period.
+    S: Sustain, the volume level (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
+    R: Release, how long the tone takes to finally die away once the note is released.
+    Ac: Curvature of the attack portion of the envelope. Values from -1 to 1, positive indicates increases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear attack, increasing at a constant rate.
+    Dc: Curvature of the Decay portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear decay, decreasing at a constant rate.
+    Rc: Curvature of the release portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear release, decreasing at a constant rate.
+    level: Total amplitude level of the envelope from 0 to 1, contolling maximum volume of the note.
+  filter: >-
+    Apply a frequency filter to to the audio signal. Values are 'on' or 'off'. A filter affects the timbre by filtering out certain harmonics
+  filter_type: >-
+    Low pass filter (only allows frequencies lower than your cutoff to pass through)
+    High pass filter (only allows frequencies higher than your cutoff to pass through)
+  cutoff: >-
+    The cutoff frequency (or `'knee'`) of the filter, beyond which frequencies are attenuated. as a fraction of the maximum frequency
+  pitch_lfo:
+    _doc: >-
+      Controls for the `'Low Frequency Oscillator'` (LFO) used to modulate pitch of notes at rhythmic
+        frequencies. In music this is often referred to as `'vibrato'`. 
+    use: Switch feature on or off
+    wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
+        (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
+    amount: the amplitude of the maximal pitch oscillation from the underlying pitch
+    freq: Base frequency of the LFO oscillations.
+    freq_shift: Shift relative to the base LFO frequency.
+    phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle
+    A: Attack, how long it takes for the LFO depth to rise to 100% of the `level` after it’s triggered.
+    D: Decay, how long it takes for the LFO depth to die down to the `Sustain` value after the `Attack` period.
+    S: Sustain, the LFO depth (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
+    R: Release, how long LFO depth takes to finally die to 0 once the note is released.
+    Ac: Curvature of the attack portion of the envelope. Values from -1 to 1, positive indicates increases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear attack, increasing at a constant rate.
+    Dc: Curvature of the Decay portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear decay, decreasing at a constant rate.
+    Rc: Curvature of the release portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+        negative slowly then quick. a value of 0 is a linear release, decreasing at a constant rate.
+    level: Total level of the envelope from 0 to 1, contolling maximum depth of the LFO.
+  volume_lfo:
+    _doc: >-
+      Controls for the `'Low Frequency Oscillator'` (LFO) used to modulate volume of notes at rhythmic
+        frequencies. In music this is often referred to as `'tremolo'`.
+    use: switch volume LFO effects on or off
+    wave: Type of waveform used for the oscillator. As with `Synthesizer` oscillators can be sawtooth
+        (`'saw'`), square (`'square'`), sinusoid (`'sine'`), triangle (`'tri'`) or noise (`'noise'`).
+    amount: The amplitude of the maximal volume oscillation from the underlying pitch
+    freq: Base frequency of the LFO oscillations.
+    freq_shift: Shift relative to the base LFO frequency
+    phase: The phase of the LFO oscillations, defined in terms of fraction of a whole cycle.
+    A: Attack, how long it takes for the LFO depth to rise to 100% of the `level` after it’s triggered.
+    D: Decay, how long it takes for the LFO depth to die down to the `Sustain` value after the `Attack` period.
+    S: Sustain, the LFO depth (from 0 to 1.0) maintained after the `Decay` period, while the note is held.
+    R: Release, how long LFO depth takes to finally die to 0 once the note is released.
+    Ac: >-
+      Curvature of the attack portion of the envelope. Values from -1 to 1, positive indicates increases quickly then slow,
+      negative slowly then quick. a value of 0 is a linear attack, increasing at a constant rate.
+    Dc: >-
+      Curvature of the Decay portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+      negative slowly then quick. a value of 0 is a linear decay, decreasing at a constant rate.
+    Rc: >-
+      Curvature of the release portion of the envelope. Values from -1 to 1, positive indicates decreases quickly then slow,
+      negative slowly then quick. a value of 0 is a linear release, decreasing at a constant rate.
+    level: Total level of the envelope from 0 to 1, contolling maximum depth of the LFO.
+  volume: >-
+    Master Volume of generator.
+  pitch: >-
+    Default pitch selection (used by all generators)
+  azimuth: >-
+    Azimuth coordinate for spatialising audio into differing channels
+  polar: >-
+    Polar coordinate for spatialising audio into differing channels
+  pitch_hi: >-
+    Pitch range maximum in semitones
+  pitch_lo: >-
+    Pitch range minimum in semitones
+  pitch_shift: >-   
+    Default shift in semitones

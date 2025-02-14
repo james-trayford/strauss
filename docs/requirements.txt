@@ -1,1 +1,6 @@
-strauss @ git+https://github.com/james-trayford/strauss.git
+strauss @ git+https://github.com/james-trayford/strauss.git@development
+sphinx-exec-code
+sphinxcontrib.jquery
+myst-parser
+sphinx-rtd-theme
+

@@ -12,8 +12,9 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('..'))
-
+from pathlib import Path
+sys.path.insert(0, os.path.abspath(Path('..')))
+sys.path.insert(0, os.path.abspath(Path('..','..','src','strauss','presets')))
 
 # -- Project information -----------------------------------------------------
 
@@ -22,7 +23,7 @@ copyright = '2023, Dr. James Trayford'
 author = 'Dr. James Trayford'
 
 # The full version, including alpha/beta/rc tags
-release = '1.0'
+release = '1.0.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -35,8 +36,12 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest',
               'sphinx.ext.ifconfig', 'sphinx.ext.viewcode',
               'sphinx.ext.inheritance_diagram',
               'sphinx.ext.autosummary','sphinx.ext.coverage',
-              'sphinx.ext.napoleon']
+              'sphinx.ext.napoleon', "myst_parser",
+              "sphinx_exec_code", 'sphinxcontrib.jquery']
 
+html_js_files = [
+    'js/custom.js'
+]
 
 print(extensions)
 
@@ -55,12 +60,18 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'sphinx_rtd_theme'
+# html_theme_path = [sphinx_pdj_theme.get_html_theme_path()]
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-# enable markdown
-#extensions.append('myst_parser')
+html_css_files = ['custom.css']
+
+myst_footnote_transition = False
+
+# html_theme_options = {
+#     'page_width': '1200px'
+# }

@@ -25,6 +25,7 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from .utilities import rescale_values 
+import warnings
 
 mappable = ['polar',
             'azimuth',
@@ -46,7 +47,7 @@ mappable = ['polar',
             'volume_lfo/amount',
             'pitch_lfo/freq',
             'pitch_lfo/freq_shift',
-            'pitch_lfo/amount']
+            'pitch_lfo/amount']     
 
 evolvable = ['polar',
              'azimuth',
@@ -56,10 +57,8 @@ evolvable = ['polar',
              'cutoff',
              'time_evo',
              'pitch_shift',
-             'volume_lfo/freq',
              'volume_lfo/freq_shift',
              'volume_lfo/amount',
-             'pitch_lfo/freq',
              'pitch_lfo/freq_shift',
              'pitch_lfo/amount']
 param_limits = [(0,1),#np.pi),
@@ -79,10 +78,10 @@ param_limits = [(0,1),#np.pi),
                 (1e-2, 10),
                 (1,12),
                 (0,3),
-                (0,2),
+                (0,1),
                 (1,12),
                 (0,3),
-                (0,1)]
+                (0,2)]     
 
 param_lim_dict = dict(zip(mappable, param_limits))
 
@@ -96,15 +95,24 @@ class Source:
 	`Source` isn't used directly, instead use child classes
     	`Events` or `Objects`.
 
-    Args:
-    	mapped_quantities (:obj:`list(str)`): The subset of parameters to
-    	   which data will be mapped. 
-
+    Attributes:
+      mapped_quantities (:obj:`list(str)`): The subset of parameters to
+        which data will be mapped.
+      raw_mapping (:obj:`dict`): Housing the input mapped parameters
+        and data, with keys corresponding to :obj:`mapped_quantities`.
+      mapping (:obj:`dict`): processed mapping :obj:`dict` rescaled
+        to parameter ranges, or interpolation funtions for evolving
+        parameters.
+    
     Raises:
-    	UnrecognisedProperty: if `mapped_quantities` entry not in `mappable`. 
-
+    	UnrecognisedProperty: if `mapped_quantities` entry not in `mappable`.
     """
     def __init__(self, mapped_quantities):
+        """
+        Args:
+    	  mapped_quantities (:obj:`list(str)`): The subset of parameters to
+    	    which data will be mapped.
+        """
         # check these are all mappable parameters
 
         
@@ -131,7 +139,6 @@ class Source:
         self.mapped_quantities = mapped_quantities
         self.raw_mapping = {}
         self.mapping = {}
-        self.mapping_evo = {}
         
     def apply_mapping_functions(self, map_funcs={}, map_lims={}, param_lims={}):
         """ Taking input data and mapping to parameters.
@@ -141,7 +148,7 @@ class Source:
         function (x' = x by default), descaling by the x' upper and
         lower limits and rescaling to the sonification parameter
         limits. These values are stored for non-evolving parameters,
-        while for evolving properties are converted to interpolation
+        while for evolving properties they are converted to interpolation
         functions. 
 
         Args:
@@ -155,8 +162,8 @@ class Source:
         	tuples indicating the lower (index 0) and upper (index
         	1) limits on the converted input data
         	values. numerical values indicate absolute limits,
-        	while strings indicate percentiles
-        	[e.g. ('10','95')]. converted data values are clipped
+        	while strings are used to indicate percentiles
+        	[e.g. ('10%','95%')]. converted data values are clipped
         	to these limits. If not provided, (0,1) is assumed.
            param_lims (:obj:`dict`, optional): dict with keys that
         	must be a subset self.mapped_quantities. Entries are
@@ -197,6 +204,12 @@ class Source:
             # scale mapped values within limits if specified
             for l in vallims:
                 if isinstance(l, str):
+                    if '%' not in l:
+                        warnings.warn("Specifying percentiles without appending a '%' character "
+                                      "(e.g. XX%) currently works but is deprecated for more "
+                                      "explicit syntax.", stacklevel=2)
+                    else:
+                        l = l.strip('%')
                     # string values notate percentile limits
                     pc = float(l)
                     buff = 1
@@ -254,7 +267,8 @@ class Events(Source):
 
     Child class of `Source`, for `Event`-type sources. Each `Event` is
     discrete in `time` with single data values mapped to each
-    sonification parameter. 
+    sonification parameter.
+    
     """
     def fromfile(self, datafile, coldict):
         """Take input data from ASCII file

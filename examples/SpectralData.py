@@ -110,7 +110,7 @@ for i in range(2):
             'volume_envelope/A':[0.05]}
     
     # again, use maximal range for the mapped parameters
-    lims = {'spectrum': ('0','100')}
+    lims = {'spectrum': ('0%','100%')}
     
     # set up source
     sources = Events(data.keys())
@@ -186,7 +186,7 @@ generator.modify_preset({'min_freq':20, 'max_freq':10000})
 data = {'spectrum':[spec_stack], 'pitch':[1]}
 
 # again, use maximal range for the mapped parameters
-lims = {'spectrum': ('0','100')}
+lims = {'spectrum': ('0%','100%')}
 
 # set up source
 sources = Events(data.keys())

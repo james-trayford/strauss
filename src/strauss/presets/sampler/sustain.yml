@@ -14,3 +14,11 @@ description: >-
 looping: "forwardback"
 loop_start: 0.2
 loop_end: 0.5
+
+_meta:
+  name: preset name
+  description: full description
+  looping: use the 'forwardback' looping mode by default, between 0.2 and 0.5 seconds for each sample
+  loop_start: start of the loop in seconds
+  loop_end: end of the loop in seconds
+
