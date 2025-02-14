@@ -46,6 +46,8 @@ If you want to develop the code, you can instead use
 
 throughout the documentation, I will refer to this as the **strauss repo** or **code directory**.
 
+.. _tts-install:
+
 Text-to-speech
 **************
 
@@ -69,7 +71,9 @@ or, for an install from a local repository copy:
 
    pip install -e ".[AI-TTS]"
 
-
+.. note::
+   The AI TTS is currently supported for python version :code:`<= 3.12`.
+   
 Example jupyter notebooks/scripts
 *********************************
 

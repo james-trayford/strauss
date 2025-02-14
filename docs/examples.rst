@@ -8,12 +8,12 @@ Here, we explain some of the example sonfications included in the :code:`example
 
 Audio Caption (:code:`AudioCaption.ipynb`)
 ******************************************
-The *Audio Caption* example demonstrates how to add audio captions to a sonification, using a text-to-speech (TTS) module. The TTS module is not included in the standard Strauss installation, but it can be installed by using pip install strauss[TTS]. This example uses the Strauss :code:`Sampler` to play a short sequence of glockenspiel notes, then generates an audio caption using a standard TTS voice. The notebook allows the user to try different voices and languages from TTS.
+The *Audio Caption* example demonstrates how to add audio captions to a sonification, using a text-to-speech (TTS) module. The TTS module is not included in the standard Strauss installation, but it can be installed by using :code:`pip install strauss[AI-TTS]`, or with the system text-to-speech module :code:`pyttsx3` (see here for more details see :ref:`tts-install`). This example uses the Strauss :code:`Sampler` to play a short sequence of glockenspiel notes, then generates an audio caption using a standard TTS voice. The notebook allows the user to try different voices and languages from TTS.
 
 There are examples of audio captioning with different voices in the following spectrogram videos
 
-#. `English default voice <https://www.youtube.com/watch?v=jcdRNKnbzPs>`_
-#. `English alternate voice <https://www.youtube.com/watch?v=fHrbVeTaNbM>`_
+#. `English default voice <https://www.youtube.com/watch?v=jcdRNKnbzPs>`_.
+#. `English alternate voice <https://www.youtube.com/watch?v=fHrbVeTaNbM>`_.
 #. `Non-English (German) voice <https://www.youtube.com/watch?v=2qE5kk-iCYk>`_.
 #. `Special characters, and writing phonetically to improve pronunciation <https://www.youtube.com/watch?v=36J2jYy33DI>`_.
 

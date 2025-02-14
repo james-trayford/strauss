@@ -60,6 +60,8 @@ or if you're working from a local copy of the repository, as above, use
 with or without the `-e` option depending on whether you want to edit the *STRAUSS* code or not, as above. 
 
 
+***Note***: The `coqui` AI TTS is currently supported for python versions `<= 3.12` - If you are running `python==3.13`, you can downgrade to use this extra.
+
 ## Acknowledgments
 *STRAUSS* is developed and provided free and open source, supported by a [UKRI Early Stage Research and Development Award](https://www.ukri.org/opportunity/early-stage-research-and-development-scheme/), grant code ST/X004651/1.
 
