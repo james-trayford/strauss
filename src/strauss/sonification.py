@@ -24,7 +24,7 @@ import os
 import ffmpeg as ff
 import wavio as wav
 import IPython.display as ipd
-from IPython.core.display import display
+from IPython.display import display
 from scipy.io import wavfile
 import warnings
 import tempfile
