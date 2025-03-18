@@ -693,7 +693,8 @@ class Sampler(Generator):
                     logger.disabled = False
                     
             else:
-                wavs = sorted(Path(sampfiles).glob("{*.wav,*.WAV}"))
+                wavs = sorted(Path(sampfiles).glob("*.[wW][aA][vV]"))
+                print(wavs)
                 self.sampdict = {}
                 for w in wavs:
                     filename = Path(w).name
