@@ -121,7 +121,7 @@ how to express data with sound.
 
 The `strauss` code minimises dependencies where possible, implementing built-in signal
 generation and audio parsing and encoding based on low-level python libraries like
-`numpy` and `scipy`, as well as being tested on multiple platforms (_MacOS, Linux,
+`numpy` [@numpy] and `scipy` [@scipy], as well as being tested on multiple platforms (_MacOS, Linux,
 Windows_). This also provides means to interface with commonly used audio formats,
 such as _"Soundfont"_ files (`.sf2`) to open a range of possibilities for representing
 data using different instruments. This helps to ensure that the free and open source
