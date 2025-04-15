@@ -12,15 +12,19 @@ authors:
     equal-contrib: false
     affiliation: 1 # (Multiple affiliations must be quoted)
   - name: Samantha Youles
+	orcid: 0000-0002-7520-5911
     affiliation: 1
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
   - name: Chris Harrison
+	orcid: 0000-0001-8618-4223
     affiliation: 2
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
   - name: Rose Shepherd
+	orcid: 0009-0002-0369-5146
     affiliation: 2
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
   - name: Nicolas Bonne
+	orcid: 0000-0001-9569-8808
     affiliation: 1
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
 
