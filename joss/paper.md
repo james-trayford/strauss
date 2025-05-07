@@ -1,5 +1,5 @@
 ---
-title: 'strauss: Sonification Tools \& Resources for Analysis Using Sound Synthesis'
+title: 'strauss: Sonification Tools and Resources for Analysis Using Sound Synthesis'
 tags:
   - Python
   - sonification
