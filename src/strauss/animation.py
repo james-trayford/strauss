@@ -70,12 +70,9 @@ res = {'4k': (3840, 2160),
 class Animate:
     
     def __init__(self, topdir, pars={}):
-        isdir = glob.glob(topdir)
-        Path(topdir).mkdir(parents=True, exist_ok=True)
-        if isdir:
-            if glob.glob(f'{isdir[0]}/*'):
-                warnings.warn(f"{topdir} is not empty, instead name "\
-                              "an empty directory, or a new one.")
+        if topdir.exists() and any(topdir.iterdir()):
+            warnings.warn(f"{topdir} is not empty, instead name "
+                          "an empty directory, or a new one.")
         self.topdir = topdir
 
         # handle parameters
@@ -146,7 +143,7 @@ class Animate:
             seq.render_caption_stills()
                             
             # compile sonification audio
-            prepath = seq.path+'/pre.wav'
+            prepath = str(Path(seq.path)/'pre.wav')
             if seq.pre:
                 audio = force_stereo(prepath)
                 audio *= MAXSAMP / abs(audio).max()
@@ -157,7 +154,7 @@ class Animate:
                 
             # compile sonification audio
             if seq.sonification:
-                audio = force_stereo(seq.audiofile)
+                audio = force_stereo(str(seq.audiofile))
                 
                 # ramp audio
                 audio[:self.aramplen] *= self.arampin
@@ -168,7 +165,7 @@ class Animate:
 
             elif seq.stype == 'clip':
                 print('in')
-                audio = force_stereo(seq.audiofile, do_resample=1)
+                audio = force_stereo(str(seq.audiofile), do_resample=1)
                 audio *= MAXSAMP / abs(audio).max()
                 audio = house_audio(audio, self.pars['spf'])
                 
@@ -182,7 +179,7 @@ class Animate:
             # append audio
             master.append(audio)
                 
-            postpath = seq.path+'/post.wav'
+            postpath = str(Path(seq.path)/'post.wav')
             if seq.post:
                 audio = force_stereo(postpath)
                 audio *= MAXSAMP / abs(audio).max()
@@ -209,11 +206,11 @@ class Animate:
         #     print('duration: ', a.shape[0]/int(SAMPRATE))
         outsamps = np.vstack(master[:-1]).astype('int32')
 
-        self.master_wav = self.topdir+'/master.wav'
-        self.master_mp3 = self.topdir+'/master.mp3'
-        self.combined = self.topdir+'/combo.mp4'
-        self.concat_file = self.topdir+'/concat_files.txt'
-        self.final = self.topdir+'/final.mp4'
+        self.master_wav = str(Path(self.topdir)/'master.wav')
+        self.master_mp3 = str(Path(self.topdir)/'master.mp3')
+        self.combined = str(Path(self.topdir)/'combo.mp4')
+        self.concat_file = str(Path(self.topdir)/'concat_files.txt')
+        self.final = str(Path(self.topdir)/'final.mp4')
         
         wavfile.write(self.master_wav, SAMPRATE, outsamps)
 
@@ -244,7 +241,7 @@ class Animate:
 
         if bgfile:
             print(f"Combine sequences and chroma-key background video...")
-            tempfile = self.topdir+'/overlay.mp4'
+            tempfile = str(Path(self.topdir)/'overlay.mp4')
             sp.check_call(["ffmpeg", '-y',
                              '-stream_loop', '-1',
                              '-i', bgfile[0],
@@ -288,15 +285,15 @@ class Sequence:
         self.index = index
         self.subs = {}
         self.stype = stype
-        self.path = topdir+f'/{name}'
-        self.frame = self.path + "/frame_{index:05d}.png"
+        self.path = Path(topdir) / name
+        self.frame = Path(self.path)  / f"frame_{index:05d}.png"
         self.nframes = int(np.ceil(int(self.pars['fps']) * self.duration))
         self.sonification = sonification
 
         if sonification and (duration is not sonification.score.length):
             Exception(f"Provided sonification length ({sonification.score.length}s) != sequence duration ({duration}s)")
         
-        self.audiofile = self.path + f"/{name}.wav"
+        self.audiofile = Path(self.path) / f"{name}.wav"
         self.pars = pars
         self._torender_flags = {'pre': True, 'post': True,
                                 'frames': True, 'sonification': bool(sonification)}
@@ -328,14 +325,14 @@ class Sequence:
     def render_caption(self, notebook=True):
         print(f"\t Rendering {self.name} captions:")
         if self.pre:
-            fpath = self.path + f'/pre.wav'
+            fpath = Path(self.path) / 'pre.wav'
             print(f'\t\t pre-caption: "{self.pre}" to {fpath}')
             # with suppress_output():
             with contextlib.redirect_stdout(None):
                 generate_caption(self.pre, fpath, notebook)
             self._torender_flags['pre'] = False
         if self.post:
-            fpath = self.path + f'/post.wav'
+            fpath = Path(self.path) / 'post.wav'
             print(f'\t\t post-caption: "{self.post}" to {fpath}')
             # with suppress_output():
             with contextlib.redirect_stdout(None):
@@ -357,7 +354,7 @@ class Sequence:
             inv = ""
             if self.pars["invert_colours"]:
                 inv = "-vf negate"
-            outfile = f"{self.path}/{self.name}.mp4"
+            outfile = str(Path(self.path)/f"{self.name}.mp4")
 
             # store the number of frames
             # nframes = len(glob.glob(f'{self.path}/frames*'))
@@ -369,13 +366,21 @@ class Sequence:
 
             if self.stype == 'animation':
                 # TODO: decide how failure-permitted subprocesses should be run?
-                sp.check_call(["ffmpeg", '-y',
-                                 '-r', self.pars["fps"],
-                                 '-i', f'{self.path}/frame_%05d.png',
-                                 '-c:v', 'mpeg4',
-                                 '-crf', self.pars["crf"]] +
-                                inv.split() + [outfile],
-                                stdout=sp.DEVNULL, stderr=sp.STDOUT)
+                #sp.check_call(["ffmpeg", '-y',
+                #                 '-r', self.pars["fps"],
+                #                 '-i', str(Path(self.path) / f'{self.name}.png'),
+                #                 '-c:v', 'mpeg4',
+                #                 '-crf', self.pars["crf"]] +
+                #                inv.split() + [outfile],
+                #                stdout=sp.DEVNULL, stderr=sp.STDOUT)
+                sp.run(['ffmpeg', '-y',
+                        '-r', self.pars["fps"],
+                        '-i', str(Path(self.path) / f'{self.name}.png'),
+                        '-c:v', 'mpeg4',
+                        '-crf', self.pars["crf"]] +
+                        inv.split() + [outfile],
+                        stdout=sp.DEVNULL, stderr=sp.STDOUT,
+                        check=False)
                 
             elif self.stype == 'slide':
                 # make slide sequence
@@ -386,15 +391,15 @@ class Sequence:
                 prepare_clip(self, self.infile, self.name)
 
             else:
-                sp.check_call(["ffmpeg", '-y',
-                                 '-f', 'lavfi',
-                                 "-i", f"color=c=black:s={self.pars['dimensions']}",
-                                 '-frames', str(self.duration * int(self.pars['fps'])),
-                                 '-r', self.pars["fps"],
-                                 '-c:v', 'mpeg4',
-                                 '-crf', self.pars["crf"],
-                                 outfile],
-                                stdout=sp.DEVNULL, stderr=sp.STDOUT)
+                sp.check_call(['ffmpeg', '-y',
+                               '-f', 'lavfi',
+                               '-i', f'color=c=black:s={self.pars["dimensions"]}',
+                               '-frames', str(self.duration * int(self.pars['fps'])),
+                               '-r', self.pars["fps"],
+                               '-c:v', 'mpeg4',
+                               '-crf', self.pars["crf"],
+                               outfile],
+                               stdout=sp.DEVNULL, stderr=sp.STDOUT)
                 
                 
             # frames rendered for now...
@@ -403,74 +408,74 @@ class Sequence:
     def render_caption_stills(self):
         print(f"\t Rendering {self.name} caption stills...")
         # iterate through existing captions
-        video = f"{self.path}/{self.name}.mp4"
+        video = str(Path(self.path)/f"{self.name}.mp4")
         pos = 0
         ctype = ["pre", "post"]
         for c in [self.pre, self.post]:
             if c:
                 print(f"\t\t Making {ctype[pos]}-caption still for {self.name}...")
-                clen = wav.read(self.path+f'/{ctype[pos]}.wav').data.shape[0]
+                clen = wav.read(str(Path(self.path) / f'{ctype[pos]}.wav')).data.shape[0]
                 nframes = clen / self.pars['spf']
                 nframes = -int(-nframes // 1) + int(self.pars['breathing_time'])
-                if (self.stype == 'animation') and (glob.glob(self.frame.format(index=0))):
+                if (self.stype == 'animation') and (glob.glob(str(self.frame).format(index=0))):
                     fnum = pos*(int(self.pars['fps'])*self.duration - 1)
                     frame = self.frame.format(index=int(fnum))
                     if self.pars["invert_colours"]:
                         inv = "-vf negate"
 
                     # make still sequence
-                    sp.check_call(["ffmpeg", '-y',
-                                   "-loop", "1",
+                    sp.check_call(['ffmpeg', '-y',
+                                   '-loop', '1',
                                    '-i', frame,
                                    '-r', self.pars["fps"],
                                    '-frames', str(nframes),
                                    '-c:v', 'mpeg4',
                                    '-crf', self.pars["crf"]] +
                                    inv.split() +
-                                   [f"{self.path}/{ctype[pos]}.mp4"],
-                                  stdout=sp.DEVNULL, stderr=sp.STDOUT)
+                                   [str(Path(self.path)/f"{ctype[pos]}.mp4")],
+                                   stdout=sp.DEVNULL, stderr=sp.STDOUT)
 
                 elif self.stype == 'slide':
                     generate_slide_video(self, self.infile, ctype[pos], nframes=nframes)
 
                 elif self.stype == 'clip':
                     if pos:
-                        frame = f'{self.path}/pre.png'
-                        sp.check_call(["ffmpeg", '-y',
-                                       "-sseof", '-0.1',
-                                       '-i', f'{self.path}/{self.name}.mp4',
+                        frame = str(Path(self.path)/f'pre.png')
+                        sp.check_call(['ffmpeg', '-y',
+                                       '-sseof', '-0.1',
+                                       '-i', Path(self.path)/f'{self.name}.mp4',
                                        '-update', '1',
                                        frame],
-                                      stdout=sp.DEVNULL, stderr=sp.STDOUT)
+                                       stdout=sp.DEVNULL, stderr=sp.STDOUT)
                     else:
-                        frame = f'{self.path}/post.png'
-                        sp.check_call(["ffmpeg", '-y',
-                                       '-i', f'{self.path}/{self.name}.mp4',
+                        frame = str(Path(self.path)/f'post.png')
+                        sp.check_call(['ffmpeg', '-y',
+                                       '-i', str(Path(self.path)/f'{self.name}.mp4'),
                                        '-vf', "select=eq(n\\,0)",
                                        frame],
-                                      stdout=sp.DEVNULL, stderr=sp.STDOUT)
+                                       stdout=sp.DEVNULL, stderr=sp.STDOUT)
                    # make still sequence
-                    sp.check_call(["ffmpeg", '-y',
-                                   "-loop", "1",
+                    sp.check_call(['ffmpeg', '-y',
+                                   '-loop', '1',
                                    '-i', frame,
                                    '-r', self.pars["fps"],
                                    '-frames', str(nframes),
                                    '-c:v', 'mpeg4',
                                    '-crf', self.pars["crf"],
-                                   f"{self.path}/{ctype[pos]}.mp4"],
-                                  stdout=sp.DEVNULL, stderr=sp.STDOUT)
+                                   str(Path(self.path)/f"{ctype[pos]}.mp4")],
+                                   stdout=sp.DEVNULL, stderr=sp.STDOUT)
                     
                 else:
                     # blank video
-                    sp.check_call(["ffmpeg", '-y',
-                                     '-f', 'lavfi',
-                                     "-i", f"color=c=black:s={self.pars['dimensions']}",
-                                     '-frames', str(nframes),
-                                     '-r', self.pars["fps"],
-                                     '-c:v', 'mpeg4',
-                                     '-crf', self.pars["crf"],
-                                    f"{self.path}/{ctype[pos]}.mp4"],
-                                    stdout=sp.DEVNULL, stderr=sp.STDOUT)
+                    sp.check_call(['ffmpeg', '-y',
+                                   '-f', 'lavfi',
+                                   '-i', f'color=c=black:s={self.pars["dimensions"]}',
+                                   '-frames', str(nframes),
+                                   '-r', self.pars["fps"],
+                                   '-c:v', 'mpeg4',
+                                   '-crf', self.pars["crf"],
+                                   str(Path(self.path)/f"{ctype[pos]}.mp4")],
+                                   stdout=sp.DEVNULL, stderr=sp.STDOUT)
                 pos += 1
                 
         #ffmpeg -i input.mp4 -vf "scale=iw*sar:ih,setsar=1" -vframes 1 filename.png
@@ -619,7 +624,7 @@ def generate_slide_video(seq, still, outtype, time=None, nframes=None):
     # print (' '.join(cmd))
     sp.check_call(cmd, stdout=sp.DEVNULL, stderr=sp.STDOUT)
 
-def merge_audio(sequences_file="sequences.txt"):
+def merge_audio(sequences_file="concat_files.txt"):
     """ merge all audio files into a single master file
 
     Args:
@@ -653,7 +658,8 @@ def merge_audio(sequences_file="sequences.txt"):
 
     for i in range(len(seq[1])):
         edx += int(ts[i]*SAMPRATE)
-        f = f"figure_animations/{tags[i]}/{tags[i]}.wav"
+        #f = f"figure_animations/{tags[i]}/{tags[i]}.wav"
+        f = Path("figure_animations") / f"{tags[i]}" / f"{tags[i]}.wav"
         if glob.glob(f):
             print(f)
             wave = wav.read(f)
@@ -692,84 +698,99 @@ def merge_animations():
     # Make plot animations
     figures = ['fig1a', 'fig1b', 'fig1c']
     for figure in figures:
-        run_ffmpeg([
-            'ffmpeg', '-r', '30', '-i', f'figure_animations/{figure}/frames_%03d.png', 
-            '-c:v', 'mpeg4', '-crf', '18', '-vf', 'negate', 
-            f'figure_animations/{figure}/{figure}.mp4'
-        ])
+        frame_name = str(Path(self.topdir)/ "frame_%03d.png")
+        mpeg_name = str(Path(self.topdir) / f"{figure}.mp4")
+        run_ffmpeg(['ffmpeg',
+                    '-r',
+                    '30',
+                    '-i',
+                    frame_name, 
+                    '-c:v',
+                    'mpeg4',
+                    '-crf',
+                    '18',
+                    '-vf',
+                    'negate',
+                    mpeg_name
+                    ])
 
     # Create x-fade transitions
+    frame089 = str(Path(self.topdir) / "fig1a" / "frame_089.png")
+    frame000 = str(Path(self.topdir) / "fig1b" / "frame_000.png")
+    mpeg_name = str(Path(self.topdir) / "fig1a2b" / "fig1a2b.mp4")
     run_ffmpeg([
         'ffmpeg', '-r', '30', '-loop', '1', '-t', '4', 
-        '-i', 'figure_animations/fig1a/frames_089.png', 
+        '-i', frame089, 
         '-loop', '1', '-r', '30', '-t', '4', 
-        '-i', 'figure_animations/fig1b/frames_000.png', 
+        '-i', frame000, 
         '-filter_complex',
         '[0][1]xfade=transition=fade:duration=1:offset=3,format=yuv420p[xfade];[xfade]negate[final]', 
-        '-map', '[final]', '-c:v', 'mpeg4', '-crf', '18', 
-        'figure_animations/fig1a2b/fig1a2b.mp4'
+        '-map', '[final]', '-c:v', 'mpeg4', '-crf', '18', mpeg_name
     ])
 
+    frame089 = str(Path(self.topdir) / "fig1b" / "frame_089.png")
+    frame000 = str(Path(self.topdir) / "fig1c" / "frame_000.png")
+    mpeg_name = str(Path(self.topdir) / "fig1b2c" / "fig1b2c.mp4")
     run_ffmpeg([
         'ffmpeg', '-r', '30', '-loop', '1', '-t', '3', 
-        '-i', 'figure_animations/fig1b/frames_089.png', 
+        '-i', frame089, 
         '-loop', '1', '-r', '30', '-t', '3', 
-        '-i', 'figure_animations/fig1c/frames_000.png', 
+        '-i', frame000, 
         '-filter_complex', '[0][1]xfade=transition=fade:duration=1:offset=2,format=yuv420p[xfade];[xfade]negate[final]', 
-        '-map', '[final]', '-c:v', 'mpeg4', '-crf', '18', 
-        'figure_animations/fig1b2c/fig1b2c.mp4'
+        '-map', '[final]', '-c:v', 'mpeg4', '-crf', '18', mpeg_name
     ])
 
     # Make fade-in/out
-    os.makedirs('figure_animations/fig1in', exist_ok=True)
-    os.makedirs('figure_animations/fig1out', exist_ok=True)
+    os.makedirs(str(Path(self.topdir)/'fig1in'), exist_ok=True)
+    os.makedirs(str(Path(self.topdir)/'fig1out'), exist_ok=True)
 
     run_ffmpeg([
-        'ffmpeg', '-loop', '1', '-i', 'figure_animations/fig1a/frames_000.png', 
+        'ffmpeg', '-loop', '1', '-i', str(Path(self.topdir)/'fig1a'/'frame_000.png'), 
         '-c:v', 'mpeg4', '-t', '10', '-pix_fmt', 'yuv420p', 
         '-crf', '18', '-r', '30', '-filter_complex', 
         '[0:v]negate[negate];[negate]fade=t=in:st=7:d=3[final]', 
-        '-map', '[final]', 'figure_animations/fig1in/fig1in.mp4'
+        '-map', '[final]', str(Path(self.topdir)/'fig1in'/'fig1in.mp4')
     ])
 
-	run_ffmpeg([
-		'ffmpeg', '-loop', '1', '-i', 'figure_animations/fig1c/frames_089.png', 
+    run_ffmpeg([
+		'ffmpeg', '-loop', '1', '-i', str(Path(self.topdir)/'fig1c'/'frame_089.png'), 
 		'-c:v', 'mpeg4', '-t', '10', '-pix_fmt', 'yuv420p', 
 		'-crf', '18', '-r', '30', '-filter_complex', 
 		'[0:v]negate[negate];[negate]fade=t=out:st=3:d=3[final]', 
-		'-map', '[final]', 'figure_animations/fig1out/fig1out.mp4'
+		'-map', '[final]', str(Path(self.topdir)/'fig1out'/'fig1out.mp4')
 	])
 
 	# Create file list for concatenation
-	with open('files.txt', 'w') as f:
-		f.write("file 'figure_animations/fig1in/fig1in.mp4'\n")
-		f.write("file 'figure_animations/fig1a/fig1a.mp4'\n")
-		f.write("file 'figure_animations/fig1a2b/fig1a2b.mp4'\n")
-		f.write("file 'figure_animations/fig1b/fig1b.mp4'\n")
-		f.write("file 'figure_animations/fig1b2c/fig1b2c.mp4'\n")
-		f.write("file 'figure_animations/fig1c/fig1c.mp4'\n")
-		f.write("file 'figure_animations/fig1out/fig1out.mp4'\n")
+    with open('files.txt', 'w') as f:
+        f.write(f"file {str(Path(self.topdir)/'fig1in'/'fig1in.mp4')}\n")
+        f.write(f"file {str(Path(self.topdir)/'fig1a'/'fig1a.mp4')}\n")
+        f.write(f"file {str(Path(self.topdir)/'fig1a2b'/'fig1a2b.mp4')}\n")
+        f.write(f"file {str(Path(self.topdir)/'fig1b'/'fig1b.mp4')}\n")
+        f.write(f"file {str(Path(self.topdir)/'fig1b2c'/'fig1b2c.mp4')}\n")
+        f.write(f"file {str(Path(self.topdir)/'fig1c'/'fig1c.mp4')}\n")
+        f.write(f"file {str(Path(self.topdir)/'fig1out'/'fig1out.mp4')}\n")
+        #f.write("file 'figure_animations/fig1out/fig1out.mp4'\n")
 
 	# Concatenate files into one video
-	run_ffmpeg(['ffmpeg', '-f', 'concat', '-safe', '1', '-i', 'files.txt', '-c', 'copy', 'combo.mp4'])
+    run_ffmpeg(['ffmpeg', '-f', 'concat', '-safe', '1', '-i', 'files.txt', '-c', 'copy', 'combo.mp4'])
 
 	# Create and convert master audio track
-	subprocess.run(['python3', 'merge_audio.py'], check=True)
-	run_ffmpeg(['ffmpeg', '-i', 'master.wav', '-vn', '-ar', '48000', '-ac', '2', '-b:a', '192k', 'master.mp3'])
+    subprocess.run(['python3', 'merge_audio.py'], check=True)
+    run_ffmpeg(['ffmpeg', '-i', 'master.wav', '-vn', '-ar', '48000', '-ac', '2', '-b:a', '192k', 'master.mp3'])
 
 	# Combine video with master audio and key out black for transparency
-	run_ffmpeg([
-		'ffmpeg', '-i', 'starfield_5loops.mov', '-i', 'combo.mp4', 
-		'-filter_complex', '[1:v]colorkey=0x000000:0.01:0.01[ckout];[0:v][ckout]overlay=(W-w)/2:(H-h)/2:shortest=1[out]', 
-		'-map', '[out]', 'overlay_test.mp4'
-	])
+    run_ffmpeg([
+        'ffmpeg', '-i', 'starfield_5loops.mov', '-i', 'combo.mp4', 
+        '-filter_complex', '[1:v]colorkey=0x000000:0.01:0.01[ckout];[0:v][ckout]overlay=(W-w)/2:(H-h)/2:shortest=1[out]', 
+        '-map', '[out]', 'overlay_test.mp4'
+    ])
 
-	run_ffmpeg([
-		'ffmpeg', '-i', 'overlay_test.mp4', '-i', 'master.mp3', 
-		'-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-shortest', 'dubbed.mp4'
-	])
+    run_ffmpeg([
+        'ffmpeg', '-i', 'overlay_test.mp4', '-i', 'master.mp3', 
+        '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-shortest', 'dubbed.mp4'
+    ])
 
-	print("Video creation complete!")
+    print("Video creation complete!")
 
 
 
