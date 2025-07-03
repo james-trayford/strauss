@@ -186,10 +186,11 @@ class audio_channels:
                                 ['ambisonic']*nchan,
                                 list(map(labfunc, ['C']*nchan, range(nchan))))
         elif setup == "custom":
+            self.custom_setup = custom_setup # Store custom_setup
             self.setup_channels(custom_setup['azimuths'],
                                 custom_setup['types'],
                                 custom_setup['labels'])
-            if 'forder' in custom_setup:
+            if 'forder' in self.custom_setup:
                 self.forder = self.custom_setup['forder']
             else:
                 self.forder = 'unknown'

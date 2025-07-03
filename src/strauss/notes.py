@@ -42,9 +42,26 @@ def parse_note(notename):
     Returns:
       out (numerical): Frequency of note in Hertz
     """
-    nsplit = re.findall("(\D+|\d+)", notename)
-    semi = semitone_dict[nsplit[0]]/12.
-    octv  = int(nsplit[1])
+    #nsplit = re.findall("(\D+|\d+)", notename)
+    #semi = semitone_dict[nsplit[0]]/12.
+    #octv  = int(nsplit[1])
+
+    # Regex to capture note (letter, optional #/b) and octave (digits)
+    # Ensures the entire string matches this pattern.
+    match = re.fullmatch(r"([a-zA-Z][#b]?)([0-9]+)", notename)
+    if not match:
+        raise ValueError(f"Invalid note format: '{notename}'")
+    raw_note_part = match.group(1)
+    octave_str = match.group(2)
+    if len(raw_note_part) > 1: # Handles "C#", "Db", etc.
+        note_component = raw_note_part[0].upper() + raw_note_part[1]
+    else: # Handles "C", "A", etc.
+        note_component = raw_note_part.upper()
+    if note_component not in semitone_dict:
+        raise ValueError(f"Invalid note name: '{note_component}' in '{notename}'")
+
+    semi = semitone_dict[note_component]/12.
+    octv  = int(octave_str)
     return tuneC0*pow(2.,semi+octv)
 
 def parse_chord(chordname, rootoct=3):
@@ -84,6 +101,7 @@ def chord_notes(chordname, rootoct=3):
       out (:obj:`list`): list of note names constituting chord
     """
     chord = chrd.Chord(chordname)
+    rootoct = int(rootoct)
     notes = chord.components_with_pitch(int(rootoct))
     return notes
 

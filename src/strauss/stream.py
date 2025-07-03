@@ -180,7 +180,7 @@ class Buffers:
         """
         nbuff = stream.samprate*bufflength
         if nbuff < 20:
-            Exception(f"Error: buffer length {nbuff} samples below "
+            raise Exception(f"Error: buffer length {nbuff} samples below "
                       "lower limit of 20, with specified bufflength "
                       "{bufflength} seconds and sample rate {self.samprate} Hz")
 

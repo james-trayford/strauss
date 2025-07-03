@@ -151,6 +151,9 @@ class Sonification:
             # index note properties
             t = self.sources.mapping['time'][source]
             tsamp = int(Nsamp * t)
+            # If the note starts at or after the end of the sonification, skip it
+            if tsamp >= Nsamp:
+                continue
             chord = self.score.note_sequence[cbin[source]]
             nints = self.score.nintervals[cbin[source]]
             pitch = pitchfrac[source]

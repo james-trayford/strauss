@@ -8,7 +8,7 @@ sonification.
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import numpy as np
-import strauss.utilities as utils
+from . import utilities as utils
 import re
 import ffmpeg as ff
 import os
@@ -68,11 +68,13 @@ def getVoices(info=False):
  
   '''
   if ttsMode == 'pyttsx3':
+      import pyttsx3
       engine = pyttsx3.init()
       voices = engine.getProperty('voices')
       getter = vars
   elif ttsMode == 'coqui-tts':
-      voices = supported_voices
+      #voices = supported_voices
+      voices = utils.get_supported_coqui_voices()
       getter = dict
   else:
       getter = dict
@@ -132,23 +134,23 @@ def render_caption(caption, samprate, model, caption_path):
     elif ttsMode == 'pyttsx3':
         
       # Setup voice model for pyttsx3
+      import pyttsx3
       engine = pyttsx3.init() # initialize object
 
       # check what model info was set; if none were
       # specified, use defaults
       for key in ['rate','volume','voice']:
-          if key in model.keys():
+          if isinstance(model, dict) and key in model.keys():
               engine.setProperty(key, model[key])
           else:
               pass
 
-      engine.save_to_file(caption, caption_path, name='caption')
+      engine.save_to_file(caption, str(caption_path), name='caption')
       # note the current PyPI release ()
       engine.runAndWait()
       
     else:
-       # initialise dummy TTS class to raise error.
-       TTS()
+       raise TTSIsNotSupported("Text-to-speech is not available (ttsMode is 'None').")
           
     # Read the file back in to check the sample rate
     try:

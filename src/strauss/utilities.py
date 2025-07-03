@@ -97,6 +97,8 @@ def nested_dict_reassign(fromdict, todict):
     for k, v in fromdict.items():
         if isinstance(v, dict):
             # recurse through nested dictionaries
+            if k not in todict or not isinstance(todict[k], dict):
+                todict[k] = {} # Ensure target dict exists for nesting
             nested_dict_reassign(v, todict[k])
         else:
             # reassign todict value
@@ -118,9 +120,9 @@ def nested_dict_fill(fromdict, todict):
         if k not in todict:
             # assign todict value
             todict[k] = v
-        elif isinstance(v, dict):
+        elif isinstance(v, dict) and isinstance(todict.get(k), dict):
             # recurse through nested dictionaries
-            nested_dict_fill(todict[k], v)
+            nested_dict_fill(v, todict[k])
             
 def nested_dict_idx_reassign(fromdict, todict, idx):
     """
@@ -139,7 +141,9 @@ def nested_dict_idx_reassign(fromdict, todict, idx):
     for k, v in fromdict.items():
         if isinstance(v, dict):
             # recurse through nested dictionaries
-            nested_dict_idx_reassign(todict[k], v, idx)
+            if k not in todict or not isinstance(todict[k], dict):
+                todict[k] = {}
+            nested_dict_idx_reassign(v, todict[k], idx)
         else:
             # reassign todict value
             todict[k] = v[idx]

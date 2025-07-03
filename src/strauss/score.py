@@ -107,10 +107,22 @@ def parse_chord_sequence(chord_sequence):
     note_list = []
     note_frqs = []
     for i in range(len(chord_list)):
-        chord_list[i] = chord_list[i].strip()
-        chord_list[i] = chord_list[i].split('_')
-        chord_notes = notes.chord_notes(*chord_list[i])
-        note_list.append(chord_notes)
+        #chord_list[i] = chord_list[i].strip()
+        #chord_list[i] = chord_list[i].split('_')
+        #chord_notes = notes.chord_notes(*chord_list[i])
+        #note_list.append(chord_notes)
+
+        chord_name_with_octave = chord_list[i].strip()
+        if not chord_name_with_octave: # Handle empty segments if they occur from "||" or trailing "|"
+            raise ValueError("Empty chord definition in sequence.")
+
+        parts = chord_name_with_octave.split('_')
+        if len(parts) < 2 or not parts[1]: # Check if octave part is missing or empty
+            raise ValueError(f"Chord '{parts[0]}' in sequence is missing an octave declaration (e.g., C_4).")
+
+        # parts[0] is chord name, parts[1] is octave
+        chord_notes_val = notes.chord_notes(parts[0], parts[1])
+        note_list.append(chord_notes_val)
     return note_list
 
 if __name__ == '__main__':

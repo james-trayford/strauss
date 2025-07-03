@@ -248,8 +248,17 @@ class Source:
                 for i in range(self.n_sources):
                     if key not in evolvable:
                         raise Exception(f"Mapping error: Parameter \"{key}\" cannot be evolved.")
-                    x = self.mapping["time_evo"][i]
-                    y = self.mapping[key][i]
+                    #x = self.mapping["time_evo"][i]
+                    #y = self.mapping[key][i]
+
+                    # Use raw time_evo for interpolation x-axis to ensure correct time points
+                    if "time_evo" not in self.raw_mapping:
+                        raise ValueError("Cannot create evolving parameter without 'time_evo' in raw_mapping.")
+                    if i >= len(self.raw_mapping["time_evo"]):
+                         raise ValueError(f"Source index {i} out of bounds for raw_mapping['time_evo'].")
+                    x = self.raw_mapping["time_evo"][i]
+                    y = self.mapping[key][i] # y-values are the scaled parameter values
+
                     if key == "phi" or key == "azimuth":
                         # special case: shortest angular distance
                         # between phi points is always assumed
