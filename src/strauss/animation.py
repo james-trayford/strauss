@@ -101,21 +101,24 @@ class Animate:
         self.apadtrans = np.column_stack([np.zeros(int(self.pars['spf'] * float(self.pars['transition_time'])))]*2)
         self.halfbsamps = self.apadtrans.size // 2
         
-    def register(self, name, duration, sonification=None, pre_caption='', post_caption='', stype='animation', infile=None, pars={}):
+    def register(self, name, dark_mode=True, sonification=None, pre_caption='', post_caption='', stype='animation', infile=None, pars={}):
+        #if ((duration * (int(self.pars['fps']) + SAMPRATE)) % 1) and (stype != 'clip'):
+        #    Exception(f"Duration {duration}s gives a non-integer number of frames and/or audio samples," \
+        #              f"please retry, for example with an integer number of seconds e.g. ({int(np.ceil(duration))}s)")
+        duration = sonification.score.length
         if ((duration * (int(self.pars['fps']) + SAMPRATE)) % 1) and (stype != 'clip'):
-            Exception(f"Duration {duration}s gives a non-integer number of frames and/or audio samples," \
-                      f"please retry, for example with an integer number of seconds e.g. ({int(np.ceil(duration))}s)")
+            duration = math.ceil(duration)
 
         inpars = self.pars.copy()
         for k in pars.keys():
             inpars[k] = pars[k]
-
         self.sequences[name] = Sequence(name, duration=duration,
                                         topdir=self.topdir, index=self.seqdx,
                                         sonification=sonification,
                                         pre_caption=pre_caption,
                                         post_caption=post_caption,
-                                        pars=inpars, stype=stype, infile=infile)
+                                        pars=inpars, stype=stype,
+                                        invert_colours=dark_mode, infile=infile)
         self.seqlist.append(name)
         self.frames[name] = self.sequences[name].frame
         self.seqdx += 1
@@ -263,6 +266,7 @@ class Animate:
                          '-i', self.combined,
                          '-itsoffset', '0.047', # TODO: investigate why extra 47ms padding is needed to sync?
                          '-i', self.master_mp3,
+                         #'-map', '0:v', '-map', '1:a', '-c:a', 'libvorbis',
                          '-map', '0:v', '-map', '1:a',
                          '-c:v', 'copy', '-shortest',
                          self.final],
@@ -373,14 +377,15 @@ class Sequence:
                 #sp.check_call(["ffmpeg", '-y',
                 #                 '-r', self.pars["fps"],
                 #                 '-i', str(Path(self.path) / f'{self.name}.png'),
-                #                 '-c:v', 'mpeg4',
+                #                 '-c:v', 'libx264',
                 #                 '-crf', self.pars["crf"]] +
                 #                inv.split() + [outfile],
                 #                stdout=sp.DEVNULL, stderr=sp.STDOUT)
                 sp.run(['ffmpeg', '-y',
                         '-r', self.pars["fps"],
                         '-i', str(Path(self.path) / f'frame_%05d.png'),
-                        '-c:v', 'mpeg4',
+                        '-c:v', 'libx264',
+                        '-c:a', 'libx264',
                         '-crf', self.pars["crf"]] +
                         inv.split() + [outfile],
                         stdout=sp.DEVNULL, stderr=sp.STDOUT,
@@ -400,8 +405,9 @@ class Sequence:
                                '-i', f'color=c=black:s={self.pars["dimensions"]}',
                                '-frames', str(self.duration * int(self.pars['fps'])),
                                '-r', self.pars["fps"],
-                               '-c:v', 'mpeg4',
+                               '-c:v', 'libx264',
                                '-crf', self.pars["crf"],
+                               '-c:a', 'libx264',
                                outfile],
                                stdout=sp.DEVNULL, stderr=sp.STDOUT)
                 
@@ -433,7 +439,8 @@ class Sequence:
                                    '-i', frame,
                                    '-r', self.pars["fps"],
                                    '-frames', str(nframes),
-                                   '-c:v', 'mpeg4',
+                                   '-c:v', 'libx264',
+                                   '-c:a', 'libx264',
                                    '-crf', self.pars["crf"]] +
                                    inv.split() +
                                    [str(Path(self.path)/f"{ctype[pos]}.mp4")],
@@ -464,9 +471,10 @@ class Sequence:
                                    '-i', frame,
                                    '-r', self.pars["fps"],
                                    '-frames', str(nframes),
-                                   '-c:v', 'mpeg4',
+                                   '-c:v', 'libx264',
                                    '-crf', self.pars["crf"],
-                                   str(Path(self.path)/f"{ctype[pos]}.mp4")],
+                                   '-c:a', 'libx264',
+                                  str(Path(self.path)/f"{ctype[pos]}.mp4")],
                                    stdout=sp.DEVNULL, stderr=sp.STDOUT)
                     
                 else:
@@ -476,8 +484,9 @@ class Sequence:
                                    '-i', f'color=c=black:s={self.pars["dimensions"]}',
                                    '-frames', str(nframes),
                                    '-r', self.pars["fps"],
-                                   '-c:v', 'mpeg4',
+                                   '-c:v', 'libx264',
                                    '-crf', self.pars["crf"],
+                                   '-c:a', 'libx264',
                                    str(Path(self.path)/f"{ctype[pos]}.mp4")],
                                    stdout=sp.DEVNULL, stderr=sp.STDOUT)
                 pos += 1
@@ -502,6 +511,7 @@ def generate_caption(caption, path, notebook=True):
 
 def prep_caption(caption):
     if caption:
+        caption = caption.strip('.!?¿¡')      
         sents = caption.split('.')
         return '.'.join(sents[:-1] + [sents[-1]+'.']) 
     return None
@@ -567,8 +577,9 @@ def render_transition(fromfile, tofile, toseq):
                      '-filter_complex',
                      f"[0][1]xfade=transition={toseq.pars['transition_type']}:duration={tdur}:offset={toff}",#format=yuv420p",
                      '-bsf:v', 'h264_metadata=sample_aspect_ratio=1/1',
-                     '-c:v', 'mpeg4',
+                     '-c:v', 'libx264',
                      '-crf', toseq.pars["crf"],
+                     '-c:a', 'libx264',
                      transfile],
                     stdout=sp.DEVNULL, stderr=sp.STDOUT)
 
@@ -593,8 +604,9 @@ def prepare_clip(seq, infile, outtype):
                    '-i', infile,
                    "-vf", ",".join(filts),
                    '-r', seq.pars["fps"],
-                   '-c:v', 'mpeg4',
+                   '-c:v', 'libx264',
                    '-crf', seq.pars["crf"],
+                   '-c:a', 'libx264',
                    f"{seq.path}/{outtype}.mp4"]
 
     # print (' '.join(cmd))
@@ -621,8 +633,9 @@ def generate_slide_video(seq, still, outtype, time=None, nframes=None):
                    "-vf", ",".join(filts),
                    '-r', seq.pars["fps"],
                    dur[0], dur[1],
-                   '-c:v', 'mpeg4',
+                   '-c:v', 'libx264',
                    '-crf', seq.pars["crf"],
+                   '-c:a', 'libx264',
                    f"{seq.path}/{outtype}.mp4"]
 
     # print (' '.join(cmd))
