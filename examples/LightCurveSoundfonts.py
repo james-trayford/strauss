@@ -41,8 +41,8 @@ else:
     path = str(path)
     
     files = ("guitars.sf2", "flute.sf2")
-    urls = ("https://drive.google.com/uc?export=download&id=18CCYj8AFy7wpDdGg0ADx8GfTTHEFilrs",
-           "https://drive.google.com/uc?export=download&id=1DAbIitPRUUGidrhVt4wiwwXrSxOD7RDY")
+    urls = ("https://huggingface.co/datasets/projectlosangeles/soundfonts4u/resolve/main/Guitars-Universal-V1.5.sf2",
+           "https://huggingface.co/datasets/projectlosangeles/soundfonts4u/resolve/main/Expressive%20Flute%20SSO-v1.2.sf2")
     for f, u in zip(files, urls):
         with urllib.request.urlopen(u) as response, Path(f"{path}",f"{f}").open(mode='wb') as out_file:
             print(f"\t getting {f}")
@@ -67,7 +67,7 @@ guitar_sampler = Sampler(Path(outdir, "guitars.sf2"))
 # This can be useful to inspect whats inside the soundfont file. If we already know which preset we want (by e.g. inspecting this list), we can pick the preset ahead of time, using the `sf_preset` keyword argument:
 
 
-sf_preset = 19
+sf_preset = 49
 guitar_sampler= Sampler(Path(outdir,"flute.sf2"), sf_preset=sf_preset)
 
 
