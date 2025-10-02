@@ -4,7 +4,6 @@
 # ### <u> Generate the sunrise to sunset sonification used in the "_Audible Universe_" planetarium show </u>
 
 import matplotlib.pyplot as plt
-import ffmpeg as ff
 import wavio as wav
 from strauss.sonification import Sonification
 from strauss.sources import Objects
@@ -17,6 +16,12 @@ import glob
 import os
 import copy
 from pathlib import Path
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--animate", action="store_true",
+                    help="create an animation of plot")
+args = parser.parse_args()
 
 
 print("\nSonifying the Sun's motion across the sky...")
@@ -49,7 +54,7 @@ system = "stereo"
 
 # **Now, set-up the sampler:**
 # set up sampler
-sampler = Sampler(str(outdir))
+sampler = Sampler(Path("..", "data", "samples", "day_sequence"))
 sampler.modify_preset({'filter':'on'}) # want filtering on for sun altitude effect
 
 # **Set mapping limits of mapped quantities** (truncated relative to planetarium show example)
@@ -113,3 +118,57 @@ soni2.hear()
 # NOTE: Change `"../../FILENAME.wav"` to your filepath of choice. By default, the sound file is normalised to that of the highest amplitude sample, but can be set to a lower normalisation by setting the `master_volume` parameter to a value between `0.` and `1.`.
 
 # soni2.save_combined(Path("..", "..", "day_sequence.wav"), True, master_volume=1.0)
+
+def animate(raw_mapping, soni):
+    '''Make frames for animating a plot showing changes in volume with time.
+       Create a sequence to animate this with the sound overlaid.'''
+
+    print("\n Creating animation frames. This may take a few minutes.")
+    soni.score.length
+    import warnings
+    from pathlib import Path
+    from strauss.animation import Animate
+    import shutil
+
+    here = Path.cwd()
+
+    # Make directory for frames
+    topdir = here / ("figure_animations") / "DaySequence" / "volume"
+    if topdir.exists() and any(topdir.iterdir()):
+    	shutil.rmtree(topdir)
+
+    topdir.mkdir(parents=True, exist_ok=True)
+    if topdir.exists() and any(topdir.iterdir()):
+    	warnings.warn(f"{topdir} is not empty, instead name "
+    	              "an empty directory, or a new one.")
+    else:
+    	pipe = Animate(topdir)
+    	pipe.register('volume', sonification=soni, pre_caption=f'This video shows how volume is mapped to daylight.', post_caption='Thank you for listening!', stype='animation')
+    	xp = events2.raw_mapping['time_evo'][0]
+    	yp = events2.raw_mapping['volume'][0]
+    	nframe = int(soni.score.length*int(pipe.pars['fps']))
+    	xf = np.linspace(xp[0], xp[-1], nframe)
+    	yf = np.interp(xf, xp, yp)
+    	xp, yp = xf, yf
+    	for i in range(xp.size)[::1]:
+    	    fig, ax1 = plt.subplots()
+            plt.title("Day Sequence")
+    	    ax1.set_xlabel('Time [s]') 
+    	    ax2 = ax1.twinx() 
+    	    ax1.plot(xp, yp)
+    	    ax1.set_ylabel('Data')
+    	    ax1.tick_params(axis ='y')
+    	    ax1.axvline(xp[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+    	    ax1.axhline(yp[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+    	    ax2.set_ylabel('Volume')
+    	    ax2.tick_params(axis ='y')
+    	    plt.savefig(pipe.frames["volume"].parent / f'frame_{i:05d}.png', dpi=120)
+    	    plt.close()
+    	print(f"Volume frames created!")
+    	pipe.render()
+
+    # Video can be found at /figure_animations/DaySequence/volume/final.mp4
+
+if args.animate:
+    animate(events2.raw_mapping, soni)
+

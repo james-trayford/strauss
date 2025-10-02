@@ -21,6 +21,13 @@ import glob
 import os
 import copy
 from pathlib import Path
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--animate", action="store_true",
+                    help="create an animation of plot")
+args = parser.parse_args()
+
 
 
 # ...and then download some soundfont (`sf2`) files. These are widely available online, and in particular we download some collected on the [_Soundfonts 4 U_](https://sites.google.com/site/soundfonts4u/) website (and hsted on _Google Drive_). Why not experiment with some of the other files hosted here? We select a flute and a collection of guitar sounds as these are small enough to automatically download.
@@ -190,4 +197,56 @@ dobj = soni.hear()
 # plt.plot(x,y)
 # plt.ylabel('Magnitude')
 # plt.xlabel('Time (Julian Days)')
+
+def animate(x, y, soni):
+    '''Make frames for animating a plot of a light curve.
+       Create a sequence to animate this with the sound overlaid.'''
+
+    print("\n Creating animation frames. This may take a few minutes.")
+
+    import warnings
+    from pathlib import Path
+    import shutil
+    from strauss.animation import Animate
+
+    here = Path.cwd()
+
+    # Make directory for frames
+    topdir = here / "figure_animations" / "LightCurveSoundfonts"
+    if topdir.exists():
+        shutil.rmtree(topdir)
+    topdir.mkdir(parents=True, exist_ok=True)
+    if topdir.exists() and any(topdir.iterdir()):
+        warnings.warn(f"{topdir} is not empty, instead name "
+                      "an empty directory, or a new one.")
+    else:
+        pipe = Animate(topdir)
+        pipe.register('cutoff', dark_mode=False, sonification=soni, pre_caption=f'This video shows how cutoff is mapped to magnitude for the light curve of 55 Cancri.', post_caption='Thank you for listening!', stype='animation')
+        nframe = int(soni.score.length*int(pipe.pars['fps']))
+        xf = np.linspace(x[0], x[-1], nframe)
+        yf = np.interp(xf, x, y)
+        x, y = xf, yf
+
+        for i in range(x.size)[::1]:
+            fig, ax1 = plt.subplots(figsize=(8,6))
+            plt.title("55 Cancri")
+            ax1.set_xlabel('Time (Julian Days)') 
+            ax2 = ax1.twinx() 
+            ax1.plot(x, y)
+            ax1.set_ylabel('Magnitude')
+            ax1.tick_params(axis ='y')
+            ax1.axvline(x[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+            ax1.axhline(y[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+            ax2.set_ylim(min(y)*4, max(y)*4)
+            ax2.set_ylabel('Cutoff')
+            ax2.tick_params(axis ='y')
+            plt.savefig(pipe.frames["cutoff"].parent / f"frame_{i:05d}.png", dpi=120)
+            plt.close()
+        print("Cutoff frames created!")
+        pipe.render()
+
+    # Video can be found at /figure_animations/LightCurveSoundfonts/cutoff/final.mp4
+
+if args.animate:
+    animate(x, y, soni)
 

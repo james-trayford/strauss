@@ -14,6 +14,12 @@ import IPython.display as ipd
 import os
 from scipy.interpolate import interp1d
 import numpy as np
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--animate", action="store_true",
+                    help="create an animation of plot")
+args = parser.parse_args()
 
 
 
@@ -160,4 +166,60 @@ sources.apply_mapping_functions()
 soni = Sonification(score, sources, generator, system)
 soni.render()
 soni.hear()
+
+def animate(raw_mapping, soni):
+    '''Make frames for animating a plot showing changes in volume with time.
+       Create a sequence to animate this with the sound overlaid.'''
+
+    print("\n Creating animation frames. This may take a few minutes.")
+
+    import warnings
+    from pathlib import Path
+    from strauss.animation import Animate
+    import shutil
+
+    here = Path.cwd()
+
+    # Make directory for frames
+    topdir = here / "figure_animations" / "1D" / "cutoff"
+    if topdir.exists():
+        shutil.rmtree(topdir)
+    topdir.mkdir(parents=True, exist_ok=True)
+    if topdir.exists() and any(topdir.iterdir()):
+        warnings.warn(f"{topdir} is not empty, instead name "
+                              "an empty directory, or a new one.")
+    else:
+        pipe = Animate(Path(here) / "figure_animations" / "1D" / "cutoff", pars={"background_video": str(Path(here) / "example_media" / "starfield.mov")})
+        pipe.register(f'cutoff', sonification=soni, pre_caption=f'This video shows how cutoff is mapped to the data.', post_caption="Thank you for listening!", stype='animation')
+        xp = sources.raw_mapping['time_evo'][0]
+        yp = sources.raw_mapping['cutoff'][0]
+        nframe = int(soni.score.length*int(pipe.pars['fps']))
+        xf = np.linspace(xp[0], xp[-1], nframe)
+        yf = np.interp(xf, xp, yp)
+        xp, yp = xf, yf
+        for i in range(xp.size)[::1]:
+            fig, ax1 = plt.subplots()
+            plt.title("1D Data")
+            ax1.set_xlabel('Time [s]') 
+            ax2 = ax1.twinx() 
+            ax1.plot(xp, yp)
+            ax1.set_ylabel('Data')
+            ax1.tick_params(axis ='y')
+            ax1.axvline(xp[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+            ax1.axhline(yp[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+            ymin, ymax = ax1.get_ylim()
+            ydel = (ymax-ymin)/(y.max() - y.min())
+            yoff = ydel*(y.min()-ymin)/(ymax-ymin)
+            ax2.set_ylim(0-yoff, ydel-yoff)
+            ax2.set_ylabel('Cutoff')
+            ax2.tick_params(axis ='y')
+            plt.savefig(pipe.frames['cutoff'].parent / f'frame_{i:05d}.png', dpi=120)
+            plt.close()
+        print(f"cutoff frames created!")
+        pipe.render()
+
+    # Video can be found at /figure_animations/1D/cutoff/final.mp4
+
+if args.animate:
+    animate(sources.raw_mapping, soni)
 

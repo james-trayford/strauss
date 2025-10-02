@@ -18,6 +18,12 @@ import os
 from scipy.interpolate import interp1d
 import numpy as np
 from pathlib import Path
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--animate", action="store_true",
+                    help="create an animation of plot")
+args = parser.parse_args()
 
 
 # In other examples we use a 'parameter mapping' approach for one-dimensional data series, where we map _y_ as a function of _x_ using the change in some expressive property of sound (e.g. `pitch_shift`) as a function of time.
@@ -198,4 +204,58 @@ soni = Sonification(score, sources, generator, system)
 soni.render()
 print(f"Spectralising Image...")
 soni.hear()
+
+def animate(wlen2, spec2, soni):
+    '''Make frames for animating the spectrum of NGC 6302. Create a sequence to 
+       animate this with the changes in sound frequency overlaid.'''
+
+    print("\n Creating animation frames. This may take a few minutes.")
+
+    import warnings
+    from pathlib import Path
+    import shutil
+    from strauss.animation import Animate
+    here = Path.cwd()
+
+    # Remove directory if it already exists
+    topdir = here / "figure_animations" / "SpectralData_NGC6302" / "pitch"
+    if topdir.exists():
+        shutil.rmtree(topdir)
+
+    # Make directory for frames
+    topdir.mkdir(parents=True, exist_ok=True)
+    if topdir.exists() and any(topdir.iterdir()):
+        warnings.warn(f"{topdir} is not empty, instead name "
+                      "an empty directory, or a new one.")
+    else:
+        pipe = Animate(topdir)
+        pipe.register('pitch', sonification=soni, pre_caption=f'This video shows how pitch is mapped to flux in the spectral data for N G C 6 3 0 2', post_caption='Thank you for listening!', stype='animation')
+        xp = 1e-12*3e8/(wlen2*1e-10)
+        yp = spec2/spec2.max()
+        nframe = int(soni.score.length*int(pipe.pars['fps']))
+        xf = np.linspace(xp[0], xp[-1], nframe)
+        yf = np.interp(xf, xp, yp)
+        xp, yp = xf, yf
+        for i in range(xp.size)[::1]:
+            fig, ax1 = plt.subplots()
+            plt.title("NGC 6302")
+            ax1.set_xlabel('Frequency [THz]') 
+            ax2 = ax1.twinx() 
+            ax1.plot(xp, yp)
+            ax1.set_ylabel('Flux')
+            ax1.tick_params(axis ='y')
+            ax1.axvline(xp[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+            ax1.axhline(yp[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+            ax2.set_ylim(100, 1000)
+            ax2.set_ylabel('Sonification Frequency [Hz]')
+            ax2.tick_params(axis ='y')
+            plt.savefig(pipe.frames["pitch"].parent / f"frame_{i:05d}.png", dpi=120)
+            plt.close()
+        print("Spectral frames created!")
+        pipe.render()
+
+    # Video can be found at /figure_animations/SpectralData_NGC6302/pitch/final.mp4
+
+if args.animate:
+    animate(wlen2, spec2, soni)
 
