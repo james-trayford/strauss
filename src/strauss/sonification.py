@@ -29,6 +29,7 @@ from scipy.io import wavfile
 import warnings
 import tempfile
 from pathlib import Path
+import ffmpeg
 try:
     import sounddevice as sd
 except (OSError, ModuleNotFoundError) as sderr:
@@ -234,7 +235,8 @@ class Sonification:
 
         if len(self.out_channels) > 2:
             print("Warning: sonification has > 2 channels, only first 2 will be used. See 'save_combined' method.")
-        
+
+            
         # first pass - find max amplitude value to normalise output
         # and concatenate channels to list
         vmax = 0.
@@ -251,7 +253,7 @@ class Sonification:
                                 self.caption_channels[str(c)].values])   
             
             channels.append(channel_values)
-           
+
         wav.write(fname,
                   np.column_stack(channels),
                   self.samprate, 
@@ -357,8 +359,14 @@ class Sonification:
             vals = channels[c]
             chans[:,c] = (vals*norm).astype("int32")
             
-        # finally combine and write out wav file
-        wavfile.write(fname, self.samprate, chans)
+        # finally combine and write out file
+        if fname.split('.')[-1] == 'mp3':
+            with tempfile.NamedTemporaryFile() as tmp:
+                wavfile.write(tmp, self.samprate, chans)
+                ffmpeg.input(tmp.name).output(fname).overwrite_output().run(quiet=True)
+        else:
+            wavfile.write(fname, self.samprate, chans)
+        
         print(f"Saved {fname}")
 
         
