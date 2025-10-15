@@ -120,7 +120,10 @@ def render_caption(caption, samprate, model, caption_path):
 
       # TODO: do this better with logging. We can filter TTS function output, e.g. alert to downloading models...
       print('Rendering caption (this can take a while if the caption is long, or if the TTS model needs downloading)...')
-      
+
+      # strip leading or trailing punctuation
+      caption = caption.strip('.!?¿¡')      
+
       # capture stdout from the talkative TTS module
       with utils.Capturing() as output:
           # Load in the tts model
