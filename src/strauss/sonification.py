@@ -15,7 +15,7 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
+from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, NoSoundDevice
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import matplotlib.pyplot as plt
@@ -52,7 +52,7 @@ class Sonification:
       * Support custom audio setups here too.
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
-                 caption=None, samprate=48000,
+                 caption=None, samprate=48000, declick_time=0.03,
                  ttsmodel=default_tts_voice):
         """
         Args:
@@ -70,6 +70,9 @@ class Sonification:
          samprate (:obj:`int`) Integer sample rate in samples per second
           (Hz), typically :obj:`44100` or :obj:`48000` for most audio
     	  applications
+         declick_time (:obj:`float`) duration of start and end fades applied
+          on save and dispolay to remove audible clicks from sample
+          discontinuity
          ttsmodel (:obj:`str` or :obj:`PosixPath`) file path to the
           text-to-speech model used for captions. 
         """
@@ -79,6 +82,9 @@ class Sonification:
         
         # tts model name
         self.ttsmodel = ttsmodel
+
+        # fade duration to de-click audio
+        self.declick_time = declick_time
         
         # caption
         self.caption = caption
@@ -344,7 +350,9 @@ class Sonification:
         for c in range(len(self.out_channels)):
             
             channel_values = np.concatenate(int(embed_caption)*[self.caption_channels[str(c)].values,]+
-                                            [self.out_channels[str(c)].values])   
+                                            [apply_fades(self.out_channels[str(c)].values,
+                                                         self.out_channels['0'].samprate,
+                                                         fdur=self.declick_time)])   
             channels.append(channel_values)
             vmax = max(
                 abs(channels[c].max()),
@@ -415,8 +423,11 @@ class Sonification:
         
         # combine caption + sonification streams at display time
         for c in range(len(self.out_channels)):
+            # apply fades at display time
             channel_values = np.concatenate([self.caption_channels[str(c)].values,
-                                             self.out_channels[str(c)].values])   
+                                             apply_fades(self.out_channels[str(c)].values,
+                                                         self.out_channels['0'].samprate,
+                                                         fdur=self.declick_time)])   
             channels.append(channel_values)
             vmax = max(
                 abs(channels[c].max()),
