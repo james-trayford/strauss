@@ -21,7 +21,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os
-import ffmpeg as ff
+import subprocess as sp
 import wavio as wav
 import IPython.display as ipd
 from IPython.display import display
@@ -320,7 +320,11 @@ class Sonification:
         """ Save render as a combined multi-channel wav file 
         
         Can use this function to save sonification of any audio_setup
-        to a 32-bit depth WAV using `scipy.io.wavfile`
+        to a file. This first creates a 32-bit depth WAV using
+        `scipy.io.wavfile`. If fname has a non-WAV extension, it then attempts
+        conversion via ffmpeg, provided ffmpeg is available.
+        
+        formats
 
         Args:
           fname (:obj:`str`) Filename or filepath
@@ -359,11 +363,35 @@ class Sonification:
             vals = channels[c]
             chans[:,c] = (vals*norm).astype("int32")
             
-        # finally combine and write out file
-        if fname.split('.')[-1] == 'mp3':
-            with tempfile.NamedTemporaryFile() as tmp:
-                wavfile.write(tmp, self.samprate, chans)
-                ffmpeg.input(tmp.name).output(fname).overwrite_output().run(quiet=True)
+        # finally combine and write out file. first check extension
+        fsplit = str(fname).split('.')
+        if len(fsplit) < 2:
+            warnings.warn('No file extension in provided fname. Assuming WAV...')
+        ext = fsplit[-1].lower()
+        if ext != 'wav':
+            # check we can use ffmpeg binary 
+            try:
+                sp.run(['ffmpeg','-h'],capture_output=1, check=1)
+            except FileNotFoundError as e: 
+                raise FileNotFoundError(f"""
+                'ffmpeg' doesn't appear to be available in the local environment.
+                This may need to be installed manually. To install ffmpeg visit
+                https://www.ffmpeg.org/download.html.
+                {str(e)}
+                """)
+            with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
+                # now first write the wav to a temporary file
+                wavfile.write(tmp.name, self.samprate, chans)
+                try:
+                    # try (naive) convert with ffmpeg
+                    sp.run(['ffmpeg', '-i', f'{tmp.name}', f'{fname}'],
+                           capture_output=1, check=1)
+                except sp.CalledProcessError as e:
+                    # if ffmpeg can't do it for whatever reason, raise
+                    raise Exception(f"""
+                    'ffmpeg' failed to convert '.wav' to '.{ext}' succesfully:
+                    {str(e)}
+                    {e.stderr}""")
         else:
             wavfile.write(fname, self.samprate, chans)
         
