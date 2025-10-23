@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `CHANGELOG.md`!
 - `apply_fades` function in utilities to apply arbitrary fade in and fade out length to "de-click"
   (see **Changed**) a sample array, using a simple linear ramp in time.
+- Added `.add_ticks(increment, duration=0.04, tick_vol=0.5)` method to the sonification. 
+  This can be run after `.render()` and generates regular ticks in `'time'` or `'time_evo'`. 
+  `increment` is specified in the input units, while duration is in seconds of the sonification
+  (usually 0.01-0.1s), and `tick_vol` is a linear fraction of the peak sonification amplitude (remember,
+  our hearing is generally logarithmic).
 
 ### Changed
 
