@@ -15,7 +15,7 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, NoSoundDevice
+from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import matplotlib.pyplot as plt
@@ -205,7 +205,6 @@ class Sonification:
                 cpath = Path(cdir, 'caption.wav')
                 render_caption(self.caption, self.samprate,
                                self.ttsmodel, str(cpath))
-                
                 rate_in, wavobj = wavfile.read(cpath)
                 wavobj = np.array(wavobj)
             # Set up the Stream objects for TTS
@@ -223,7 +222,39 @@ class Sonification:
             self.caption_channels = {}
             for c in range(Nchan):
                 self.caption_channels[str(c)] = Stream(0, self.samprate) 
+
+
+    def add_ticks(self, increment, duration=0.04, tick_vol=0.25):
+        # TODO this should probably use a dedicated generator...
+
+        # add tick volume to Sonification object
+        self.tick_vol = tick_vol
         
+        tick_samples = 2*(np.random.random(self.out_channels['0'].values.shape)-0.5)
+        k = 'time'
+        if k not in self.sources.lims.keys():
+            k = 'time_evo'
+            if k not in self.sources.lims.keys():
+                raise Exception("""
+                Sonification doesn't have a time base! only sonifications with a 'time'
+                or 'time_evo' mapping can have time increment ticks...
+                """)
+        inc = self.score.length*rescale_values(self.sources.lims[k][0]+increment,
+                                               self.sources.lims[k],
+                                               self.sources.plims[k])
+        self.t_per_inc = np.linspace(0, self.score.length/inc, tick_samples.shape[0])
+        self.tdur_per_inc = inc/duration
+        tickenv = np.clip(1/self.tdur_per_inc - self.t_per_inc%1, 0, np.inf)
+        tickenv /= tickenv.max()
+        tick_samples = tick_samples*tickenv
+        Nchan = len(self.out_channels.keys())
+        self.tick_channels = {}
+        for i in range(Nchan):
+            panenv = self.channels.mics[i].antenna(0, 0.5*np.pi)
+            self.tick_channels[str(i)] = Stream(tick_samples.size, self.samprate, ltype='samples')
+            self.tick_channels[str(i)].values += tick_samples * panenv
+
+                
     def save_stereo(self, fname, master_volume=1.):
         """ Save stereo or mono sonifications
         
@@ -345,14 +376,16 @@ class Sonification:
 
         channels = []
         vmax = 0.
-        
+
+        has_ticks = hasattr(self, 'tick_channels')
+
         # first pass - find max amplitude value to normalise output
         for c in range(len(self.out_channels)):
-            
+                
             channel_values = np.concatenate(int(embed_caption)*[self.caption_channels[str(c)].values,]+
                                             [apply_fades(self.out_channels[str(c)].values,
                                                          self.out_channels['0'].samprate,
-                                                         fdur=self.declick_time)])   
+                                                         fdur=self.declick_time)])
             channels.append(channel_values)
             vmax = max(
                 abs(channels[c].max()),
@@ -368,8 +401,11 @@ class Sonification:
         
         # normalise and collect channels into a list
         for c in range(len(self.out_channels)):
-            vals = channels[c]
-            chans[:,c] = (vals*norm).astype("int32")
+            signal = channels[c]*norm
+            if has_ticks:
+                # add the ticks
+                signal += self.tick_channels[str(c)].values*norm*self.tick_vol
+            chans[:,c] = (signal).astype("int32")
             
         # finally combine and write out file. first check extension
         fsplit = str(fname).split('.')
@@ -417,6 +453,7 @@ class Sonification:
 
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
 
+        has_ticks = hasattr(self, 'tick_channels')
         channels = []
         fig = plt.figure(figsize=(18,12))
         vmax = 0.
@@ -455,6 +492,10 @@ class Sonification:
             outfmt = np.column_stack(channels[:2]).T / vmax
         if len(self.channels.labels) > 2:
             print("Warning: for more than two channels, only first two channels are mapped to L and R, respectively.")
+        if has_ticks:
+            # add the ticks
+            for c in range(outfmt.shape[0]):
+                outfmt[c] += self.tick_channels['0'].values*self.tick_vol / vmax
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
         
     def hear(self):
