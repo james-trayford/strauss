@@ -65,7 +65,7 @@ else:
 flute_sampler = Sampler(Path(outdir,"flute.sf2"))
 
 
-# On the other hand, the ***guitar*** file has multiple presets. If we try loading this in in the same way, the `_strauss_` sampler will default to picking the first preset to use, but will print a list of all of the presets and thier associated numbers. 
+# On the other hand, the ***guitar*** file hahttps://app.slack.com/client/T04SZN1PZPS/C04SCFH9AG4s multiple presets. If we try loading this in in the same way, the `_strauss_` sampler will default to picking the first preset to use, but will print a list of all of the presets and thier associated numbers. 
 
 print("\nAn example of preset selection for the Sampler (note this is overridden in the script with a pre-chosen preset).\n")
 guitar_sampler = Sampler(Path(outdir, "guitars.sf2"))
@@ -202,25 +202,26 @@ def animate(x, y, soni):
     '''Make frames for animating a plot of a light curve.
        Create a sequence to animate this with the sound overlaid.'''
 
-    print("\n Creating animation frames. This may take a few minutes.")
+    print("\n Creating animation frames. This may take a few minutes. The output, 'final.mp4' is saved to /figure_animations/LightCurveSoundfonts/'''
+")
 
     import warnings
     from pathlib import Path
-    import shutil
     from strauss.animation import Animate
+    import shutil
+    import tempfile
 
     here = Path.cwd()
 
-    # Make directory for frames
-    topdir = here / "figure_animations" / "LightCurveSoundfonts"
-    if topdir.exists():
-        shutil.rmtree(topdir)
-    topdir.mkdir(parents=True, exist_ok=True)
-    if topdir.exists() and any(topdir.iterdir()):
-        warnings.warn(f"{topdir} is not empty, instead name "
-                      "an empty directory, or a new one.")
-    else:
-        pipe = Animate(topdir)
+    # Define the final target directory
+    target_dir_name = Path("figure_animations") / "LightCurveSoundfonts"
+    
+    # Use a temporary directory for all intermediate files
+    with tempfile.TemporaryDirectory() as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        print(f"Using temporary directory: {temp_dir}")
+
+        pipe = Animate(temp_dir)
         pipe.register('cutoff', dark_mode=False, sonification=soni, pre_caption=f'This video shows how cutoff is mapped to magnitude for the light curve of 55 Cancri.', post_caption='Thank you for listening!', stype='animation')
         nframe = int(soni.score.length*int(pipe.pars['fps']))
         xf = np.linspace(x[0], x[-1], nframe)
@@ -244,8 +245,17 @@ def animate(x, y, soni):
             plt.close()
         print("Cutoff frames created!")
         pipe.render()
+        temp_final_mp4 = temp_dir / "final.mp4" 
 
-    # Video can be found at /figure_animations/LightCurveSoundfonts/cutoff/final.mp4
+        target_dir_name.mkdir(parents=True, exist_ok=True)
+        final_target_path = target_dir_name / temp_final_mp4.name
+        
+        if temp_final_mp4.exists():
+            shutil.copy(temp_final_mp4, final_target_path)
+            print(f"\nFinal animation copied to: {final_target_path}")
+        else:
+            warnings.warn(f"Could not find {temp_final_mp4} after rendering.")
+
 
 if args.animate:
     animate(x, y, soni)

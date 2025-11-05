@@ -146,7 +146,7 @@ soni.hear()
 
 # Example 3b: Filter Cutoff Mapping - Textural
 
-print("Example 3b: Filter Cutoff Mapping - Textural...")
+print("Example 3b: Filter Cuthttps://app.slack.com/client/T04SZN1PZPS/C04SCFH9AG4off Mapping - Textural...")
 generator = Synthesizer()
 
 generator.load_preset('windy')
@@ -177,19 +177,19 @@ def animate(raw_mapping, soni):
     from pathlib import Path
     from strauss.animation import Animate
     import shutil
+    import tempfile
 
     here = Path.cwd()
 
-    # Make directory for frames
-    topdir = here / "figure_animations" / "1D" / "cutoff"
-    if topdir.exists():
-        shutil.rmtree(topdir)
-    topdir.mkdir(parents=True, exist_ok=True)
-    if topdir.exists() and any(topdir.iterdir()):
-        warnings.warn(f"{topdir} is not empty, instead name "
-                              "an empty directory, or a new one.")
-    else:
-        pipe = Animate(Path(here) / "figure_animations" / "1D" / "cutoff", pars={"background_video": str(Path(here) / "example_media" / "starfield.mov")})
+    # Define the final target directory
+    target_dir_name = Path("figure_animations") / "1D"
+    
+    # Use a temporary directory for all intermediate files
+    with tempfile.TemporaryDirectory() as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        print(f"Using temporary directory: {temp_dir}")
+
+        pipe = Animate(temp_dir, pars={"background_video": str(Path(here) / "example_media" / "starfield.mov")})
         pipe.register(f'cutoff', sonification=soni, pre_caption=f'This video shows how cutoff is mapped to the data.', post_caption="Thank you for listening!", stype='animation')
         xp = sources.raw_mapping['time_evo'][0]
         yp = sources.raw_mapping['cutoff'][0]
@@ -197,6 +197,7 @@ def animate(raw_mapping, soni):
         xf = np.linspace(xp[0], xp[-1], nframe)
         yf = np.interp(xf, xp, yp)
         xp, yp = xf, yf
+
         for i in range(xp.size)[::1]:
             fig, ax1 = plt.subplots()
             plt.title("1D Data")
@@ -218,7 +219,16 @@ def animate(raw_mapping, soni):
         print(f"cutoff frames created!")
         pipe.render()
 
-    # Video can be found at /figure_animations/1D/cutoff/final.mp4
+        temp_final_mp4 = temp_dir / "final.mp4" 
+
+        target_dir_name.mkdir(parents=True, exist_ok=True)
+        final_target_path = target_dir_name / temp_final_mp4.name
+        
+        if temp_final_mp4.exists():
+            shutil.copy(temp_final_mp4, final_target_path)
+            print(f"\nFinal animation copied to: {final_target_path}")
+        else:
+            warnings.warn(f"Could not find {temp_final_mp4} after rendering.")
 
 if args.animate:
     animate(sources.raw_mapping, soni)

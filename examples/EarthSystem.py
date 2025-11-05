@@ -99,20 +99,20 @@ def animate(timegrid, wfracgrid, soni):
     import warnings
     from pathlib import Path
     import shutil
+    import tempfile
 
     from strauss.animation import Animate
     here = Path.cwd()
-    topdir = here / "figure_animations" / "EarthSystem" / "cutoff"
-    if topdir.exists():
-        shutil.rmtree(topdir)
 
-    # Make directory for frames
-    topdir.mkdir(parents=True, exist_ok=True)
-    if topdir.exists() and any(topdir.iterdir()):
-        warnings.warn(f"{topdir} is not empty, instead name "
-                      "an empty directory, or a new one.")
-    else:
-        pipe = Animate(topdir)
+    # Define the final target directory
+    target_dir_name = Path("figure_animations") / "EarthSystem"
+    
+    # Use a temporary directory for all intermediate files
+    with tempfile.TemporaryDirectory() as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        print(f"Using temporary directory: {temp_dir}")
+
+        pipe = Animate(temp_dir)
         pipe.register('cutoff', sonification=soni, pre_caption=f'This video shows how timbre changes with water fraction, during two Earth rotations.', post_caption='Thank you for listening!', stype='animation')
         xp = timegrid
         yp = wfracgrid
@@ -138,7 +138,16 @@ def animate(timegrid, wfracgrid, soni):
         print("Cutoff frames created!")
         pipe.render()
 
-    # Video can be found at /figure_animations/EarthSystem/cutoff/final.mp4
+        temp_final_mp4 = temp_dir / "final.mp4" 
+
+        target_dir_name.mkdir(parents=True, exist_ok=True)
+        final_target_path = target_dir_name / temp_final_mp4.name
+        
+        if temp_final_mp4.exists():
+            shutil.copy(temp_final_mp4, final_target_path)
+            print(f"\nFinal animation copied to: {final_target_path}")
+        else:
+            warnings.warn(f"Could not find {temp_final_mp4} after rendering.")
 
 if args.animate:
     animate(timegrid, wfracgrid, soni)

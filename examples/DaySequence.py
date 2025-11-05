@@ -121,39 +121,38 @@ soni2.hear()
 
 def animate(raw_mapping, soni):
     '''Make frames for animating a plot showing changes in volume with time.
-       Create a sequence to animate this with the sound overlaid.'''
+       Create a sequence to animate this with the sound overlaid, using a temporary directory for intermediate files.'''
 
-    print("\n Creating animation frames. This may take a few minutes.")
+    print("\n Creating animation frames. This may take a few minutes. The output, 'final.mp4' is saved to /figure_animations/DaySequence/")
     soni.score.length
     import warnings
     from pathlib import Path
     from strauss.animation import Animate
     import shutil
+    import tempfile
 
     here = Path.cwd()
 
-    # Make directory for frames
-    topdir = here / ("figure_animations") / "DaySequence" / "volume"
-    if topdir.exists() and any(topdir.iterdir()):
-    	shutil.rmtree(topdir)
+    # Define the final target directory
+    target_dir_name = Path("figure_animations") / "DaySequence"
+    
+    # Use a temporary directory for all intermediate files
+    with tempfile.TemporaryDirectory() as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        print(f"Using temporary directory: {temp_dir}")
 
-    topdir.mkdir(parents=True, exist_ok=True)
-    if topdir.exists() and any(topdir.iterdir()):
-    	warnings.warn(f"{topdir} is not empty, instead name "
-    	              "an empty directory, or a new one.")
-    else:
-    	pipe = Animate(topdir)
-    	pipe.register('volume', sonification=soni, pre_caption=f'This video shows how volume is mapped to daylight.', post_caption='Thank you for listening!', stype='animation')
-    	xp = events2.raw_mapping['time_evo'][0]
-    	yp = events2.raw_mapping['volume'][0]
-    	nframe = int(soni.score.length*int(pipe.pars['fps']))
-    	xf = np.linspace(xp[0], xp[-1], nframe)
-    	yf = np.interp(xf, xp, yp)
-    	xp, yp = xf, yf
-    	for i in range(xp.size)[::1]:
-    	    fig, ax1 = plt.subplots()
+        pipe = Animate(temp_dir)
+        pipe.register('volume', sonification=soni, pre_caption=f'This video shows how volume is mapped to daylight.', post_caption='Thank you for listening!', stype='animation')
+        xp = events2.raw_mapping['time_evo'][0]
+        yp = events2.raw_mapping['volume'][0]
+        nframe = int(soni.score.length*int(pipe.pars['fps']))
+        xf = np.linspace(xp[0], xp[-1], nframe)
+        yf = np.interp(xf, xp, yp)
+        xp, yp = xf, yf
+        for i in range(xp.size)[::1]:
+            fig, ax1 = plt.subplots()
             plt.title("Day Sequence")
-    	    ax1.set_xlabel('Time [s]') 
+            ax1.set_xlabel('Time [s]') 
     	    ax2 = ax1.twinx() 
     	    ax1.plot(xp, yp)
     	    ax1.set_ylabel('Data')
@@ -164,10 +163,18 @@ def animate(raw_mapping, soni):
     	    ax2.tick_params(axis ='y')
     	    plt.savefig(pipe.frames["volume"].parent / f'frame_{i:05d}.png', dpi=120)
     	    plt.close()
-    	print(f"Volume frames created!")
-    	pipe.render()
+        print(f"Volume frames created in temporary directory!")
+        pipe.render()
+        temp_final_mp4 = temp_dir / "final.mp4" 
 
-    # Video can be found at /figure_animations/DaySequence/volume/final.mp4
+        target_dir_name.mkdir(parents=True, exist_ok=True)
+        final_target_path = target_dir_name / temp_final_mp4.name
+        
+        if temp_final_mp4.exists():
+            shutil.copy(temp_final_mp4, final_target_path)
+            print(f"\nFinal animation copied to: {final_target_path}")
+        else:
+            warnings.warn(f"Could not find {temp_final_mp4} after rendering.")
 
 if args.animate:
     animate(events2.raw_mapping, soni)
