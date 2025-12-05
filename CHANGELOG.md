@@ -25,3 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Sonification.save` can now accept non-WAV file extensions, simply handing off the conversion to 
   `ffmpeg`. Requires `ffmpeg` installed - could add more specific directives for certain file types
   **Warning**: format conversions may not preserve channels! Surround formats may require more work.
+- Sampler Improvements:
+  - Some groundwork for sample `aliases` which will be used to call samples without an assigned pitch
+  - `Sampler.info()` method giving a run down of how the `Sampler` is loaded with samples and aliases
+  - a new `Sampler.fill_midi()` which is on by default, and fills all note keys in the midi-key pitch range
+	(`C-1 - G9`)  with pitch-shifted equivalents of nearest samples
+  - Allow loading of samples without needing specifically formatted note name in title - instead analyse pitch
+	of sample and assign to nearest available note (TBC)
+
+## To do (this version)
