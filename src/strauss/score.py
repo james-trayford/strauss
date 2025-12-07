@@ -40,7 +40,8 @@ class Score:
     	40s and C for 20s, `[["C2","G3","E4"]*37+["G2","D3","B4"]*23]`
         would play the C voicing for 37s and G voicing for 23s). 
     """
-    def __init__(self, chord_sequence, length, pitch_binning='adaptive'):
+    def __init__(self, chord_sequence, length, pitch_binning='adaptive',
+                 bpm=60, quantize=None):
         """
         Args:
          chord_sequence: (:obj:`str` or :obj:`list`): The chord or chord
@@ -84,7 +85,17 @@ class Score:
         # number of chords in the sequence 
         self.nchords = len(self.note_sequence)
         self.nintervals = [len(c) for c in self.note_sequence]
-        
+
+        # set quantization increment
+        self.quantize = quantize
+        if self.quantize:
+            self.quantize_increment = 60 * quantize / bpm
+            self.quantize_num_steps = self.length / self.quantize_increment
+            self.quantize_frac_step = 1./self.quantize_num_steps
+        else:
+            self.quantize_increment = None
+            self.qunatize_num_steps = None
+            self.quantize_frac_step = None
         # For now, chords changes are just equally spaced in the timeline
         self.fracbins = np.linspace(0,1, self.nchords+1) 
         self.timebins = self.length * self.fracbins

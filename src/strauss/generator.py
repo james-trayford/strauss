@@ -657,7 +657,7 @@ class Sampler(Generator):
         super().__init__(params, samprate)
 
         # non-note names for samples (e.g. non-tonal samples)
-        self.aliases = {}    
+        self.tags = {}    
         
         if isinstance(sampfiles, dict):
             # catch case sample dictionary provided directly
@@ -706,7 +706,7 @@ class Sampler(Generator):
                     self.sf_preset = sf_preset
                     hdr = self.sf2.raw.pdta['Phdr'][sf_preset-1]
                     self.sf_preset_name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
-                    
+                    self.load_samples()
                     
             else:
                 self.sampsource = 'directory'
@@ -853,7 +853,8 @@ class Sampler(Generator):
             sampdict[nte] = compwave # return notes using sharps
             if nte[1] == '#':
                 # if a sharp, also assign flat...
-                sampdict[nte.replace('#','b')] = compwave
+                flat_note = notes.noteflats[i%12]+nte[2:]
+                sampdict[flat_note] = compwave
             # outname = f'../../example_wavs/out_{nte}.wav'
             # write(outname, samprate, compwave)
         return sampdict
@@ -882,7 +883,8 @@ class Sampler(Generator):
             sintp, slen = process_sample(self.sampdict[note], self.samprate)
             self.samples[note] = sintp
             self.samplens[note] = slen
-            self.aliases[note] = Path(self.sampdict[note]).stem
+            if self.sampsource != 'soundfont':
+                self.tags[note] = Path(self.sampdict[note]).stem
             mkeys.append(mkey)
             root_notes.append(note)
         for wav in unassigned_wavs:
@@ -894,7 +896,7 @@ class Sampler(Generator):
             self.samples[note] = sintp
             self.samplens[note] = slen
             self.sampdict[note] = wav
-            self.aliases[note] = Path(wav).stem
+            self.tags[note] = Path(wav).stem
             mkeys.append(mkey)
             root_notes.append(note)
         self.sampranges = {}
@@ -903,7 +905,7 @@ class Sampler(Generator):
         
         for k in self.sampdict.keys():
             self.sampranges[k] = [[k]]
-        if fill_notes:
+        if fill_notes and self:
             self.fill_midi()
 
     def fill_midi(self):
@@ -956,7 +958,7 @@ class Sampler(Generator):
 
             print(f"{bfl}Sample Assignment:{bfr}\n")
 
-            titles = ['Number', 'Home Pitch', 'File Name', 'Note Range', 'Alias']
+            titles = ['Number', 'Home Pitch', 'File Name', 'Note Range', 'Tag']
             maxchars = []
             for i in range(len(titles)):
                 maxchars.append(len(titles[i]))
@@ -965,7 +967,7 @@ class Sampler(Generator):
             for i in range(len(self.samporder)):
                 note = self.samporder[i]
                 fname = Path(self.sampdict[note]).name
-                line = [f"{i+1}.",f"{note}",f"{fname}",f"{' - '.join(self.sampranges[note])}", f"\"{self.aliases[note]}\""]
+                line = [f"{i+1}.",f"{note}",f"{fname}",f"{' - '.join(self.sampranges[note])}", f"\"{self.tags[note]}\""]
                 for j in range(len(line)):
                     maxchars[j] = max(maxchars[j], len(line[j]))
                 lines.append(line)

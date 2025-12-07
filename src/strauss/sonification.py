@@ -154,9 +154,12 @@ class Sonification:
         indices = range(0,self.sources.n_sources, downsamp)
 
         for source in tqdm(indices):
-
+            
             # index note properties
             t = self.sources.mapping['time'][source]
+            if self.score.quantize:
+                qstep = self.score.quantize_frac_step
+                t = np.round(t / qstep) * qstep
             tsamp = int(Nsamp * t)
             chord = self.score.note_sequence[cbin[source]]
             nints = self.score.nintervals[cbin[source]]
@@ -224,7 +227,7 @@ class Sonification:
                 self.caption_channels[str(c)] = Stream(0, self.samprate) 
 
 
-    def add_ticks(self, increment, duration=0.04, tick_vol=0.25):
+    def add_ticks(self, increment, duration=0.04, tick_vol=0.5):
         # TODO this should probably use a dedicated generator...
 
         # add tick volume to Sonification object
@@ -244,7 +247,7 @@ class Sonification:
                                                self.sources.plims[k])
         self.t_per_inc = np.linspace(0, self.score.length/inc, tick_samples.shape[0])
         self.tdur_per_inc = inc/duration
-        tickenv = np.clip(1/self.tdur_per_inc - self.t_per_inc%1, 0, np.inf)
+        tickenv = np.clip((1./self.tdur_per_inc) - self.t_per_inc%1, 0, np.inf)
         tickenv /= tickenv.max()
         tick_samples = tick_samples*tickenv
         Nchan = len(self.out_channels.keys())
