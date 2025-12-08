@@ -9,6 +9,7 @@ import os
 import matplotlib.pyplot as plt
 from IPython.display import Audio
 from TTS.api import TTS
+import strauss.tts_caption as tts
 from pathlib import Path
 import uuid
 import subprocess as sp
@@ -18,6 +19,7 @@ import sys
 from scipy.io import wavfile
 from strauss.utilities import resample
 import wavio as wav
+
 
 # ----------------------------------------------------------------------
 # Globals
@@ -506,6 +508,16 @@ def suppress_output():
 
 
 def generate_caption(caption, path, notebook=True):
+    #mode = tts.ttsMode
+    #voices = tts.getVoices(True)
+    #if mode == 'coqui-tts':
+    #    tts = TTS(model_name='tts_models/en/jenny/jenny', progress_bar=False, gpu=False)
+    #elif mode == 'pyttsx3':
+    #    tts = TTS(model_name={'voice':v.id, 'rate': 217}, progress_bar=False, gpu=False)
+    #tts.tts_to_file(text=caption, file_path=path)
+
+
+    #tts.render_caption(caption, samprate=48000, model, path)
     tts = TTS(model_name='tts_models/en/jenny/jenny', progress_bar=False, gpu=False)
     tts.tts_to_file(text=caption, file_path=path)
 
