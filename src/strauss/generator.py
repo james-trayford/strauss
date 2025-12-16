@@ -1393,6 +1393,44 @@ class Spectralizer(Generator):
                                utils.const_or_evo_func(params['cutoff']))
         return sstream    
 
+class Speech(Generator):
+    """Spectralizer generator class
+
+    This generator class synthesises speech from text (string) input
+    speech via the available TTS back-end (either through coqui-ai,
+    system text-to-speech) if one is avaialable. Makes use of choice
+    of voice, and available speed if available. This does not support
+    pitched input, and will interpret input strings as text to be read
+    out
+
+    Attributes:
+      gtype (:obj:`str`): Generator type
+
+    """
+    
+    def __init__(self, params=None, samprate=48000):
+        # default synth preset
+        self.gtype = 'speech'
+        self.preset = getattr(presets, self.gtype).load_preset()
+        self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
+        
+        # universal initialisation for generator objects:
+        super().__init__(params, samprate)
+
+        # set up the text-to-speech engine
+        self.setup_voice()
+        
+    def setup_voice(self):
+        from . import tts_caption as tts
+        print(tts.ttsMode)
+        if tts.ttsMode == 'None':
+            # raise TTS error if no TTS avialable
+            tts.TTS()
+        elif tts.ttsMode == 'pyttsx3':
+            pass
+        elif tts.ttsMode == 'coqui-tts':
+            pass
+    
 def process_sample(sample, samprate, find_pitch=False):
     if isinstance(sample, str):
         rate_in, wavobj = wavfile.read(sample)
