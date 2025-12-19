@@ -38,6 +38,7 @@ mappable = ['polar',
             'time_evo',
             'spectrum',
             'pitch_shift',
+            'pan',
             'volume_envelope/A',
             'volume_envelope/D',
             'volume_envelope/S',
@@ -57,6 +58,7 @@ evolvable = ['polar',
              'cutoff',
              'time_evo',
              'pitch_shift',
+             'pan'
              'volume_lfo/freq_shift',
              'volume_lfo/amount',
              'pitch_lfo/freq_shift',
@@ -72,6 +74,7 @@ param_limits = [(0,1),#np.pi),
                 (0,1),
                 (0,1),
                 (0,24),
+                (0,1),
                 (1e-2, 10),
                 (1e-2, 10),
                 (0,1),
@@ -84,6 +87,16 @@ param_limits = [(0,1),#np.pi),
                 (0,2)]     
 
 param_lim_dict = dict(zip(mappable, param_limits))
+
+# parameter pairs that don't work together
+invalid_combos = {('azimuth', 'pan') : 'angle_pan', 
+                  ('polar', 'pan') :  'angle_pan',
+                  ('phi', 'pan'): 'angle_pan',
+                  ('theta', 'pan'): 'angle_pan',
+                  ('theta', 'azimuth'): 'alias',
+                  ('phi', 'polar'): 'alias'}
+invalid_explanations = {'angle_pan': "'pan' and spatial angles are both controlling spatialisation",
+                        'alias': "these represent different names for the same quantity"}
 
 class Source:
     """ Generic source class defining common methods/attributes
@@ -107,38 +120,65 @@ class Source:
     Raises:
     	UnrecognisedProperty: if `mapped_quantities` entry not in `mappable`.
     """
-    def __init__(self, mapped_quantities):
+    def __init__(self, mapped_quantities, angle_unit=None):
         """
         Args:
     	  mapped_quantities (:obj:`list(str)`): The subset of parameters to
     	    which data will be mapped.
         """
-        # check these are all mappable parameters
 
+        self.angle_unit = angle_unit
+        
+        # check these are all mappable parameters
         
         for q in mapped_quantities:
             if q not in mappable:
                 raise UnrecognisedProperty(
                     f"Property \"{q}\" is not recognised")
-
-        if ('theta' in mapped_quantities) and ('polar' in mapped_quantities):
-            raise Exception(
-                "\"theta\" and \"polar\" cannot be combined as " \
-                "these represent the same quantity: \"theta\" and " \
-                "\"phi\" are deprecated and will be replaced with \"polar\"" \
-                " and \"azimuth\" in a future version.")
-
-        if ('phi' in mapped_quantities) and ('azimuth' in mapped_quantities):
-            raise Exception(
-                "\"phi\" and \"azimuth\" cannot be combined as " \
-                "these represent the same quantity: \"theta\" and " \
-                "\"phi\" are deprecated and will be replaced with \"polar\"" \
-                " and \"azimuth\" in a future version.")            
             
         # initialise common structures
         self.mapped_quantities = mapped_quantities
         self.raw_mapping = {}
         self.mapping = {}
+
+    def validate_mapping(self):
+        """ Validate the mapping choices, warn and/or except on issues.
+
+        Looks through provided mapping for invalid combinations of parameters,
+        as well as checking angle unit for the special case of 3D angles
+        """
+
+        params = self.mapped_quantities
+        err_text = ""
+        warn_text = ""
+        
+        # check invalid combinations of parameters
+        bad_combos = []
+        explain = []        
+        for pair in invalid_combos.keys():
+            if (pair[0] in params) and (pair[1] in params):
+                bad_combos.append(pair)
+                explain.append(invalid_explanations[invalid_combos[pair]])
+        if bad_combos:
+            err_text += "\n\nInvald parameter combinations in mapping:\n"
+            for i in range(len(bad_combos)):
+                err_text += f" - '{bad_combos[i][0]}' and '{bad_combos[i][1]}' "
+                err_text += f"are incompatible, as {explain[i]}. \n"
+            err_text += f"Please remove any incompatible parameter combinations from the input mapping."
+
+        # check we know what unit angles are input in
+        for ang in ('azimuth', 'polar', 'theta', 'phi'):
+            if (ang in params) and not (ang in self.map_lims) and not (self.angle_unit):
+                warn_text += f" - no angle unit or map_lims entry for {ang}, assuming [0,1] range \n"
+            if (ang in self.map_lims) and (self.angle_unit):
+                warn_text += f" - map_lims entry for '{ang}' ('{ang}':{self.map_lims['ang']}) provided alongside "
+                warn_text += f"angle_unit={self.angle_unit}. Ignoring angle_unit for '{ang}'.\n"
+                
+        # Finally, warn or except about any issues after full audit of mapping
+        if warn_text:
+            warnings.warn("\n\nParameter mapping warning:\n"+warn_text)
+        if err_text:
+            raise Exception(err_text)
         
     def apply_mapping_functions(self, map_funcs={}, map_lims={}, param_lims={}):
         """ Taking input data and mapping to parameters.
@@ -180,6 +220,14 @@ class Source:
         
         """
 
+        # first store the chosen mapping variables
+        self.map_funcs = map_funcs
+        self.map_lims = map_lims
+        self.param_lims = param_lims
+
+        # then validate the mapping combinations
+        self.validate_mapping()
+        
         # set up dictionaries to store the limits
         self.lims = {}
         self.plims = {}
@@ -197,7 +245,7 @@ class Source:
             if key in map_lims:
                 vallims = map_lims[key]
             else:
-                vallims = (0,1)
+                vallims = ('0%','100%')
 
             # set parameter limits if specified
             if key in param_lims:
