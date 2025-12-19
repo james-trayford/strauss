@@ -858,7 +858,7 @@ class Sampler(Generator):
             # write(outname, samprate, compwave)
         return sampdict
             
-    def load_samples(self, unassigned_wavs=None, fill_notes=True):
+    def load_samples(self, unassigned_wavs=[], fill_notes=True):
         """Load audio samples into the sampler.
 
         Read audio samples in from a specified directory or via a
