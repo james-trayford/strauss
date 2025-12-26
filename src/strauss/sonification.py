@@ -157,7 +157,7 @@ class Sonification:
 
             # index note properties
             t = self.sources.mapping['time'][source]
-            tsamp = int(Nsamp * t)
+            tsamp = int((Nsamp-1) * t)
             chord = self.score.note_sequence[cbin[source]]
             nints = self.score.nintervals[cbin[source]]
             pitch = pitchfrac[source]
