@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+from scipy import signal as sig
 from .utilities import rescale_values 
 import warnings
 
@@ -88,6 +89,13 @@ param_limits = [(0,1),#np.pi),
 
 param_lim_dict = dict(zip(mappable, param_limits))
 
+
+spatial_angles = ('azimuth', 'polar', 'theta', 'phi')
+z_angles = ('polar', 'theta')
+angle_unit_maxs = {'degrees': 360,
+                   'radians': 2*np.pi,
+                   'cycles': 1}
+
 # parameter pairs that don't work together
 invalid_combos = {('azimuth', 'pan') : 'angle_pan', 
                   ('polar', 'pan') :  'angle_pan',
@@ -120,14 +128,12 @@ class Source:
     Raises:
     	UnrecognisedProperty: if `mapped_quantities` entry not in `mappable`.
     """
-    def __init__(self, mapped_quantities, angle_unit=None):
+    def __init__(self, mapped_quantities):
         """
         Args:
     	  mapped_quantities (:obj:`list(str)`): The subset of parameters to
     	    which data will be mapped.
         """
-
-        self.angle_unit = angle_unit
         
         # check these are all mappable parameters
         
@@ -149,27 +155,33 @@ class Source:
         """
 
         params = self.mapped_quantities
-        err_text = ""
+        errs = []
         warn_text = ""
         
         # check invalid combinations of parameters
         bad_combos = []
-        explain = []        
+        explain = []
         for pair in invalid_combos.keys():
             if (pair[0] in params) and (pair[1] in params):
                 bad_combos.append(pair)
                 explain.append(invalid_explanations[invalid_combos[pair]])
         if bad_combos:
-            err_text += "\n\nInvald parameter combinations in mapping:\n"
+            err_text = "Invald parameter combinations in mapping:\n"
             for i in range(len(bad_combos)):
                 err_text += f" - '{bad_combos[i][0]}' and '{bad_combos[i][1]}' "
                 err_text += f"are incompatible, as {explain[i]}. \n"
-            err_text += f"Please remove any incompatible parameter combinations from the input mapping."
+            err_text += f"Please remove any incompatible parameter combinations from the input mapping.\n\n"
+            errs.append(err_text)
 
         # check we know what unit angles are input in
-        for ang in ('azimuth', 'polar', 'theta', 'phi'):
+        for ang in spatial_angles:
+            if ang in self.param_lims:
+                err_text = f"As spatial angle {ang} is cyclic, a limited range cannot be supported in param_lims. "
+                err_text += f"Instead, provide the units of input values for {ang} using the angle_unit argument via"
+                err_text += f"of apply_mapping_functions, or use the 'pan' parameter to simply map stereo effects.\n\n"
+                err_text.append(err_text)
             if (ang in params) and not (ang in self.map_lims) and not (self.angle_unit):
-                warn_text += f" - no angle unit or map_lims entry for {ang}, assuming [0,1] range \n"
+                warn_text += f" - no angle unit or map_lims entry for {ang}, assuming values (0,1] for fractions of a circle (cycles)  \n"
             if (ang in self.map_lims) and (self.angle_unit):
                 warn_text += f" - map_lims entry for '{ang}' ('{ang}':{self.map_lims['ang']}) provided alongside "
                 warn_text += f"angle_unit={self.angle_unit}. Ignoring angle_unit for '{ang}'.\n"
@@ -177,10 +189,16 @@ class Source:
         # Finally, warn or except about any issues after full audit of mapping
         if warn_text:
             warnings.warn("\n\nParameter mapping warning:\n"+warn_text)
-        if err_text:
-            raise Exception(err_text)
+        if len(errs):
+            err_text = ''
+            errnum = 1
+            for e in errs:
+                err_text += f"{errnum}.  "
+                err_text += e
+                errnum += 1
+            raise Exception(f"Found {len(errs)} critical issues with mapping:\n\n", err_text)
         
-    def apply_mapping_functions(self, map_funcs={}, map_lims={}, param_lims={}):
+    def apply_mapping_functions(self, map_funcs={}, map_lims={}, param_lims={}, angle_unit=None):
         """ Taking input data and mapping to parameters.
 
         This function does the bulk of the work for `Source` classes,
@@ -212,19 +230,27 @@ class Source:
         	map_lims ranges are resaled to these ranges to give
         	the parameter values. If not provided, the default
         	param_lim_dict values are taken.
-
+           angle_unit (:obj:`str`, optional): string naming a
+                supported unit for any spatial angles used in the mapping
+          	(e.g. `'azimuth'` or `'polar'`). Supported units are
+        	`'degrees'`, `'radians'` or `'cycles'`. If spatial
+        	angles are mapped without any unit system, will default
+        	to cycles and warn the user.
+        	
+        
         Note:
            There is special behaviour for the `polar` and `azimuth`
            parameters, to ensure shortest angular distance when
            interpolating across the 0-2pi and 0-pi boundaries.
-        
+                   
         """
 
         # first store the chosen mapping variables
         self.map_funcs = map_funcs
         self.map_lims = map_lims
         self.param_lims = param_lims
-
+        self.angle_unit = angle_unit
+        
         # then validate the mapping combinations
         self.validate_mapping()
         
@@ -244,9 +270,23 @@ class Source:
             # set mapping limits if specified
             if key in map_lims:
                 vallims = map_lims[key]
+            elif key in spatial_angles:
+                # special case for spatial angles - use absolute values
+                # set domain based on units unit (by default in cycles)
+                amax = 1
+                if self.angle_unit:
+                    amax = angle_unit_maxs[self.angle_unit]
+                # for angles make sure conforms to units
+                if key in z_angles:
+                    # triangle wave behaviour to map polar angle domain
+                    mapvals = (sig.sawtooth(2*np.pi*(mapvals/amax),0.5) + 1)/2
+                else:
+                    # sawtooth wave behaviour to map azimuthal angle domain
+                    mapvals = (mapvals%amax)/amax
+                vallims = (0, 1)
             else:
                 vallims = ('0%','100%')
-
+                
             # set parameter limits if specified
             if key in param_lims:
                 plims = param_lims[key]
@@ -302,7 +342,6 @@ class Source:
                 # ^ in case we want to catch and pre process multi-spectra
                 continue
             elif hasattr(self.mapping[key][0], "__iter__"):
-                # print(key, self.mapping[key][0])
                 for i in range(self.n_sources):
                     if key not in evolvable:
                         raise Exception(f"Mapping error: Parameter \"{key}\" cannot be evolved.")
