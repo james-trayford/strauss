@@ -157,7 +157,7 @@ class Sonification:
 
             # index note properties
             t = self.sources.mapping['time'][source]
-            tsamp = int(Nsamp * t)
+            tsamp = int((Nsamp-1) * t)
             chord = self.score.note_sequence[cbin[source]]
             nints = self.score.nintervals[cbin[source]]
             pitch = pitchfrac[source]
@@ -174,18 +174,24 @@ class Sonification:
             # run generator to play each note
             sstream = self.generator.play(sourcemap)
             playlen = sstream.values.size
-            if 'phi' in sourcemap:
-                azi     = const_or_evo(sourcemap['phi'], sstream.sampfracs) * 2 * np.pi
-            elif 'azimuth' in sourcemap:
-                azi     = const_or_evo(sourcemap['azimuth'], sstream.sampfracs) * 2 * np.pi
+
+            # place source on listener plane (quarter rotation) by default
+            polar = 0.5 * np.pi
+            if 'pan' in sourcemap:
+                # in pan mode, put everything on the 
+                azi     = (const_or_evo(sourcemap['pan'], sstream.sampfracs) + 0.5) * np.pi
             else:
-                azi     = const_or_evo(self.generator.preset['azimuth'], sstream.sampfracs) * 2 * np.pi
-            if 'theta' in sourcemap:
-                polar   = const_or_evo(sourcemap['theta'], sstream.sampfracs) * np.pi
-            elif 'polar' in sourcemap:
-                polar   = const_or_evo(sourcemap['polar'], sstream.sampfracs) * np.pi                
-            else:
-                polar   = const_or_evo(self.generator.preset['polar'], sstream.sampfracs) * np.pi
+                # TODO: generic handling of alias parameters (beyond 3D angles)
+                if 'phi' in sourcemap:
+                    azi     = const_or_evo(sourcemap['phi'], sstream.sampfracs) * 2 * np.pi
+                elif 'azimuth' in sourcemap:
+                    azi     = const_or_evo(sourcemap['azimuth'], sstream.sampfracs) * 2 * np.pi
+                else:
+                    azi     = const_or_evo(self.generator.preset['azimuth'], sstream.sampfracs) * 2 * np.pi
+                if 'theta' in sourcemap:
+                    polar   = const_or_evo(sourcemap['theta'], sstream.sampfracs) * np.pi
+                elif 'polar' in sourcemap:
+                    polar   = const_or_evo(sourcemap['polar'], sstream.sampfracs) * np.pi                
 
             # compute sample indices for truncating notes overshooting sonification length
             trunc_note = min(playlen, lastsamp-tsamp)
