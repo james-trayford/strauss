@@ -1,0 +1,35 @@
+name: 'Stars Appearing'
+
+description: 'Brightest stars appear first, pitch mapped to colour. Mallets base sound.'
+
+sound: 'Mallets'
+
+type: 'events'
+
+mapping:
+    
+  - input: 'colour'
+    output: 'pitch'
+    function: '-x'
+
+  - input: 'magnitude'
+    output: 'volume'
+    output_range: [0.2, 1]
+    function: 'log(x)'
+
+  - input: 'magnitude'
+    input_range: ['0%', '110%']
+    output: 'time'
+
+  - input: 'ra'
+    output: 'azimuth'
+    output_range: [0.25, 0.75]
+
+notes: ['G3', 'D3', 'G4', 'B4', 'F#4']
+  
+
+
+  
+  
+  
+
