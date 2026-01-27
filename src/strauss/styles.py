@@ -21,14 +21,14 @@ def get_presets():
 
     # Iterate through preset folders and add names to list
     for generator_type in ['sampler', 'spec', 'synth']:
+        
         folder = BASE_DIR / 'presets' / generator_type
-        print(folder)
+
         if folder.is_dir():
             preset_names.extend(p.stem for p in folder.rglob('*.yml'))
 
     return preset_names
 
-print(get_presets())
 
 class Mapping(BaseModel):
     # Input can be a string (column header), an int (column index) or None (to auto-map to available columns in dataset)
