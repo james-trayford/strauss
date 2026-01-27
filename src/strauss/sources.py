@@ -25,7 +25,7 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy import signal as sig
-from .utilities import rescale_values 
+from utilities import rescale_values 
 import warnings
 
 mappable = ['polar',
