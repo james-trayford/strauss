@@ -31,7 +31,15 @@ from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
 from .utilities import nested_dict_reassign # For merging styles
 
+import yaml
+import numpy as np
+from pathlib import Path
+
 __version__ = "1.0.3"
+
+p = Path(__file__)
+thisdir = p.parent
+
 
 # --- Matplotlib-like interface ---
 _current_sonification = None
@@ -41,13 +49,12 @@ _style_cycle = {"theremin",
                 "clicker"}
 
 _kw_defaults = {
-    'spatial_setup': 'stereo',
-    'duration': 30,
+    'channels': 'stereo',
+    'duration': 10,
     'is_mapped': ['pitch', 'time_evo'],
     # Style File
-    'style' : {'harmony': ['C3', 'E3', 'G3'],
-               'source_type': 'Objects',
-               }
+    'style' : None,
+    'caption': None,
 }
 
 def sonify(*args, **kwargs):
@@ -64,31 +71,54 @@ def sonify(*args, **kwargs):
         The generated Sonification object.
     """
     global _current_sonification
-
-
-    args = ()
-
     sonpars, is_default = fill_from_kwargs(kwargs)            
-        
-    _score = Score('Cmaj7_3', length=sonpars['duration'])
-    _sources = getattr(sources, sonpars['style']['source_type'])(is_mapped)
-    _sources.fromdict()
-    _generator = 1
-    _sonification = 0 #Sonification(
 
-    #     score=_score,
-    #     sources=_sources,
-    #     generator=_generator,
-    #     audio_setup=sonpars['duration'],
-    #     caption=sonification_params["caption"],
-    #     samprate=_generator.samprate, # Use generator's samprate for consistency
-    #     declick_time=sonification_params["declick_time"],
-    #     ttsmodel=sonification_params["ttsmodel"]
-    # )
+    if not sonpars['style']:
+        sonpars['style'] = 'default'
+    style = load_style(sonpars['style'])
+
+    if len(args) == 0:
+        raise Exception("No data to sonify!")
+    elif len(args) == 1:
+        args = [np.arange(len(args[0])), args[0]]        
+    
+    nmap = min(len(args), len(style['mapping']))
+    
+    to_map = []
+    for i in range(nmap):
+        to_map.append(style['mapping'][i]['output'])
+    map_data = dict(zip(to_map, args[:nmap]))
+
+    if 'pitch' not in to_map:
+        to_map.append('pitch')
+        nnote = len(style['notes'])
+        for k in map_data.keys():
+            map_data[k] = [map_data[k]]*nnote
+        map_data['pitch'] = list(range(nnote))
+        
+    _score = Score([style['notes']], length=sonpars['duration'])
+    _sources = getattr(sources, style['type'])(to_map)
+    _sources.fromdict(map_data)
+    _sources.apply_mapping_functions()
+    _generator = getattr(generator, style['generator'])()
+    _generator.load_preset(style['generator_preset'])
+    _sonification = Sonification(
+        score=_score,
+        sources=_sources,
+        generator=_generator,
+        audio_setup=sonpars['channels'],
+        caption=sonpars["caption"],
+        samprate=_generator.samprate, # Use generator's samprate for consistency
+    )
     
     _current_sonification = _sonification
     return _sonification
+
+def display():
+    _current_sonification.render()
+    return _current_sonification.notebook_display(False)
     
+
 def fill_from_kwargs(input_kwargs):
     """ function to store provided keyword arguments against defaults
     """
@@ -101,6 +131,24 @@ def fill_from_kwargs(input_kwargs):
         else:
             is_default[k] = False
     return sonpars, is_default
+
+def load_style(name="default"):
+    if Path(name).name == Path(name):
+        # if open user directly
+        filename = Path(name)
+    else:
+        # else load built-in preset of that name
+        filename = Path(f"{thisdir}", "styles", f"{name}.yml")
+    return read_yaml(filename)
+
+def read_yaml(filename):
+    with filename.open(mode='r') as fdata:
+        try:
+            yamldict = yaml.safe_load(fdata)
+        except yaml.YAMLError as err:
+            print(err)
+    return yamldict
+
 
 #     if style:
 #         nested_dict_reassign(style, current_style)
