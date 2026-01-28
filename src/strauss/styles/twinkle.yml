@@ -8,7 +8,7 @@ description: >
 generator:
   type: 'sampler'
   preset: 'sustain'
-  path: 'path/to/twinkle.mp3'
+  sample: 'Bright Mallets'
   mods:
     looping: 'forwardback'
     loop_start: 0.2

@@ -8,7 +8,7 @@ description: >
 generator:
   type: 'sampler'
   preset: 'sustain'
-  path: 'path/to/sci_fi.mp3'
+  sample: 'Space Strings'
   mods:
     looping: 'forwardback'
     loop_start: 0.2

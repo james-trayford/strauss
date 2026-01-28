@@ -4,9 +4,9 @@ description: 'Brightest stars appear first, pitch mapped to colour. Glockenspiel
 
 generator:
   type: 'sampler'
-  path: 'path/to/glockenspiel?'
+  sample: 'Glockenspiel'
 
-type: 'events'
+sources: 'events'
 
 map:
     
