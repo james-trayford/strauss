@@ -4,10 +4,6 @@ from sources import param_lim_dict as valid_params
 from pathlib import Path
 import random
 
-metadata = {
-    # Field titles, descriptions, and examples will go here
-}
-
 FUNCTION_WHITELIST = [
     # Our 'whitelisted' functions can go here
 ]
@@ -32,10 +28,28 @@ def get_presets():
 
 class Mapping(BaseModel):
     # Input can be a string (column header), an int (column index) or None (to auto-map to available columns in dataset)
-    input: Union[str, int, None] = Field(default=None, ge=0)
+    input: Union[str, int, None] = Field(
+        default=None,
+        ge=0,
+        title='Input',
+        description=(
+            "Source data column to map from. "
+            "Can be a column name (str), column index (int), "
+            "or null to auto-map to available columns in the data."
+        ),
+        examples=["magnitude", 2, None]
+        )
 
     # 'map_lims' in STRAUSS v1. Must be a tuple/list of two elements which can either be strings (for percentiles) or floats (ints are converted to floats)
-    input_range: Tuple[Union[str, float], Union[str, float]] = Field(default=('0%','100%'))
+    input_range: Tuple[Union[str, float], Union[str, float]] = Field(
+        default=('0%','100%'),
+        title='Input Range',
+        description=(
+            "Range of input values to map from. "
+            "Can either be string percentiles, or absolute values in the data."
+        ),
+        examples=[("5%", "95%"), (24, 68.3)]
+        )
 
     # Output is required (...) and must be a string
     output: str = Field(...)
@@ -201,10 +215,7 @@ class Style(BaseModel):
     map: List[Mapping] = Field(...)
 
     # Notes can either be a list of notes, a list of a list of notes (for a chord progression), or the name of a chord/scale e.g. 'Cmaj7', 'D Hirajoshi'
-    notes: Union[List[str], List[List[str]], str, None] = Field(default=['C3'])
-
-    # Chord mode can either be True/False (also accepts 'on'/'off', 1/0, 'yes'/'no' etc.)
-    chord_mode: bool = Field(default=True)
+    notes: Union[List[str], List[List[str]], str, None] = Field(default=None)
 
 
     @field_validator('sources', mode='before')
@@ -223,9 +234,6 @@ class Style(BaseModel):
         # Could validate the chords/scales here? E.g. try to parse the chord name with pychord
 
         return value
-    
-
-    
 
    
 
