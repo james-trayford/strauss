@@ -1,12 +1,14 @@
 name: 'Stars Appearing'
 
-description: 'Brightest stars appear first, pitch mapped to colour. Mallets base sound.'
+description: 'Brightest stars appear first, pitch mapped to colour. Glockenspiel base sound.'
 
-sound: 'Mallets'
+generator:
+  type: 'sampler'
+  path: 'path/to/glockenspiel?'
 
 type: 'events'
 
-mapping:
+map:
     
   - input: 'colour'
     output: 'pitch'
@@ -22,10 +24,9 @@ mapping:
     output: 'time'
 
   - input: 'ra'
-    output: 'azimuth'
-    output_range: [0.25, 0.75]
+    output: 'pan'
 
-notes: ['G3', 'D3', 'G4', 'B4', 'F#4']
+notes: ['G2', 'D3', 'G3', 'B4', 'F#4']
   
 
 

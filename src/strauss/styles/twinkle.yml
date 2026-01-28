@@ -1,14 +1,14 @@
-name: 'Sci-Fi'
+name: 'Twinkle'
 
 description: >
-  This style uses a spacey strings sample and maps the dependent variable
+  This style uses a twinkly mallets sample and maps the dependent variable
   to filter cutoff. This is particularly effective for one dimensional or
   time series data sonifications.
 
 generator:
   type: 'sampler'
   preset: 'sustain'
-  path: 'path/to/sci_fi.mp3'
+  path: 'path/to/twinkle.mp3'
   mods:
     looping: 'forwardback'
     loop_start: 0.2
