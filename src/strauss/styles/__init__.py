@@ -201,7 +201,7 @@ class GeneratorStyle(BaseModel):
         default=None,
         title='Sample',
         description=(
-            'If using Sampler, this is the either the name of the sample/instrument, '
+            'If using Sampler, this is the either the name of the sample/instrument (case insensitive), '
             'a file path to a directory of audio files, or a web URL to an audio file. '
             "If it's a name, STRAUSS will first check if the sample(s) are already downloaded, "
             "and if not, it will fetch them from the online library."
@@ -219,7 +219,7 @@ class GeneratorStyle(BaseModel):
     )
 
     # Any modifications to the Generator preset. These will be applied with the generator.modify_preset() function
-    mods: Optional[Dict] = Field(
+    mods: Optional[dict[str, Union[str, int, float]]] = Field(
         default=None,
         title='Generator Modifications',
         description=(
@@ -242,11 +242,17 @@ class GeneratorStyle(BaseModel):
         if value is None:
             return value
         
-        if isinstance(value, Path):
-            if str(value).startswith('http'):
+        # String means it's a name or a web URL
+        if isinstance(value, str):
+            if value.startswith(('http', 'www')):
                 # Do something here to validate URLs?
                 return value
-
+            
+            # Case insensitive if it's a sample name
+            return value.lower()
+        
+        # It's a local path
+        if isinstance(value, Path):
             if not value.exists():
                 raise ValueError('The Generator path provided does not exist.')
         

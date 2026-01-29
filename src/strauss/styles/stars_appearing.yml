@@ -9,28 +9,20 @@ generator:
 sources: 'events'
 
 map:
-    
-  - input: 'colour'
-    output: 'pitch'
+  
+  - input_range: ['0%', '110%']
+    output: 'time'
+
+  - output: 'pitch'
     function: '-x'
 
-  - input: 'magnitude'
-    output: 'volume'
+  - output: 'volume'
     output_range: [0.2, 1]
     function: 'log(x)'
 
-  - input: 'magnitude'
-    input_range: ['0%', '110%']
-    output: 'time'
-
-  - input: 'ra'
-    output: 'pan'
+  - output: 'pan'
 
 notes: ['G2', 'D3', 'G3', 'B4', 'F#4']
-  
-
-
-  
   
   
 
