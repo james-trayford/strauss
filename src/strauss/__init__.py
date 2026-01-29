@@ -13,6 +13,7 @@ from . import sources
 from . import stream
 from . import presets
 from . import styles
+from . import assets
 
 # relative imports of submodules
 from . import channels
@@ -34,7 +35,9 @@ from .utilities import nested_dict_reassign # For merging styles
 
 import yaml
 import numpy as np
+import glob
 from pathlib import Path
+
 
 __version__ = "1.0.3"
 
@@ -101,7 +104,14 @@ def sonify(*args, **kwargs):
     _sources = getattr(sources, style.sources.capitalize())(to_map)
     _sources.fromdict(map_data)
     _sources.apply_mapping_functions()
-    _generator = getattr(generator, style.generator.type.capitalize())()
+
+    gentype = style.generator.type
+    
+    if gentype == 'sampler':
+         asset = assets.get_asset_path(style.generator.sample.lower())
+         _generator = getattr(generator, "Sampler")(asset)
+    else:
+        _generator = getattr(generator, style.generator.type.capitalize())()
     _generator.load_preset(style.generator.preset)
     _sonification = Sonification(
         score=_score,
