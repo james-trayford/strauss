@@ -99,8 +99,11 @@ def sonify(*args, **kwargs):
         for k in map_data.keys():
             map_data[k] = [map_data[k]]*nnote
         map_data['pitch'] = list(range(nnote))
-        
-    _score = Score([style.notes], length=sonpars['duration'])
+
+    snotes = style.notes
+    if not isinstance(style.notes, str):
+        snotes = [snotes]
+    _score = Score(snotes, length=sonpars['duration'])
     _sources = getattr(sources, style.sources.capitalize())(to_map)
     _sources.fromdict(map_data)
     _sources.apply_mapping_functions()
@@ -113,6 +116,8 @@ def sonify(*args, **kwargs):
     else:
         _generator = getattr(generator, style.generator.type.capitalize())()
     _generator.load_preset(style.generator.preset)
+    if style.generator.mods:
+        _generator.modify_preset(style.generator.mods)
     _sonification = Sonification(
         score=_score,
         sources=_sources,

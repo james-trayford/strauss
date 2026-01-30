@@ -40,7 +40,7 @@ cutoff: 1.
 pitch_lfo:
   use: off
   wave: 'saw'
-  amount: 0.5
+p  amount: 0.5
   freq: 4
   freq_shift: 0
   phase: 'random'
