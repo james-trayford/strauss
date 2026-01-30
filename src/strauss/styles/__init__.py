@@ -82,6 +82,20 @@ class Mapping(BaseModel):
         examples=['log(x)', ['-x', 'log(x)']]
     )
 
+    fixed: bool = Field(
+        default=False,
+        title='Fixed Flag',
+        description=(
+            'Whether or not this mapping should be fixed or evolve over time.'
+            'Some parameters are "evolvable" but we might want to fix them at the data points inputted. '
+            'For example, we might want to hard pan two sources left and right for the duration of the sonification. '
+            'Because pan is an evolvable parameter, STRAUSS would shift the pan from left to right by default. '
+            'We can therefore prevent this behaviour by specifying "fixed: True". '
+            'This is a non-strict boolean, meaning it accepts any of True/False, on/off, yes/no, 0/1 etc.'
+        ),
+        examples=[True, 'true', 0, 'yes', 'off']
+    )
+
     @field_validator('input')
     @classmethod
     def validate_input(cls, value: Union[str, int, None]):
@@ -219,7 +233,7 @@ class GeneratorStyle(BaseModel):
     )
 
     # Any modifications to the Generator preset. These will be applied with the generator.modify_preset() function
-    mods: Optional[dict[str, Union[str, int, float]]] = Field(
+    mods: Optional[dict] = Field(
         default=None,
         title='Generator Modifications',
         description=(
