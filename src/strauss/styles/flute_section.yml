@@ -1,0 +1,24 @@
+name: 'Flute Section'
+
+description: ''
+
+generator:
+  type: 'sampler'
+  sample: 'flute'
+  mods:
+    filter: "on"
+    looping: 'forwardback'
+    loop_start: 0.1
+    loop_end:  2.1
+
+sources: 'objects'
+
+map:
+  - output: 'time_evo'
+  - output: 'cutoff'
+    output_range: [0.4, 0.95]
+    
+notes: ['G2', 'D3', 'A3', 'E4', 'B4']
+  
+  
+

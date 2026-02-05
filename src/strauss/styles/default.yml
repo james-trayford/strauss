@@ -1,0 +1,21 @@
+name: 'default'
+
+description: ''
+
+sources: 'events'
+
+generator:
+  type: 'synthesizer'
+  preset: 'pitch_mapper'
+
+map:
+
+  - input: 'time'
+    input_range: ['0%', '100%']
+    output: 'time_evo'
+  
+  - input: 'pitch'
+    input_range: ['0%', '100%']
+    output: 'pitch_shift'
+    
+notes: ['C2']
