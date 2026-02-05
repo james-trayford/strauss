@@ -15,13 +15,13 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign, NoSoundDevice
+from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os
-import ffmpeg as ff
+import subprocess as sp
 import wavio as wav
 import IPython.display as ipd
 from IPython.display import display
@@ -29,6 +29,7 @@ from scipy.io import wavfile
 import warnings
 import tempfile
 from pathlib import Path
+import ffmpeg
 try:
     import sounddevice as sd
 except (OSError, ModuleNotFoundError) as sderr:
@@ -51,7 +52,7 @@ class Sonification:
       * Support custom audio setups here too.
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
-                 caption=None, samprate=48000,
+                 caption=None, samprate=48000, declick_time=0.03,
                  ttsmodel=default_tts_voice):
         """
         Args:
@@ -69,6 +70,9 @@ class Sonification:
          samprate (:obj:`int`) Integer sample rate in samples per second
           (Hz), typically :obj:`44100` or :obj:`48000` for most audio
     	  applications
+         declick_time (:obj:`float`) duration of start and end fades applied
+          on save and dispolay to remove audible clicks from sample
+          discontinuity
          ttsmodel (:obj:`str` or :obj:`PosixPath`) file path to the
           text-to-speech model used for captions. 
         """
@@ -78,6 +82,9 @@ class Sonification:
         
         # tts model name
         self.ttsmodel = ttsmodel
+
+        # fade duration to de-click audio
+        self.declick_time = declick_time
         
         # caption
         self.caption = caption
@@ -198,7 +205,6 @@ class Sonification:
                 cpath = Path(cdir, 'caption.wav')
                 render_caption(self.caption, self.samprate,
                                self.ttsmodel, str(cpath))
-                
                 rate_in, wavobj = wavfile.read(cpath)
                 wavobj = np.array(wavobj)
             # Set up the Stream objects for TTS
@@ -216,7 +222,39 @@ class Sonification:
             self.caption_channels = {}
             for c in range(Nchan):
                 self.caption_channels[str(c)] = Stream(0, self.samprate) 
+
+
+    def add_ticks(self, increment, duration=0.04, tick_vol=0.25):
+        # TODO this should probably use a dedicated generator...
+
+        # add tick volume to Sonification object
+        self.tick_vol = tick_vol
         
+        tick_samples = 2*(np.random.random(self.out_channels['0'].values.shape)-0.5)
+        k = 'time'
+        if k not in self.sources.lims.keys():
+            k = 'time_evo'
+            if k not in self.sources.lims.keys():
+                raise Exception("""
+                Sonification doesn't have a time base! only sonifications with a 'time'
+                or 'time_evo' mapping can have time increment ticks...
+                """)
+        inc = self.score.length*rescale_values(self.sources.lims[k][0]+increment,
+                                               self.sources.lims[k],
+                                               self.sources.plims[k])
+        self.t_per_inc = np.linspace(0, self.score.length/inc, tick_samples.shape[0])
+        self.tdur_per_inc = inc/duration
+        tickenv = np.clip(1/self.tdur_per_inc - self.t_per_inc%1, 0, np.inf)
+        tickenv /= tickenv.max()
+        tick_samples = tick_samples*tickenv
+        Nchan = len(self.out_channels.keys())
+        self.tick_channels = {}
+        for i in range(Nchan):
+            panenv = self.channels.mics[i].antenna(0, 0.5*np.pi)
+            self.tick_channels[str(i)] = Stream(tick_samples.size, self.samprate, ltype='samples')
+            self.tick_channels[str(i)].values += tick_samples * panenv
+
+                
     def save_stereo(self, fname, master_volume=1.):
         """ Save stereo or mono sonifications
         
@@ -234,7 +272,8 @@ class Sonification:
 
         if len(self.out_channels) > 2:
             print("Warning: sonification has > 2 channels, only first 2 will be used. See 'save_combined' method.")
-        
+
+            
         # first pass - find max amplitude value to normalise output
         # and concatenate channels to list
         vmax = 0.
@@ -251,7 +290,7 @@ class Sonification:
                                 self.caption_channels[str(c)].values])   
             
             channels.append(channel_values)
-           
+
         wav.write(fname,
                   np.column_stack(channels),
                   self.samprate, 
@@ -318,7 +357,11 @@ class Sonification:
         """ Save render as a combined multi-channel wav file 
         
         Can use this function to save sonification of any audio_setup
-        to a 32-bit depth WAV using `scipy.io.wavfile`
+        to a file. This first creates a 32-bit depth WAV using
+        `scipy.io.wavfile`. If fname has a non-WAV extension, it then attempts
+        conversion via ffmpeg, provided ffmpeg is available.
+        
+        formats
 
         Args:
           fname (:obj:`str`) Filename or filepath
@@ -333,12 +376,16 @@ class Sonification:
 
         channels = []
         vmax = 0.
-        
+
+        has_ticks = hasattr(self, 'tick_channels')
+
         # first pass - find max amplitude value to normalise output
         for c in range(len(self.out_channels)):
-            
+                
             channel_values = np.concatenate(int(embed_caption)*[self.caption_channels[str(c)].values,]+
-                                            [self.out_channels[str(c)].values])   
+                                            [apply_fades(self.out_channels[str(c)].values,
+                                                         self.out_channels['0'].samprate,
+                                                         fdur=self.declick_time)])
             channels.append(channel_values)
             vmax = max(
                 abs(channels[c].max()),
@@ -354,11 +401,44 @@ class Sonification:
         
         # normalise and collect channels into a list
         for c in range(len(self.out_channels)):
-            vals = channels[c]
-            chans[:,c] = (vals*norm).astype("int32")
+            signal = channels[c]*norm
+            if has_ticks:
+                # add the ticks
+                signal += self.tick_channels[str(c)].values*norm*self.tick_vol
+            chans[:,c] = (signal).astype("int32")
             
-        # finally combine and write out wav file
-        wavfile.write(fname, self.samprate, chans)
+        # finally combine and write out file. first check extension
+        fsplit = str(fname).split('.')
+        if len(fsplit) < 2:
+            warnings.warn('No file extension in provided fname. Assuming WAV...')
+        ext = fsplit[-1].lower()
+        if ext != 'wav':
+            # check we can use ffmpeg binary 
+            try:
+                sp.run(['ffmpeg','-h'],capture_output=1, check=1)
+            except FileNotFoundError as e: 
+                raise FileNotFoundError(f"""
+                'ffmpeg' doesn't appear to be available in the local environment.
+                This may need to be installed manually. To install ffmpeg visit
+                https://www.ffmpeg.org/download.html.
+                {str(e)}
+                """)
+            with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
+                # now first write the wav to a temporary file
+                wavfile.write(tmp.name, self.samprate, chans)
+                try:
+                    # try (naive) convert with ffmpeg
+                    sp.run(['ffmpeg', '-i', f'{tmp.name}', f'{fname}'],
+                           capture_output=1, check=1)
+                except sp.CalledProcessError as e:
+                    # if ffmpeg can't do it for whatever reason, raise
+                    raise Exception(f"""
+                    'ffmpeg' failed to convert '.wav' to '.{ext}' succesfully:
+                    {str(e)}
+                    {e.stderr}""")
+        else:
+            wavfile.write(fname, self.samprate, chans)
+        
         print(f"Saved {fname}")
 
         
@@ -373,14 +453,18 @@ class Sonification:
 
         time = self.out_channels['0'].samples / self.out_channels['0'].samprate
 
+        has_ticks = hasattr(self, 'tick_channels')
         channels = []
         fig = plt.figure(figsize=(18,12))
         vmax = 0.
         
         # combine caption + sonification streams at display time
         for c in range(len(self.out_channels)):
+            # apply fades at display time
             channel_values = np.concatenate([self.caption_channels[str(c)].values,
-                                             self.out_channels[str(c)].values])   
+                                             apply_fades(self.out_channels[str(c)].values,
+                                                         self.out_channels['0'].samprate,
+                                                         fdur=self.declick_time)])   
             channels.append(channel_values)
             vmax = max(
                 abs(channels[c].max()),
@@ -408,6 +492,10 @@ class Sonification:
             outfmt = np.column_stack(channels[:2]).T / vmax
         if len(self.channels.labels) > 2:
             print("Warning: for more than two channels, only first two channels are mapped to L and R, respectively.")
+        if has_ticks:
+            # add the ticks
+            for c in range(outfmt.shape[0]):
+                outfmt[c] += self.tick_channels['0'].values*self.tick_vol / vmax
         display(ipd.Audio(outfmt,rate=self.out_channels['0'].samprate, autoplay=False))
         
     def hear(self):

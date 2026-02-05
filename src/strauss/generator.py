@@ -28,7 +28,7 @@ try:
     scipy.fft.set_backend(pyfftw.interfaces.scipy_fft)
 except (OSError, ModuleNotFoundError):
     pass
-from scipy.fft import fft, ifft, fftfreq
+from scipy.fft import fft, rfft, ifft, fftfreq, rfftfreq
 import glob
 import copy
 import scipy
@@ -647,9 +647,17 @@ class Sampler(Generator):
         self.gtype = 'sampler'
         self.preset = getattr(presets, self.gtype).load_preset()
         self.preset['ranges'] = getattr(presets, self.gtype).load_ranges() 
+        self.sampsource = None
+        self.sampfiles = sampfiles
+        self.sf_preset = sf_preset
+        self.sf_preset_name = None
+        self.sf_note_range = []
         
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
+
+        # non-note names for samples (e.g. non-tonal samples)
+        self.aliases = {}    
         
         if isinstance(sampfiles, dict):
             # catch case sample dictionary provided directly
@@ -658,6 +666,7 @@ class Sampler(Generator):
             # re-cast sampfiles as a string
             sampfiles = str(sampfiles)
             if sampfiles[-4:] == '.sf2':
+                self.sampsource = 'soundfont'
                 # if a soundfont (.sf2) file, use read routines
                 with open(sampfiles, 'rb') as sf2_file:
                     self.sf2 = Sf2File(sf2_file)
@@ -684,22 +693,46 @@ class Sampler(Generator):
                               f"preset, ie. 'Sampler(\"{sampfiles}\",sf_preset=N)',\n"
                               f"where N is an integer from 1-{i+1}.\n")
                         sf_preset = 1
+                        
                     # TODO: isolate the warning suppression better?
                     logger = logging.getLogger()
+
                     pres = self.sf2.build_presets()
                     logger.disabled = True
                     sf_data = self.get_sfpreset_samples(pres[sf_preset-1])
                     self.sampdict = self.reconstruct_samples(sf_data)
                     logger.disabled = False
+
+                    self.sf_preset = sf_preset
+                    hdr = self.sf2.raw.pdta['Phdr'][sf_preset-1]
+                    self.sf_preset_name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
+                    
                     
             else:
+                self.sampsource = 'directory'
                 wavs = sorted(Path(sampfiles).glob("*.[wW][aA][vV]"))
                 self.sampdict = {}
+                unassigned_wavs = []
                 for w in wavs:
                     filename = Path(w).name
                     note = filename.split('_')[-1].split('.')[0]
-                    self.sampdict[note] = str(w)
-        self.load_samples()
+                    if notes.valid_note(note):
+                        self.sampdict[note] = str(w)
+                    else:
+                        unassigned_wavs.append(str(w))
+                if len(unassigned_wavs) == 0:
+                    # All samples assigned to notes
+                    self.load_samples()
+                elif len(unassigned_wavs) == len(wavs):
+                    # All samples unassigned
+                    self.load_samples(unassigned_wavs=unassigned_wavs)
+                else:
+                    # A mix of assigned and unassigned samples
+                    warnings.warn("Mix of sample filenames with and without specified notes. \n"
+                                  "Assigning unspecified samples to remaining notes.")
+                    self.load_samples(unassigned_wavs=unassigned_wavs)
+                    
+
 
     def get_sfpreset_samples(self, sfpreset):
         """Reading samples from a soundfont file along with metadata.
@@ -776,6 +809,7 @@ class Sampler(Generator):
                         opitchdat[name] = note-tune
                         sratedat[name] = samp.sample_rate
                         sampdat[name] = sample
+        self.sf_note_range = [notes.mkey_to_note(minmidi), notes.mkey_to_note(maxmidi)]
         return {'samples': sampdat, 'sample_rate': sratedat, 'original_pitch': opitchdat,
                'min_note': minmidi, 'max_note': maxmidi, 'sample_map': mapsamps}
 
@@ -824,7 +858,7 @@ class Sampler(Generator):
             # write(outname, samprate, compwave)
         return sampdict
             
-    def load_samples(self):
+    def load_samples(self, unassigned_wavs=[], fill_notes=True):
         """Load audio samples into the sampler.
 
         Read audio samples in from a specified directory or via a
@@ -841,29 +875,114 @@ class Sampler(Generator):
         """
         self.samples = {}
         self.samplens = {}
+        mkeys = []
+        root_notes = []
         for note in self.sampdict.keys():
-            if isinstance(self.sampdict[note], str):
-                rate_in, wavobj = wavfile.read(self.sampdict[note])
-                # If it doesn't match the required rate, resample and re-write
-                if rate_in != self.samprate:
-                    wavobj = utils.resample(rate_in, self.samprate, wavobj)
-                # force to mono array, else convert values to float
-                if wavobj.ndim > 1:
-                    wavdat = np.mean(wavobj.data, axis=1)
-                else:
-                    wavdat = np.array(wavobj.data, dtype='float64')
-            else:
-                wavdat = self.sampdict[note].astype('float64')
-            # remove DC term 
-            dc = wavdat.mean()
-            wavdat -= dc
-            wavdat /= abs(wavdat).max()
-            samps = range(wavdat.size)
-            self.samples[note] = interp1d(samps, wavdat,
-                                          bounds_error=False,
-                                          fill_value = (0.,0.),
-                                          assume_sorted=True)
-            self.samplens[note] = wavdat.size
+            mkey = notes.note_to_mkey(note)
+            sintp, slen = process_sample(self.sampdict[note], self.samprate)
+            self.samples[note] = sintp
+            self.samplens[note] = slen
+            self.aliases[note] = Path(self.sampdict[note]).stem
+            mkeys.append(mkey)
+            root_notes.append(note)
+        for wav in unassigned_wavs:
+            sintp, slen, mkey = process_sample(wav, self.samprate, find_pitch=True)
+            note = notes.mkey_to_note(mkey)
+            while note in self.samples:
+                mkey += 1
+                note = notes.mkey_to_note(mkey)
+            self.samples[note] = sintp
+            self.samplens[note] = slen
+            self.sampdict[note] = wav
+            self.aliases[note] = Path(wav).stem
+            mkeys.append(mkey)
+            root_notes.append(note)
+        self.sampranges = {}
+        self.samporder = list(np.array(root_notes)[np.argsort(mkeys)])
+
+        
+        for k in self.sampdict.keys():
+            self.sampranges[k] = [[k]]
+        if fill_notes:
+            self.fill_midi()
+
+    def fill_midi(self):
+        keys = np.array(list(self.samples.keys()))
+        assigned_mkey = np.zeros(len(keys))
+        for k in range(keys.size):
+            assigned_mkey[k] = notes.note_to_mkey(keys[k])
+        keysort = np.argsort(assigned_mkey)
+        assigned_mkey = assigned_mkey[keysort]
+        keys = keys[keysort]
+        idx = 0
+        keylim = keys[0]
+        keylims = [['C-1']]
+        for i in range(128):
+            offsets = i - assigned_mkey
+            neardx = abs(offsets).argmin()
+            off = offsets[neardx]
+            sfac = pow(2, off/12.)
+            this_note = notes.mkey_to_note(i)
+            nearkey = keys[neardx]
+            if (keys[neardx] != keylim):
+                keylims[idx].append(notes.mkey_to_note(i-1))
+                idx += 1
+                keylims.append([])
+                keylims[idx].append(this_note)
+                keylim = keys[neardx]
+            if this_note != nearkey:
+                self.samples[this_note] = lambda x, s=sfac, k=nearkey: self.samples[k](x*s)  
+                self.samplens[this_note] = sfac*self.samplens[nearkey]
+            if this_note[1] == '#':
+                # if a sharp, also assign flat...
+                flat_note = notes.noteflats[i%12]+this_note[2:]
+                if flat_note != nearkey:
+                    # avoid recursion assigning reference to itself!
+                    self.samples[flat_note] = self.samples[this_note]
+                    self.samplens[flat_note] = self.samplens[this_note]                
+        keylims[idx].append(notes.mkey_to_note(i))
+        self.sampranges = dict(zip(keys, keylims))
+            
+    def info(self, pretty=True):
+        """
+        Print info about the sampler set-up
+        """
+        # TODO: we could use a keyboard view, built with something like https://gist.github.com/wbolster/65fc4819120857b9fc8bdc0f7a976ed7
+        if pretty:
+            bfl, bfr = "\033[1m", "\033[0m"
+        else:
+            bfl, bfr = '',''
+        if self.sampsource == 'directory':
+
+            print(f"{bfl}Sample Assignment:{bfr}\n")
+
+            titles = ['Number', 'Home Pitch', 'File Name', 'Note Range', 'Alias']
+            maxchars = []
+            for i in range(len(titles)):
+                maxchars.append(len(titles[i]))
+            lines = [titles]        
+
+            for i in range(len(self.samporder)):
+                note = self.samporder[i]
+                fname = Path(self.sampdict[note]).name
+                line = [f"{i+1}.",f"{note}",f"{fname}",f"{' - '.join(self.sampranges[note])}", f"\"{self.aliases[note]}\""]
+                for j in range(len(line)):
+                    maxchars[j] = max(maxchars[j], len(line[j]))
+                lines.append(line)
+            llen = len(line)
+            np.sum(maxchars)
+            for l in range(len(lines)):
+                for c in range(llen):
+                    lines[l][c] = lines[l][c].ljust(maxchars[c])
+                lines[l] = '\t'.join(lines[l])
+                print(lines[l])
+                if l == 0:
+                    print(len(lines[l].expandtabs())*'-')
+        elif self.sampsource == 'soundfont':
+            print(f"{bfl}Samples from SoundFont:{bfr}")
+            print(f'SoundFont: \t {self.sampfiles}')
+            print(f"Preset: \t {self.sf_preset}. {self.sf_preset_name} ({' - '.join(self.sf_note_range)})")
+                    
 
     def forward_loopsamp(self, s, start, end):
         """Looping samples forward using indexing
@@ -1271,6 +1390,51 @@ class Spectralizer(Generator):
             sstream.filt_sweep(getattr(filters, params['filter_type']),
                                utils.const_or_evo_func(params['cutoff']))
         return sstream    
+
+def process_sample(sample, samprate, find_pitch=False):
+    if isinstance(sample, str):
+        rate_in, wavobj = wavfile.read(sample)
+        # If it doesn't match the required rate, resample and re-write
+        if rate_in != samprate:
+            wavobj = utils.resample(rate_in, samprate, wavobj)
+            # force to mono array, else convert values to float
+        if wavobj.ndim > 1:
+            wavdat = np.mean(wavobj.data, axis=1)
+        else:
+            wavdat = np.array(wavobj.data, dtype='float64')
+    else:
+        wavdat = sample.astype('float64')
+    # remove DC term 
+    dc = wavdat.mean()
+    slen = wavdat.size
+    wavdat -= dc
+    wavdat /= abs(wavdat).max()
+    samps = range(slen)
+    intp = interp1d(samps, wavdat,
+                    bounds_error=False,
+                    fill_value = (0.,0.),
+                    assume_sorted=True)
+    
+    if find_pitch:
+
+        # need fourier analysis to assign notes...
+        yf = rfft(wavdat)
+        xf = rfftfreq(slen, 1 / samprate)
+
+        # Don't need phase info - get power peak
+        magnitudes = np.abs(yf)
+
+        # double check for any DC term
+        peak_index = np.argmax(magnitudes[1:]) + 1
+
+        # Frequency, to closest midi key
+        pf =  xf[peak_index]
+        mkey = np.round((np.log2(pf/notes.tuneC0)+1)*12).astype(int)
+        
+        return intp, slen, mkey
+    else:
+        return intp, slen
+
     
 def gen_chord(stream, chordname, rootoctv=3):
     """DEPRECATED CODE:

@@ -10,7 +10,6 @@ from scipy.interpolate import interp1d
 import numpy as np
 import strauss.utilities as utils
 import re
-import ffmpeg as ff
 import os
 import warnings
 from pathlib import Path
@@ -157,6 +156,7 @@ def render_caption(caption, samprate, model, caption_path):
     except:
         # ...but pttsx3 TTS can produce audio files incompatable
         # with scipy - convert to standard WAV using ffmpeg
+        import ffmpeg as ff
         cpre = caption_path.split('.')[0] + '_pre.wav'
         os.rename(caption_path, cpre)
         ff.input(cpre).output(caption_path).run(quiet=1)

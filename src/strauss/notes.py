@@ -42,10 +42,24 @@ def parse_note(notename):
     Returns:
       out (numerical): Frequency of note in Hertz
     """
-    nsplit = re.findall("(\D+|\d+)", notename)
+    nsplit = re.findall("(\\D+|\\d+)", notename)
     semi = semitone_dict[nsplit[0]]/12.
     octv  = int(nsplit[1])
     return tuneC0*pow(2.,semi+octv)
+
+def valid_note(notename):
+    nsplit = re.findall("(\\D+|\\d+)", notename)
+    if len(nsplit) == 2:
+        if nsplit[0] in semitone_dict:
+            try:
+                octv = int(nsplit[1])
+                return True
+            except ValueError:
+                return False
+    return False
+        
+    
+    
 
 def parse_chord(chordname, rootoct=3):
     """
@@ -99,7 +113,23 @@ def mkey_to_note(val):
       out (:obj:`str`): scientific pitch name, in format
         `<note><octave>`, e.g. `'E3'` or `'F#2'`
     """
-    from strauss.notes import notesharps
     octv = val // 12 - 1
     semi = val % 12
     return f'{notesharps[semi]}{octv}'
+
+def note_to_mkey(notename):
+    """
+    Take MIDI key value and return the note name in scientific
+    notation
+
+    Args:
+      val (:obj:`int`): MIDI key value
+
+    Returns:
+      out (:obj:`str`): scientific pitch name, in format
+        `<note><octave>`, e.g. `'E3'` or `'F#2'`
+    """
+    nsplit = re.findall("(\\D+|\\d+)", notename)
+    mkey = semitone_dict[nsplit[0]] + (int(nsplit[1])+1)*12
+    return mkey
+

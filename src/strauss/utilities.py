@@ -290,7 +290,28 @@ def get_supported_coqui_voices():
 
     return voices
 
-    
+
+def apply_fades(samples, srate, fdur=0.03):
+    """ Apply de-click fades to a sample array
+
+    Args:
+      samples (:obj:`ndarray`): array of input sample indices
+      samprate (:obj:`int`): Samples per second of audio stream (Hz)
+      fdur (`optional`, :obj:`float`): duration of fade in seconds
+
+    Returns:
+      out (:obj:`ndarray`): array of output samples
+    """
+    samps = samples.copy()
+    nfade = int(srate*fdur)
+    if nfade > 0:
+        ramp = np.linspace(0,1,nfade)
+        samps[:nfade] *= ramp
+        samps[-nfade:] *= ramp[::-1]
+    else:
+        pass
+    return samps
+
 class Capturing(list):
     """
     Context manager for handling stdout (see https://stackoverflow.com/a/16571630)
