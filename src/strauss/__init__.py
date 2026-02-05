@@ -89,8 +89,14 @@ def sonify(*args, **kwargs):
     nmap = min(len(args), len(style.map))
     
     to_map = []
+    in_lims = {}
+    out_lims = {}
     for i in range(nmap):
         to_map.append(style.map[i].output)
+        if style.map[i].input_range:
+            in_lims[to_map[-1]] = style.map[i].input_range
+        if style.map[i].output_range:
+            out_lims[to_map[-1]] = style.map[i].output_range
     map_data = dict(zip(to_map, args[:nmap]))
 
     if 'pitch' not in to_map:
@@ -106,7 +112,7 @@ def sonify(*args, **kwargs):
     _score = Score(snotes, length=sonpars['duration'])
     _sources = getattr(sources, style.sources.capitalize())(to_map)
     _sources.fromdict(map_data)
-    _sources.apply_mapping_functions()
+    _sources.apply_mapping_functions(map_lims=in_lims, param_lims=out_lims)
 
     gentype = style.generator.type
     
