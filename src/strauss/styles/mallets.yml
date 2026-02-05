@@ -1,0 +1,21 @@
+name: 'Mallets'
+
+description: 'Mapping pitch on a musical scale with staccato notes'
+
+generator:
+  type: 'sampler'
+  sample: 'mallet'
+
+sources: 'events'
+
+map:
+
+  - input_range: ['0%', '110%']
+    output: 'time'
+
+  - output: 'pitch'
+
+notes: 'C11'
+  
+  
+
