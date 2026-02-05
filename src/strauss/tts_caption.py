@@ -6,96 +6,108 @@ sonification.
 """
 
 from scipy.io import wavfile
-from scipy.interpolate import interp1d
 import numpy as np
 import strauss.utilities as utils
+import ffmpeg as ff
 import re
 import os
 import warnings
 from pathlib import Path
 
+# Ordered by preference: Kokoro > Coqui > Pyttsx3
+ENGINE_PREFERENCE = ['kokoro', 'coqui-tts', 'pyttsx3']
+current_tts_mode = 'None'
+pipeline = None
 default_tts_voice = None
 
-class NoTTSAPI(Exception):
-    # except when no API key is found for coqui-TTS module
-    pass
-try:
-    from TTS.api import TTS
-    ttsMode = 'coqui-tts'
-    default_tts_voice = Path('tts_models','en','jenny', 'jenny')
-    supported_voices = utils.get_supported_coqui_voices()    
-except (OSError, ModuleNotFoundError, NoTTSAPI) as sderr:
+def set_engine(engine_name):
+    """
+    Manually set the TTS engine and update the default voice.
+    
+    Args:
+        engine_name (str): One of 'kokoro', 'coqui-tts', or 'pyttsx3'.
+    """
+    global current_tts_mode, pipeline, default_tts_voice
+    
     try:
-      import pyttsx3
-      ttsMode = 'pyttsx3'
-      class TTS:
-          def __init__(*args, **kwargs):
-              pass
-          def list_models(self):
-              return getVoices(True)
-      warnings.warn("Default TTS module coqui not found, using pyttsx3 instead. Note this is platform \n"
-                    "dependent and can be problematic for linux-based systems (using the espeak engine)")
-      default_tts_voice = {} # i.e. system default TTS (if exists)
-    except (OSError, ModuleNotFoundError) as sderr:
-      ttsMode = 'None'
-      # print('No supported text-to-speech packages have been found.')
-      def TTS(*args, **kwargs):
-          raise TTSIsNotSupported("strauss has not been installed with text-to-speech support. \n"
-                "This is not installed by default, due to some specific module requirements of the TTS module.\n"
-                "Reinstalling strauss with 'pip install strauss[AI-TTS]' will give you access to this function\n"
-                "If you run into issues with the TTS package, you can also install pyttsx3. Currently the most\n" 
-                "compatible version is not published on PyPI, but you can install from the test repo with \n"
-                "'pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple/ pyttsx3==2.99'")
+        if engine_name == 'kokoro':
+            from kokoro import KPipeline
+            pipeline = KPipeline(lang_code='b')
+            current_tts_mode = 'kokoro'
+            default_tts_voice = 'bf_emma'
+            
+        elif engine_name == 'coqui-tts':
+            from TTS.api import TTS
+            current_tts_mode = 'coqui-tts'
+            default_tts_voice = Path('tts_models','en','jenny', 'jenny')
+            
+        elif engine_name == 'pyttsx3':
+            import pyttsx3
+            current_tts_mode = 'pyttsx3'
+            default_tts_voice = {} 
+            
+        print(f"TTS engine successfully set to: {current_tts_mode}")
+        return True
+    except (OSError, ModuleNotFoundError, Exception) as e:
+        print(f"Failed to load {engine_name}: {e}")
+        return False
 
-class TTSIsNotSupported(Exception):
-    pass
+def initialize_tts():
+    """Initializes the best available engine based on preference."""
+    for engine in ENGINE_PREFERENCE:
+        if set_engine(engine):
+            return
+    print("No supported text-to-speech packages found.")
+
+# Run initial detection
+initialize_tts()
 
 def get_ttsMode():
-   return ttsMode
+    return current_tts_mode
 
 def getVoices(info=False):
-  '''Get available voices for text-to-speech.
+    """Get available voices for the currently active TTS engine."""
+    voices = []
+    getter = dict
 
-  When info=True, this prints out information
-  for each voice option.
-
-    Args:
-      info (:obj:`bool`): Print out voice information when True, 
-      by default False
-      voices (:obj:`list`): List of ``pyttsx3.voice.Voice`` objects
-      or ``dict`` objects.
- 
-  '''
-  if ttsMode == 'pyttsx3':
-      engine = pyttsx3.init()
-      voices = engine.getProperty('voices')
-      getter = vars
-  elif ttsMode == 'coqui-tts':
-      voices = supported_voices
-      getter = dict
-  else:
-      getter = dict
-      voices = [{"voices": "None"}]
-  if info==True:
-      print('Text-to-speech voice options')
-      for ind in range(len(voices)):
-          voiceProps = getter(voices[ind])
-          print('\nVoice index:', ind)
-          for key in voiceProps.keys():
-              print('{}: {}'.format(key, voiceProps[key]))      
-  return voices      
+    if current_tts_mode == 'pyttsx3':
+        import pyttsx3
+        engine = pyttsx3.init()
+        voices = engine.getProperty('voices')
+        getter = vars
+    elif current_tts_mode == 'coqui-tts':
+        try:
+            voices = utils.get_supported_coqui_voices()
+        except:
+            voices = []
+    elif current_tts_mode == 'kokoro':
+        # Hardcoded list from your specification
+        voices = [{'name': n} for n in [
+            'af_heart', 'af_bella', 'af_nicole', 'af_sarah', 'af_sky', 
+            'am_adam', 'am_michael', 'bf_emma', 'bf_isabella', 'bf_lily'
+        ]]
+    
+    if info:
+        print(f'\n--- {current_tts_mode.upper()} Voice Options ---')
+        for i, v in enumerate(voices):
+            props = getter(v)
+            print(f"Index {i}: {props.get('name', 'Unknown')}")
+    return voices
 
 def render_caption(caption, samprate, model, caption_path):
-    '''The render_caption function generates an audio caption from text input
+    """The render_caption function generates an audio caption from text input
     and writes it as a wav file. If the sample rate of the model is not equal 
     to that passed from sonification.py, it resamples to the correct rate and
     re-writes the file. 
     
-    If Coqui-AI is installed, text from user input is converted with text-to-
+    If Kokoro is selcted, text from user input is converted with text-to-
+    speech software from Kokoro - https://pypi.org/project/kokoro-tts/ .
+
+    If Coqui-AI is selected, text from user input is converted with text-to-
     speech software from Coqui-AI - https://pypi.org/project/TTS/ . 
     You can view publicly available voice models with 'TTS.list_models()'
 
-    If Coqui-AI is not installed but pyttsx3 (https://pypi.org/project/pyttsx3/)
+    If neither Kokoro nor Coqui-AI are installed but pyttsx3 (https://pypi.org/project/pyttsx3/)
     is installed, text from user input is converted offline using pyttsx3.
 
     Note:
@@ -112,39 +124,39 @@ def render_caption(caption, samprate, model, caption_path):
         'volume' (float from 0 to 1), and/or 'voice' (the voice 'id' that can
         be chosen from the list given by the TTS.list_models() function).
       caption_path (:obj:`str`): filepath for spoken caption output
-    '''
+    """
+    
+    if current_tts_mode == 'None':
+        raise Exception("TTS not supported. Install with 'pip install strauss[AI-TTS]'")
 
-    # TODO: allow uniform indexing and/or language querying approaches for more consistency between tts modes...
-    if ttsMode == 'coqui-tts':
+    # Generate Audio Output
+    if current_tts_mode == 'kokoro':
+        # Process Kokoro generator into a single audio array
+        kokoro_gen = pipeline(caption, voice=model, speed=1, split_pattern=r'\n+')
+        all_audio = [audio for _, _, audio in kokoro_gen]
+        final_audio = np.concatenate(all_audio)
+        # Clip values to avoid distortion during conversion
+        final_audio = np.clip(final_audio, -1.0, 1.0)
+        # Convert to 16-bit PCM (standard WAV format)
+        final_audio = (final_audio * 32767).astype(np.int16)
+        wavfile.write(caption_path, 24000, final_audio)
 
-      # TODO: do this better with logging. We can filter TTS function output, e.g. alert to downloading models...
-      print('Rendering caption (this can take a while if the caption is long, or if the TTS model needs downloading)...')
-      
-      # capture stdout from the talkative TTS module
-      with utils.Capturing() as output:
-          # Load in the tts model
-          tts = TTS(str(model), progress_bar=False, gpu=False)
+    elif current_tts_mode == 'coqui-tts':
+        from TTS.api import TTS
+        with utils.Capturing():
+            tts = TTS(str(model), progress_bar=False, gpu=False)
+            tts.tts_to_file(text=caption, file_path=caption_path)
 
-          # render to speech, and write as a wav file (allow )
-          tts.tts_to_file(text=caption, file_path=caption_path)
-          
-    elif ttsMode == 'pyttsx3':
-        
-      # Setup voice model for pyttsx3
-      engine = pyttsx3.init() # initialize object
+    elif current_tts_mode == 'pyttsx3':
+        import pyttsx3
+        engine = pyttsx3.init()
+        if isinstance(model, dict):
+            for key in ['rate', 'volume', 'voice']:
+                if key in model:
+                    engine.setProperty(key, model[key])
+        engine.save_to_file(caption, caption_path)
+        engine.runAndWait()
 
-      # check what model info was set; if none were
-      # specified, use defaults
-      for key in ['rate','volume','voice']:
-          if key in model.keys():
-              engine.setProperty(key, model[key])
-          else:
-              pass
-
-      engine.save_to_file(caption, caption_path, name='caption')
-      # note the current PyPI release ()
-      engine.runAndWait()
-      
     else:
        # initialise dummy TTS class to raise error.
        TTS()
@@ -156,7 +168,6 @@ def render_caption(caption, samprate, model, caption_path):
     except:
         # ...but pttsx3 TTS can produce audio files incompatable
         # with scipy - convert to standard WAV using ffmpeg
-        import ffmpeg as ff
         cpre = caption_path.split('.')[0] + '_pre.wav'
         os.rename(caption_path, cpre)
         ff.input(cpre).output(caption_path).run(quiet=1)
@@ -165,6 +176,5 @@ def render_caption(caption, samprate, model, caption_path):
     # If it doesn't match the required rate, resample and re-write
     if rate_in != samprate:
         new_wavobj = utils.resample(rate_in, samprate, wavobj)
-        wavfile.write(caption_path, samprate, new_wavobj)
-
+        wavfile.write(caption_path, samprate, new_wavobj)    # Resample to target rate if necessary
 
