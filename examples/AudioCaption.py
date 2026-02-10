@@ -9,14 +9,17 @@ from strauss.sonification import Sonification
 from strauss.sources import Events
 from strauss import channels
 from strauss.score import Score
-from strauss.tts_caption import render_caption
+from strauss.tts_caption import set_engine, render_caption, get_ttsMode
 import numpy as np
 from strauss.generator import Sampler
 import os
 from pathlib import Path
 import strauss
+import pyttsx3
 
-mode = strauss.tts_caption.ttsMode
+# Set TTS module to 'kokoro', 'coqui-tts' or 'pyttsx3'
+set_engine('kokoro')
+mode = get_ttsMode()
 
 # What text to speech do we have?
 print(f"Available text-to-speech (TTS) is: {mode}")
@@ -56,7 +59,7 @@ from strauss.tts_caption import getVoices
 voices = getVoices(True)
 
 
-# Generate text-to-speech (TTS) for the caption, using the default choice of voice (`"Jenny"` for the `coqui-tts` module, OS default for `pyttsx3`)
+# Generate text-to-speech (TTS) for the caption, using the default choice of voice (`"Jenny"` for the `coqui-tts` module, "bf-emma" for kokoro, OS default for `pyttsx3`)
 caption_en = 'In the following audio, a glockenspiel is used to represent stars of varying colour.'
 
 soni = Sonification(score, events, generator, system,
@@ -67,10 +70,19 @@ soni.hear()
 # We could also try an alternative model, if one's available
 caption_en = 'In the following audio, a glockenspiel is used to represent stars of varying colour.'
 
+set_engine('coqui-tts')
+#set_engine('kokoro')
+#set_engine('pyttsx3.init')
+mode = get_ttsMode()
+
 if mode == 'coqui-tts':
     soni = Sonification(score, events, generator, system,
                         caption=caption_en,
                        ttsmodel=Path('tts_models', 'eng', 'fairseq', 'vits'))
+elif mode == 'kokoro':
+    soni = Sonification(score, events, generator, system,
+                        caption=caption_en,
+                       ttsmodel=('am_michael'))
 elif mode == 'pyttsx3':
     for v in voices[::-1]:
         #print(v.languages[0][:2])
@@ -89,6 +101,11 @@ soni.hear()
 # Other TTS models are available in several languages. We can demonstrate a German voice, for example
 caption_de = "In der folgenden Tonspur wird ein Glockenspiel verwendet um Sterne mit unterschiedlichen Farben zu repräsentieren."
 
+set_engine('coqui-tts')
+#set_engine('kokoro')
+#set_engine('pyttsx3.init')
+mode = get_ttsMode()
+
 if mode == 'coqui-tts':
     language_index = 0 # or, pick a different index for another langauge
     iso_codes = ['deu', 'spa', 'ita', 'pol', 'hin']
@@ -105,6 +122,12 @@ if mode == 'coqui-tts':
     soni = Sonification(score, events, generator, system,
                         caption=captions[language_index],
                         ttsmodel=models[language_index])
+elif mode == 'kokoro':
+    print('Non-English voices are currently not available in Strauss')
+    soni = Sonification(score, events, generator, system,
+                       caption=caption_en,
+                       ttsmodel=('af_nicole'))
+
 elif mode == 'pyttsx3':
     # find a German-language voice...
     has_voice = 0
@@ -126,11 +149,21 @@ soni.hear()
 # **Note**: the `TTS` can behave unpredictably when using unrecognised characters or terms. Sometimes these will be mispronounced by the TTS, other times they could be skipped entirely. This can be circumvented by writing out the how symbols should be pronounced, or spelling phonetically to improve pronunciation:
 symbol_examples_en = 'The Lyman-α resonance is 1216 Å. The Lyman alpha resonance is twelve hundred and sixteen angstroms. '
 
+set_engine('coqui-tts')
+#set_engine('kokoro')
+#set_engine('pyttsx3.init')
+mode = get_ttsMode()
+
 if mode == 'coqui-tts':
     soni = Sonification(score, events, generator, system,
                         caption=symbol_examples_en, 
                         ttsmodel=Path('tts_models', 'eng', 'fairseq', 'vits'))
     
+elif mode == 'kokoro':
+    soni = Sonification(score, events, generator, system,
+                        caption=symbol_examples_en,
+                        ttsmodel=('bf_emma'))
+
 elif mode == 'pyttsx3':
     for v in voices[::-1]:
         #print(v.languages[0][:2])
@@ -138,7 +171,8 @@ elif mode == 'pyttsx3':
             break
                        
     soni = Sonification(score, events, generator, system,
-                        caption=symbol_examples_en)
+                        caption=symbol_examples_en,
+                        ttsmodel={'voice':v.id})
 
 soni.render()
 soni.hear()

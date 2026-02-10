@@ -16,7 +16,7 @@ Todo:
 from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice
-from .tts_caption import render_caption, get_ttsMode, default_tts_voice
+from .tts_caption import render_caption, get_ttsMode, set_engine, default_tts_voice
 import numpy as np
 import matplotlib.pyplot as plt
 import sys

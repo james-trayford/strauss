@@ -1,6 +1,5 @@
 [build-system]
 requires = [
-    "ffmpeg-python",
     "matplotlib",
     "numpy",
     "pandas",
@@ -12,6 +11,8 @@ requires = [
     "tqdm",
     "wavio",
     "wheel",
-    "pyttsx3 @ git+https://github.com/nateshmbhat/pyttsx3.git"
+    "pyttsx3 @ git+https://github.com/nateshmbhat/pyttsx3.git",
+    "kokoro>=0.9.4",
+    "soundfile"
 ]
 build-backend = "setuptools.build_meta"
