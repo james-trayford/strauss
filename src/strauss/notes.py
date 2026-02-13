@@ -42,7 +42,7 @@ def parse_note(notename):
     Returns:
       out (numerical): Frequency of note in Hertz
     """
-    nsplit = re.findall("(\D+|\d+)", notename)
+    nsplit = re.findall(r"(\D+|\d+)", notename)
     semi = semitone_dict[nsplit[0]]/12.
     octv  = int(nsplit[1])
     return tuneC0*pow(2.,semi+octv)
