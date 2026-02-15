@@ -567,3 +567,37 @@ class Sonification:
             self.loop_channels[str(c)].values[:buffsize] *= ramp[:-1]
             self.loop_channels[str(c)].values[:buffsize] += ramp[::-1][:-1] * self.out_channels[str(c)].values[-buffsize:]
             
+    def _make_out_array(self, master_volume=1., embed_caption=True):
+        channels = []
+        vmax = 0.
+
+        has_ticks = hasattr(self, 'tick_channels')
+
+        # first pass - find max amplitude value to normalise output
+        for c in range(len(self.out_channels)):
+                
+            channel_values = np.concatenate(int(embed_caption)*[self.caption_channels[str(c)].values,]+
+                                            [apply_fades(self.out_channels[str(c)].values,
+                                                         self.out_channels['0'].samprate,
+                                                         fdur=self.declick_time)])
+            channels.append(channel_values)
+            vmax = max(
+                abs(channels[c].max()),
+                abs(channels[c].min()),
+                vmax
+            ) * 1.05
+
+        # normalisation for conversion to int32 bitdepth wav
+        norm = master_volume * (pow(2, 31)-1) / vmax
+
+        # setup array to house wav stream data 
+        chans = np.zeros((channels[0].size, len(channels)))
+        
+        # normalise and collect channels into a list
+        for c in range(len(self.out_channels)):
+            signal = channels[c]*norm
+            if has_ticks:
+                # add the ticks
+                signal += self.tick_channels[str(c)].values*norm*self.tick_vol
+            chans[:,c] = (signal)
+        return chans

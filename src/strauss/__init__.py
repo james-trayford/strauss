@@ -14,6 +14,7 @@ from . import stream
 from . import presets
 from . import styles
 from . import assets
+from .audio_figure import AudioFigure
 
 # relative imports of submodules
 from . import channels
@@ -60,6 +61,33 @@ _kw_defaults = {
     'style' : None,
     'caption': None,
 }
+
+# class AudioFigure:
+#     """
+#     AudioFigure Class, wrapper for Sonification objects
+#     """
+#     def __init__(self, duration=1, system='stereo'):
+#         self.sonifications = []
+#         self.snames = []
+#         self.master_levels = []
+#         self.system = system
+#         self.duration = duration
+        
+#     def add_sonification(self, soni, name=None):
+#         """
+#         """
+#         self.sonifications.append(soni)
+#         if name:
+#             self.sonifications.append(name)
+#         else:
+#             self.sonifications.append(f"sonification_{len(self.sonifications)}")
+        
+#     def mix():
+#         """
+#         """
+        
+#         pass
+        
 
 def sonify(*args, **kwargs):
     """
