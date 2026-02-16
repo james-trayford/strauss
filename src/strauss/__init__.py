@@ -62,33 +62,6 @@ _kw_defaults = {
     'caption': None,
 }
 
-# class AudioFigure:
-#     """
-#     AudioFigure Class, wrapper for Sonification objects
-#     """
-#     def __init__(self, duration=1, system='stereo'):
-#         self.sonifications = []
-#         self.snames = []
-#         self.master_levels = []
-#         self.system = system
-#         self.duration = duration
-        
-#     def add_sonification(self, soni, name=None):
-#         """
-#         """
-#         self.sonifications.append(soni)
-#         if name:
-#             self.sonifications.append(name)
-#         else:
-#             self.sonifications.append(f"sonification_{len(self.sonifications)}")
-        
-#     def mix():
-#         """
-#         """
-        
-#         pass
-        
-
 def sonify(*args, **kwargs):
     """
     Generate a sonification in a matplotlib-like interface.
@@ -160,7 +133,7 @@ def sonify(*args, **kwargs):
         caption=sonpars["caption"],
         samprate=_generator.samprate, # Use generator's samprate for consistency
     )
-    
+
     _current_sonification = _sonification
     return _sonification
 

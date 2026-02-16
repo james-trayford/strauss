@@ -113,7 +113,20 @@ class Sonification:
         for c in range(self.channels.Nmics):
             self.out_channels[str(c)] = Stream(self.score.length, self.samprate)
 
-    def render(self, downsamp=1):
+    def clear(self):
+        """
+        Clears the audio buffers in all output channels by setting values to 0.
+        This prevents audio from accumulating if render() is called multiple times.
+        """
+        # Iterate over the dictionary of channels (usually '0', '1', etc.)
+        for chan in self.out_channels:
+            if hasattr(self.out_channels[chan], 'values'):
+                self.out_channels[chan].values[:] = 0.
+            # Fallback if the channel is a raw numpy array
+            elif isinstance(self.out_channels[chan], np.ndarray):
+                self.out_channels[chan][:] = 0.
+            
+    def render(self, downsamp=1, progress=True):
         """Render the sonification.
         
         Generates the sonification by running the  Synthesizer
@@ -129,7 +142,10 @@ class Sonification:
            render by some integer factor.
         """
 
-        # first determine if time is provided, if not assume all start at zero
+        # first, clear the audio channels
+        self.clear()
+        
+        # determine if time is provided, if not assume all start at zero
         # and last the duration of sonification
 
         if "time" not in self.sources.mapping:
@@ -153,7 +169,7 @@ class Sonification:
         Nchan = len(self.out_channels.keys())
         indices = range(0,self.sources.n_sources, downsamp)
 
-        for source in tqdm(indices):
+        for source in tqdm(indices) if progress else indices:
 
             # index note properties
             t = self.sources.mapping['time'][source]
