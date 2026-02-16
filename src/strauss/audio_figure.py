@@ -2,9 +2,17 @@ import numpy as np
 from . import channels
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice
+from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import IPython.display as ipd
+try:
+    if is_notebook:
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
+except ModuleNotFoundError:
+    tqdm = list
+
 
 INTMAX32 = (pow(2, 31)-1)
 
@@ -31,10 +39,23 @@ class AudioFigure:
         # Store mixing levels
         self.levels = {}
 
+        # Store any prescribed styles
+        self.styles = {}
+        
         # The final mixed audio array
         self.master_audio = None         
 
-    def add(self, soni, name=None, level='0dB'):
+    def list_sonifications(self):
+        for i, k in enumerate(self.sonifications.keys()):
+            print(f"\t{i+1}.\t {k}")
+
+    def rename(self, old, new):
+        dicts = [self.sonifications, self.levels, self.styles]
+        for d in dicts:
+            d[new] = d[old]
+            del d[old]
+            
+    def add(self, soni, name=None, level='0dB', style=None):
         """
         Add a sonification to the figure.
         Enforces the common timebase so it can be mixed seamlessly.
@@ -56,7 +77,9 @@ class AudioFigure:
             
         self.sonifications[name] = soni
         self.levels[name] = level
-
+        self.styles[name] = style
+        return name
+        
     def remove(self, name):
         """Remove a sonification from the figure."""
         if name in self.sonifications:
@@ -107,7 +130,7 @@ class AudioFigure:
         else:
             raise TypeError(f"Level must be str or float, got {type(level)}")
 
-    def render(self, normalize='peak'):
+    def render(self, progress=True, normalize='peak'):
         """
         Regenerate all attached sonifications and mix them additively.
         
@@ -121,7 +144,10 @@ class AudioFigure:
         n_samples = int(self.length * self.samprate)
         self.master_audio = np.zeros((self.channel_arrays['0'].values.size, len(self.channel_arrays)))
 
-        for name, soni in self.sonifications.items():
+        if progress:
+            print('Processing audio figure...')
+        self.list_sonifications()
+        for name, soni in tqdm(self.sonifications.items()) if progress else self.sonifications.items():
             # 1. Generate the individual track
             soni.render(progress=False)
             
@@ -164,8 +190,43 @@ class AudioFigure:
             # add the ticks
             for c in range(outfmt.shape[0]):
                 outfmt[c] += self.tick_channels['0'].values*self.tick_vol / vmax
-        print(outfmt.max())
         display(ipd.Audio(outfmt.T,rate=self.samprate, autoplay=False))
+
+    def save():
+        # combine and write out file. first check extension
+        fsplit = str(fname).split('.')
+        if len(fsplit) < 2:
+            warnings.warn('No file extension in provided fname. Assuming WAV...')
+        ext = fsplit[-1].lower()
+        if ext != 'wav':
+            # check we can use ffmpeg binary 
+            try:
+                sp.run(['ffmpeg','-h'],capture_output=1, check=1)
+            except FileNotFoundError as e: 
+                raise FileNotFoundError(f"""
+                'ffmpeg' doesn't appear to be available in the local environment.
+                This may need to be installed manually. To install ffmpeg visit
+                https://www.ffmpeg.org/download.html.
+                {str(e)}
+                """)
+            with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
+                # now first write the wav to a temporary file
+                wavfile.write(tmp.name, self.samprate, chans)
+                try:
+                    # try (naive) convert with ffmpeg
+                    sp.run(['ffmpeg', '-i', f'{tmp.name}', f'{fname}'],
+                           capture_output=1, check=1)
+                except sp.CalledProcessError as e:
+                    # if ffmpeg can't do it for whatever reason, raise
+                    raise Exception(f"""
+                    'ffmpeg' failed to convert '.wav' to '.{ext}' succesfully:
+                    {str(e)}
+                    {e.stderr}""")
+        else:
+            wavfile.write(fname, self.samprate, chans)
+        
+        print(f"Saved {fname}")
+
         
     def _align_audio(self, audio, expected_channels, expected_samples):
         """

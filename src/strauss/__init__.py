@@ -38,7 +38,8 @@ import yaml
 import numpy as np
 import glob
 from pathlib import Path
-
+import hashlib
+import json
 
 __version__ = "1.0.3"
 
@@ -47,7 +48,8 @@ thisdir = p.parent
 
 
 # --- Matplotlib-like interface ---
-_current_sonification = None
+_current_figure = None
+_figure_hashes = {}
 _style_cycle_index = 0
 _style_cycle = {"theremin",
                 "windy",
@@ -60,7 +62,11 @@ _kw_defaults = {
     # Style File
     'style' : None,
     'caption': None,
+    'name': None,
+    'level': 1,
 }
+
+_exclude_keys = ['name', 'level']
 
 def sonify(*args, **kwargs):
     """
@@ -75,9 +81,43 @@ def sonify(*args, **kwargs):
     Returns:
         The generated Sonification object.
     """
-    global _current_sonification
+    global _current_figure
     sonpars, is_default = fill_from_kwargs(kwargs)            
 
+    # We first analyse if this is a repeat sonification...
+    # Initially filter relevent keys
+    kwargs_to_hash = {k: v for k, v in sonpars.items() if k not in _exclude_keys}
+    args_to_hash = [str(arg) for arg in args]
+    
+    # Put it in a dictionary, and get a unique hash
+    param_dict = {
+        'args': args_to_hash, 
+        'kwargs': kwargs_to_hash  # Use the filtered dict here
+    }
+    param_str = json.dumps(param_dict, sort_keys=True)
+    current_hash = hashlib.md5(param_str.encode('utf-8')).hexdigest()
+
+    # now check against existing hashes and rename sonification
+    # or re-set volume level if necessary
+    if current_hash in _figure_hashes.keys():
+        name = _figure_hashes[current_hash]
+        mssg = 'Matching sonification exists, '
+        actions = []
+        if ('name' in sonpars) and sonpars['name'] != name:
+            actions.append('renaming')
+            _current_figure.rename(old=name, new=sonpars['name'])
+            name = sonpars['name']
+        if ('level' in sonpars['name']):
+            actions.append(f"re-setting level to {sonpars['level']}")
+            current_figure.set_level(sonpars['level'])
+        if not actions:
+            actions.append('skipping')
+        print(mssg + ' and '.join(actions) + '...')
+        
+        # replace the named hash
+        _figure_hashes[current_hash] = name
+        return _current_figure.sonifications[name]
+            
     if not sonpars['style']:
         sonpars['style'] = 'default'
     style = styles.Style(**load_style(sonpars['style']))
@@ -134,13 +174,24 @@ def sonify(*args, **kwargs):
         samprate=_generator.samprate, # Use generator's samprate for consistency
     )
 
-    _current_sonification = _sonification
+    if not _current_figure:
+        _current_figure = AudioFigure(sonpars['duration'], system=sonpars['channels'])
+    name = _current_figure.add(_sonification, name=sonpars["name"], level=sonpars["level"])
+    _figure_hashes[current_hash] = name
     return _sonification
 
-def display():
-    _current_sonification.render()
-    return _current_sonification.notebook_display(False)
+def close():
+    global _current_figure
+    global _figure_hashes
+    _current_figure = None
+    _figure_hashes = {}
     
+def display():
+    _current_figure.render()
+    return _current_figure.notebook_display(False)
+    
+def list_sonifications():
+    _current_figure.list_sonifications()
 
 def fill_from_kwargs(input_kwargs):
     """ function to store provided keyword arguments against defaults

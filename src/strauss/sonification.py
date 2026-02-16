@@ -15,7 +15,7 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice
+from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,7 +35,10 @@ try:
 except (OSError, ModuleNotFoundError) as sderr:
     sd = NoSoundDevice(sderr)
 try:
-    from tqdm import tqdm
+    if is_notebook:
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
 except ModuleNotFoundError:
     tqdm = list
 
@@ -169,6 +172,8 @@ class Sonification:
         Nchan = len(self.out_channels.keys())
         indices = range(0,self.sources.n_sources, downsamp)
 
+        if progress:
+            print('Processing sonification..')
         for source in tqdm(indices) if progress else indices:
 
             # index note properties
