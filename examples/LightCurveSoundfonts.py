@@ -21,6 +21,13 @@ import glob
 import os
 import copy
 from pathlib import Path
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--animate", action="store_true",
+                    help="create an animation of plot")
+args = parser.parse_args()
+
 
 
 # ...and then download some soundfont (`sf2`) files. These are widely available online, and in particular we download some collected on the [_Soundfonts 4 U_](https://sites.google.com/site/soundfonts4u/) website (and hsted on _Google Drive_). Why not experiment with some of the other files hosted here? We select a flute and a collection of guitar sounds as these are small enough to automatically download.
@@ -191,3 +198,64 @@ dobj = soni.hear()
 # plt.ylabel('Magnitude')
 # plt.xlabel('Time (Julian Days)')
 
+def animate(x, y, soni):
+    '''Make frames for animating a plot of a light curve.
+       Create a sequence to animate this with the sound overlaid.'''
+
+    print("\n Creating animation frames. This may take a few minutes. The output, 'final.mp4' is saved to /figure_animations/LightCurveSoundfonts/'''
+")
+
+    import warnings
+    from pathlib import Path
+    from strauss.animation import Animate
+    import shutil
+    import tempfile
+
+    here = Path.cwd()
+
+    # Define the final target directory
+    target_dir_name = Path("figure_animations") / "LightCurveSoundfonts"
+    
+    # Use a temporary directory for all intermediate files
+    with tempfile.TemporaryDirectory() as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        print(f"Using temporary directory: {temp_dir}")
+
+        pipe = Animate(temp_dir)
+        pipe.register('cutoff', dark_mode=False, sonification=soni, pre_caption=f'This video shows how cutoff is mapped to magnitude for the light curve of 55 Cancri.', post_caption='Thank you for listening!', stype='animation')
+        nframe = int(soni.score.length*int(pipe.pars['fps']))
+        xf = np.linspace(x[0], x[-1], nframe)
+        yf = np.interp(xf, x, y)
+        x, y = xf, yf
+
+        for i in range(x.size)[::1]:
+            fig, ax1 = plt.subplots(figsize=(8,6))
+            plt.title("55 Cancri")
+            ax1.set_xlabel('Time (Julian Days)') 
+            ax2 = ax1.twinx() 
+            ax1.plot(x, y)
+            ax1.set_ylabel('Magnitude')
+            ax1.tick_params(axis ='y')
+            ax1.axvline(x[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+            ax1.axhline(y[i], ls ='--', c='C0',lw=1.5, alpha=0.55)
+            ax2.set_ylim(min(y)*4, max(y)*4)
+            ax2.set_ylabel('Cutoff')
+            ax2.tick_params(axis ='y')
+            plt.savefig(pipe.frames["cutoff"].parent / f"frame_{i:05d}.png", dpi=120)
+            plt.close()
+        print("Cutoff frames created!")
+        pipe.render()
+        temp_final_mp4 = temp_dir / "final.mp4" 
+
+        target_dir_name.mkdir(parents=True, exist_ok=True)
+        final_target_path = target_dir_name / temp_final_mp4.name
+        
+        if temp_final_mp4.exists():
+            shutil.copy(temp_final_mp4, final_target_path)
+            print(f"\nFinal animation copied to: {final_target_path}")
+        else:
+            warnings.warn(f"Could not find {temp_final_mp4} after rendering.")
+
+
+if args.animate:
+    animate(x, y, soni)
