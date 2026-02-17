@@ -1,6 +1,5 @@
 [build-system]
 requires = [
-    "ffmpeg-python",
     "matplotlib",
     "numpy",
     "pandas",
