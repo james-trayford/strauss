@@ -63,7 +63,7 @@ class Score:
         """
         # check types to handle score length correctly
         if isinstance(length, str):
-            regex = "([0-9]*)m\s*([0-9]*.[0-9]*)s"
+            regex = r"([0-9]*)m\s*([0-9]*.[0-9]*)s"
             reobj = re.match(regex, length, re.M | re.I)
             self.length = float(reobj.group(1))*60. + float(reobj.group(2))            
         else:

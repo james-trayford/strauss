@@ -43,7 +43,7 @@ from pathlib import Path
 import os
 
 # ignore wavfile read warning that complains due to WAV file metadata
-warnings.filterwarnings("ignore", message="Chunk \(non-data\) not understood, skipping it\.")
+warnings.filterwarnings("ignore", message=r"Chunk \(non-data\) not understood, skipping it\.")
 
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object
