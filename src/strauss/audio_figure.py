@@ -4,6 +4,7 @@ from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
+from scipy.io import wavfile
 import IPython.display as ipd
 try:
     if is_notebook:
@@ -43,8 +44,11 @@ class AudioFigure:
         self.styles = {}
         
         # The final mixed audio array
-        self.master_audio = None         
+        self.master_audio = None
 
+        # has this figure been rendered?
+        self.is_rendered = False
+        
     def list_sonifications(self):
         for i, k in enumerate(self.sonifications.keys()):
             print(f"\t{i+1}.\t {k}")
@@ -70,14 +74,36 @@ class AudioFigure:
         soni.system = self.system
         # (Assuming the length is set on the generator, score, or sonification itself in your architecture)
         # soni.generator.length = self.length 
-        
+
+        if self.sonifications:
+            # preliminary check if sonification is consistent with existing timebase
+            # TODO: build this out to a better overall system
+            pre_soni = list(self.sonifications.values())[0]
+            mssg = ''
+            if pre_soni.channels.setup != soni.channels.setup:
+                mssg += (f"Clashing sonification channel setup: added setup '{soni.channels.setup}' does not "
+                         f"match existing '{pre_soni.channels.setup}.'")
+
+            new_length = np.round(soni.score.length, decimals=1)
+            old_length = np.round(pre_soni.score.length, decimals=1)
+            if old_length != new_length:
+                mssg += (f"Clashing sonification length: added duration {new_length} s does not "
+                         f"match existing '{old_length} s.'")
+            if mssg:
+                raise ValueError(mssg)
+
+            
         # Determine key name
         if name is None:
             name = f"sonification_{len(self.sonifications) + 1}"
             
+        # will need to re-render now there's a new sonification
+        self.is_rendered = False
+            
         self.sonifications[name] = soni
         self.levels[name] = level
         self.styles[name] = style
+        
         return name
         
     def remove(self, name):
@@ -87,6 +113,9 @@ class AudioFigure:
         if name in self.levels:
             del self.levels[name]
 
+        # change in state, need to re-render
+        self.is_rendered = False
+            
     def set_level(self, name, level):
         """
         Update the mixing level for a specific sonification.
@@ -97,6 +126,10 @@ class AudioFigure:
         """
         if name in self.sonifications:
             self.levels[name] = level
+            
+            # change in state, need to re-render
+            self.is_rendered = False
+
         else:
             raise KeyError(f"Sonification '{name}' not found in AudioFigure.")
 
@@ -177,8 +210,12 @@ class AudioFigure:
         vmax = abs(self.master_audio).max()
         self.master_audio *= (pow(2, 31)-1)/vmax
         self.master_audio = self.master_audio.astype('int32')
-
+        self.is_rendered = True
+        
     def notebook_display(self, show_waveform=True):
+        if not self.is_rendered:
+            self.render()
+
         has_ticks = hasattr(self, 'tick_channels')
         if len(self.channels.labels) == 1:             
             outfmt = np.column_stack([self.master_audio]*2)
@@ -192,8 +229,11 @@ class AudioFigure:
                 outfmt[c] += self.tick_channels['0'].values*self.tick_vol / vmax
         display(ipd.Audio(outfmt.T,rate=self.samprate, autoplay=False))
 
-    def save():
+    def save(self, fname):
         # combine and write out file. first check extension
+        if not self.is_rendered:
+            self.render()
+
         fsplit = str(fname).split('.')
         if len(fsplit) < 2:
             warnings.warn('No file extension in provided fname. Assuming WAV...')
@@ -211,7 +251,7 @@ class AudioFigure:
                 """)
             with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
                 # now first write the wav to a temporary file
-                wavfile.write(tmp.name, self.samprate, chans)
+                wavfile.write(tmp.name, self.samprate, self.master_audio)
                 try:
                     # try (naive) convert with ffmpeg
                     sp.run(['ffmpeg', '-i', f'{tmp.name}', f'{fname}'],
@@ -223,7 +263,7 @@ class AudioFigure:
                     {str(e)}
                     {e.stderr}""")
         else:
-            wavfile.write(fname, self.samprate, chans)
+            wavfile.write(fname, self.samprate, self.master_audio)
         
         print(f"Saved {fname}")
 
@@ -237,6 +277,7 @@ class AudioFigure:
         if audio.shape[0] != expected_channels:
             # If mono source in stereo system, duplication might be needed, 
             # but strictly raising error for now as per original code.
+            self.remove()
             raise ValueError(f"Channel mismatch: Source has {audio.shape[0]}, Master has {expected_channels}")
             
         current_samples = audio.shape[1]

@@ -103,13 +103,13 @@ def sonify(*args, **kwargs):
         name = _figure_hashes[current_hash]
         mssg = 'Matching sonification exists, '
         actions = []
-        if ('name' in sonpars) and sonpars['name'] != name:
+        if ('name' in sonpars) and sonpars['name'] and sonpars['name'] != name:
             actions.append('renaming')
             _current_figure.rename(old=name, new=sonpars['name'])
             name = sonpars['name']
-        if ('level' in sonpars['name']):
+        if (sonpars['level'] != _current_figure.levels[name]):
             actions.append(f"re-setting level to {sonpars['level']}")
-            current_figure.set_level(sonpars['level'])
+            _current_figure.set_level(name, sonpars['level'])
         if not actions:
             actions.append('skipping')
         print(mssg + ' and '.join(actions) + '...')
