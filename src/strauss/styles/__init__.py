@@ -82,18 +82,18 @@ class Mapping(BaseModel):
         examples=['log(x)', ['-x', 'log(x)']]
     )
 
-    fixed: bool = Field(
-        default=False,
-        title='Fixed Flag',
+    fixed: Union[int, float, None] = Field(
+        default=None,
+        title='Fixed Value',
         description=(
-            'Whether or not this mapping should be fixed or evolve over time.'
-            'Some parameters are "evolvable" but we might want to fix them at the data points inputted. '
-            'For example, we might want to hard pan two sources left and right for the duration of the sonification. '
-            'Because pan is an evolvable parameter, STRAUSS would shift the pan from left to right by default. '
-            'We can therefore prevent this behaviour by specifying "fixed: True". '
-            'This is a non-strict boolean, meaning it accepts any of True/False, on/off, yes/no, 0/1 etc.'
+            'The value to hold this parameter at for the duration of the sonification.'
+            'Some parameters are "evolvable" but we might want to fix them at certain values. '
+            'For example, we might want to hard pan a source to the left for the duration of the sonification. '
+            'We can achieve this by specifying "output": "pan" and "fixed": 0. '
+            'If using a fixed value, any input specified will be ignored, as the fixed value takes precedence.'
+            'The fixed value specified needs to be within the limits of the output parameter specified.'
         ),
-        examples=[True, 'true', 0, 'yes', 'off']
+        examples=[0, 1, 0.5, 0.3, 0.9]
     )
 
     @field_validator('input')
@@ -186,6 +186,19 @@ class Mapping(BaseModel):
                     continue
                 raise ValueError(f'Parameter limits for "{self.output}" must be between those in param_lim_dict.')
             
+        return self
+    
+    @model_validator(mode='after')
+    def validate_fixed(self):
+        
+        if self.fixed is None:
+            return self
+        
+        valid_min, valid_max = valid_params[self.output]
+        
+        if not valid_min <= self.fixed <= valid_max:
+            raise ValueError('Fixed value must be between the limits of the output parameter.')
+        
         return self
     
 
@@ -367,6 +380,15 @@ class Style(BaseModel):
         description='Whether to use Objects or Events type (case insensitive).',
         examples=['Objects', 'events']
     )
+    
+    max_notes_per_sec: Optional[int] = Field(
+        default=None,
+        title='Maximum Notes per Second',
+        description='This optional field defines the maximum number of notes played per second '
+                    'when sonifying Events. This prevents high-frequency artefacts appearing '
+                    'in the audio by downsampling the input data. If using, must be between 1 and 20.',
+        examples=[15, 10, 7]
+        )
 
     # The map is the list of Mapping objects which set up the sonification parameters and limits.
     map: List[Mapping] = Field(
@@ -466,6 +488,17 @@ class Style(BaseModel):
     def lowercase_type(cls, value: str):
         # Convert string to lowercase so that 'Objects', 'objects', and 'OBJECTS' are all valid.
         return value.lower()
+    
+    
+    @field_validator('max_notes_per_sec')
+    @classmethod
+    def validate_max_notes_per_sec(cls, value: int):
+        
+        if not 0 < value <= 20:
+            raise ValueError("max_notes_per_sec must be between 1 and 20")
+        
+        return value
+        
     
     @field_validator('notes')
     @classmethod
