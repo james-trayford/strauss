@@ -193,6 +193,9 @@ def display():
 def list_sonifications():
     _current_figure.list_sonifications()
 
+def set_level(name, level):
+    _current_figure.set_level(name, level)
+    
 def fill_from_kwargs(input_kwargs):
     """ function to store provided keyword arguments against defaults
     """
@@ -206,15 +209,28 @@ def fill_from_kwargs(input_kwargs):
             is_default[k] = False
     return sonpars, is_default
 
-def load_style(name="default"):
-    if Path(name).name == Path(name):
+def _get_style_path(name="default"):
+    path = Path(name)
+    if (len(path.parts) > 1) or (path.suffix != ''):
         # if open user directly
-        filename = Path(name)
+        return Path(name)
     else:
         # else load built-in preset of that name
-        filename = Path(f"{thisdir}", "styles", f"{name}.yml")
+        return Path(f"{thisdir}", "styles", f"{name}.yml")
+
+def load_style(name="default"):
+    filename = _get_style_path(name)
     return read_yaml(filename)
 
+def get_style(name, print_style=False):
+    filename = _get_style_path(name)
+    with filename.open(mode='r') as fdata:
+        # strip unnecessary whitespace
+        yaml_string = fdata.read().rstrip().lstrip()
+    if print_style:
+        print(yaml_string)
+    return yaml_string
+        
 def read_yaml(filename):
     with filename.open(mode='r') as fdata:
         try:
@@ -222,3 +238,6 @@ def read_yaml(filename):
         except yaml.YAMLError as err:
             print(err)
     return yamldict
+
+def save(fname):
+    _current_figure.save(fname)

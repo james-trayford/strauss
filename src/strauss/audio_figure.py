@@ -6,6 +6,8 @@ from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, resc
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 from scipy.io import wavfile
 import IPython.display as ipd
+import subprocess as sp
+import tempfile
 try:
     if is_notebook:
         from tqdm.notebook import tqdm
@@ -54,7 +56,7 @@ class AudioFigure:
             print(f"\t{i+1}.\t {k}")
 
     def rename(self, old, new):
-        dicts = [self.sonifications, self.levels, self.styles]
+        dicts = [self.sonifications, self.levels, self.styles, self.style_hashes]
         for d in dicts:
             d[new] = d[old]
             del d[old]
@@ -99,7 +101,10 @@ class AudioFigure:
             
         # will need to re-render now there's a new sonification
         self.is_rendered = False
-            
+
+        # reset flag for reprocessing in style
+        # style.reset_processing_flag()
+        
         self.sonifications[name] = soni
         self.levels[name] = level
         self.styles[name] = style
@@ -201,7 +206,6 @@ class AudioFigure:
                 self.master_audio += track_audio
             else:
                 # Basic safety add if dimensions differ slightly (e.g. 1 sample off)
-                # This uses the helper you had commented out or a similar logic
                 aligned_audio = self._align_audio(track_audio, self.channels.Nmics, n_samples)
                 self.master_audio += aligned_audio
 

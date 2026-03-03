@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, Field, field_validator, model_validator
 from typing import Optional, Literal, Dict, List, Union, Tuple
 from ..sources import param_lim_dict as valid_params
 from pathlib import Path
@@ -23,7 +23,24 @@ def get_presets(generator_type):
     return preset_names
 
 
-class Mapping(BaseModel):
+class MonitoredBaseModel(BaseModel):
+    
+    # Private attributes are excluded from .model_dump() and schema generation
+    _is_touched: bool = PrivateAttr(default=True)
+    
+    def __setattr___(self, name, value):
+        self._is_touched = True
+        super().__setattr__(name, value)
+
+    @property
+    def needs_reprocessing(self) -> bool:
+        return self._is_touched
+        
+    def reset_processing_flag(self):
+        self._is_touched = False
+    
+
+class Mapping(MonitoredBaseModel):
     # Input can be a string (column header), an int (column index) or None (to auto-map to available columns in dataset)
     input: Union[str, int, None] = Field(
         default=None,
@@ -189,7 +206,7 @@ class Mapping(BaseModel):
         return self
     
 
-class GeneratorStyle(BaseModel):
+class GeneratorStyle(MonitoredBaseModel):
 
     # Generator type - defaults to Synthesizer 
     type: Literal['sampler', 'synthesizer', 'spectralizer'] = Field(
@@ -297,7 +314,7 @@ class GeneratorStyle(BaseModel):
         return self
     
     
-class Style(BaseModel):
+class Style(MonitoredBaseModel):
 
     # Style name is required (no default)
     name: str = Field(
