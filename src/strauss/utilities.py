@@ -12,6 +12,7 @@ from contextlib import contextmanager,redirect_stderr,redirect_stdout
 from os import devnull
 from io import StringIO 
 import sys
+from scipy.stats import binned_statistic as bs1d
 from pathlib import Path
 
 # Some utility classes (these may graduate to somewhere else eventually)
@@ -290,6 +291,15 @@ def get_supported_coqui_voices():
 
     return voices
 
+def merge_events(duration, max_rate, time, arglist):
+    nevents = len(time)
+    nbin = int(duration*max_rate)+1
+    bins = np.linspace(0,1, nbin)
+    newargs = []
+    for i in range(len(arglist)):
+        mean, _, _ = bs1d(time, arg, statistic='mean', bins=bins)
+        newargs.append(mean[~np.isnan(mean)])
+    return newargs
 
 def apply_fades(samples, srate, fdur=0.03):
     """ Apply de-click fades to a sample array

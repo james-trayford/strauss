@@ -32,7 +32,7 @@ from .score import Score
 from .sources import Events, Objects
 from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
-from .utilities import nested_dict_reassign # For merging styles
+from .utilities import nested_dict_reassign, merge_events  # For merging styles
 
 import yaml
 import numpy as np
@@ -125,8 +125,18 @@ def sonify(*args, **kwargs):
     if len(args) == 0:
         raise Exception("No data to sonify!")
     elif len(args) == 1:
-        args = [np.arange(len(args[0])), args[0]]        
-    
+        args = [np.arange(len(args[0])), args[0]]
+        tlims = (0,args[0][-1])
+
+    if (style.sources.lower == 'events') and style.max_notes_per_sec:
+        if style.map[0].output == 'time':
+            tlims = style.map[0].input_range
+        tlims = set_limits(tlims, args[0], warn=False)
+        time = rescale_values(args[0], tlims, (0,1))
+        
+        # lets now thin the data according to max events per second if using events
+        args = merge_events(duration, style.max_notes_per_sec, time, args)
+            
     nmap = min(len(args), len(style.map))
     
     to_map = []
@@ -147,6 +157,7 @@ def sonify(*args, **kwargs):
             map_data[k] = [map_data[k]]*nnote
         map_data['pitch'] = list(range(nnote))
 
+        
     snotes = style.notes
     if not isinstance(style.notes, str):
         snotes = [snotes]
