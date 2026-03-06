@@ -8,12 +8,18 @@ generator:
 
 sources: 'events'
 
+max_notes_per_sec: 15
+
 map:
 
   - input_range: ['0%', '110%']
     output: 'time'
 
   - output: 'pitch'
+
+  - output: 'pan'
+    fixed: true
+    input_range: [0, 1]
 
 notes: 'C11'
   

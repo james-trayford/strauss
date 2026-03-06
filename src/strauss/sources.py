@@ -294,7 +294,7 @@ class Source:
                 plims = param_lim_dict[key]
 
             # set the limits in input units
-            lims = set_limits(vallims, warn=True)
+            lims = set_limits(vallims, mapvals, warn=True)
 
             # lets store the limits from input for later conversion
             self.lims[key] = lims
@@ -408,7 +408,7 @@ class Objects(Source):
                 Exception(f"Mapped property {key} not in datadict.")
         self.n_sources = np.array(self.raw_mapping[key]).shape[0]
 
-def set_limits(vallims, warn=True):
+def set_limits(vallims, mapvals, warn=True):
     lims = []
     for l in vallims:
         if isinstance(l, str):

@@ -29,10 +29,10 @@ from . import presets
 
 # Import core classes for direct use in the sonify function
 from .score import Score
-from .sources import Events, Objects
+from .sources import Events, Objects, set_limits
 from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
-from .utilities import nested_dict_reassign, merge_events  # For merging styles
+from .utilities import nested_dict_reassign, merge_events, rescale_values
 
 import yaml
 import numpy as np
@@ -128,14 +128,14 @@ def sonify(*args, **kwargs):
         args = [np.arange(len(args[0])), args[0]]
         tlims = (0,args[0][-1])
 
-    if (style.sources.lower == 'events') and style.max_notes_per_sec:
+    if (style.sources.lower() == 'events') and style.max_notes_per_sec:
         if style.map[0].output == 'time':
             tlims = style.map[0].input_range
         tlims = set_limits(tlims, args[0], warn=False)
         time = rescale_values(args[0], tlims, (0,1))
         
         # lets now thin the data according to max events per second if using events
-        args = merge_events(duration, style.max_notes_per_sec, time, args)
+        args = merge_events(sonpars['duration'], style.max_notes_per_sec, time, args)
             
     nmap = min(len(args), len(style.map))
     
@@ -149,15 +149,39 @@ def sonify(*args, **kwargs):
         if style.map[i].output_range:
             out_lims[to_map[-1]] = style.map[i].output_range
     map_data = dict(zip(to_map, args[:nmap]))
-
+    
     if 'pitch' not in to_map:
         to_map.append('pitch')
         nnote = len(style.notes)
         for k in map_data.keys():
             map_data[k] = [map_data[k]]*nnote
         map_data['pitch'] = list(range(nnote))
+        to_map.append('pitch')
+    
+    # we now iterate through style fixed values
+    if len(args) > nmap: 
+        for i in range(nmap, len(args)):
+            if style.map[i].fixed:
+                if style.map[i].input_range:
+                    in_lims[to_map[-1]] = style.map[i].input_range
+                if style.map[i].output_range:
+                    out_lims[to_map[-1]] = style.map[i].output_range
+                fix_array = np.array(args[1])*0 + style.map[i].fixed
+                to_map.append(style.map[i].output)
+                map_data[style.map[i].output] = fix_array
 
-        
+    # and finally overwrite with any kwarg fixed values:
+    for k in sonpars.keys():
+        ksplit = k.split('fix_')
+        if len(ksplit) > 1:
+            prop = ksplit[1]
+            if prop in to_map:
+                print(f'Overwriting {prop} with fixed value...')
+            fix_array = np.array(args[1])*0 + sonpars[k]
+            map_data[prop] = fix_array
+            in_lims[prop] = (0,1)
+            to_map.append(prop)
+                
     snotes = style.notes
     if not isinstance(style.notes, str):
         snotes = [snotes]
@@ -199,7 +223,7 @@ def close():
     
 def display():
     _current_figure.render()
-    return _current_figure.notebook_display(False)
+    return _current_figure.notebook_display(True)
     
 def list_sonifications():
     _current_figure.list_sonifications()
