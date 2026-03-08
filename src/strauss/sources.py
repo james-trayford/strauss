@@ -59,11 +59,12 @@ evolvable = ['polar',
              'cutoff',
              'time_evo',
              'pitch_shift',
-             'pan'
+             'pan',
              'volume_lfo/freq_shift',
              'volume_lfo/amount',
              'pitch_lfo/freq_shift',
              'pitch_lfo/amount']
+
 param_limits = [(0,1),#np.pi),
                 (0,1),#2*np.pi),
                 (0,1),#np.pi),

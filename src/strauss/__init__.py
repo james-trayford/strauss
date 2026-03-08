@@ -166,10 +166,11 @@ def sonify(*args, **kwargs):
                     in_lims[to_map[-1]] = style.map[i].input_range
                 if style.map[i].output_range:
                     out_lims[to_map[-1]] = style.map[i].output_range
-                fix_array = np.array(args[1])*0 + style.map[i].fixed
+
+                fix_array =  len(map_data[to_map[0]])*[style.map[i].fixed]
                 to_map.append(style.map[i].output)
                 map_data[style.map[i].output] = fix_array
-
+                
     # and finally overwrite with any kwarg fixed values:
     for k in sonpars.keys():
         ksplit = k.split('fix_')
@@ -177,14 +178,19 @@ def sonify(*args, **kwargs):
             prop = ksplit[1]
             if prop in to_map:
                 print(f'Overwriting {prop} with fixed value...')
-            fix_array = np.array(args[1])*0 + sonpars[k]
-            map_data[prop] = fix_array
-            in_lims[prop] = (0,1)
+            map_data[prop] = [sonpars[k]]*len(map_data[to_map[0]])
+            if prop in ['azimuth', 'polar']:
+                if prop == 'polar':
+                    in_lims[prop] = (0,180)
+                if prop == 'azimuth':
+                    in_lims[prop] = (0,360)
+            else:
+                in_lims[prop] = (0,1)
             to_map.append(prop)
-                
+
     snotes = style.notes
     if not isinstance(style.notes, str):
-        snotes = [snotes]
+         snotes = [snotes]
     _score = Score(snotes, length=sonpars['duration'])
     _sources = getattr(sources, style.sources.capitalize())(to_map)
     _sources.fromdict(map_data)
@@ -193,8 +199,14 @@ def sonify(*args, **kwargs):
     gentype = style.generator.type
     
     if gentype == 'sampler':
-         asset = assets.get_asset_path(style.generator.sample.lower())
-         _generator = getattr(generator, "Sampler")(asset)
+        s = style.generator.sample
+        if '/' in s or '\\' in s or '.' in s:
+            # this is probably intended to be a file path
+            asset = s
+        else:
+            # if not, assume intention is in-built name
+            asset = assets.get_asset_path(s.lower())
+        _generator = getattr(generator, "Sampler")(asset)
     else:
         _generator = getattr(generator, style.generator.type.capitalize())()
     _generator.load_preset(style.generator.preset)
