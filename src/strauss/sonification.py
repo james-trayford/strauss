@@ -337,11 +337,11 @@ class Sonification:
                       self.samprate, 
                       scale = (-vmax,vmax),
                       sampwidth=3)
-            inputs[self.channels.forder[c]] = ff.input(tempfname)
+            inputs[self.channels.forder[c]] = ffmpeg.input(tempfname)
             
         print("Joining temporary .wav files...")
         (
-            ff.filter(inputs, 'join', inputs=len(inputs), channel_layout=self.channels.setup)
+            ffmpeg.filter(inputs, 'join', inputs=len(inputs), channel_layout=self.channels.setup)
             .output(fname)
             .overwrite_output()
             .run(quiet=~ffmpeg_output)

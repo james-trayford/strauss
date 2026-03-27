@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import os
 from pathlib import Path
 import strauss
+import pyttsx3
 import argparse
 
 parser = argparse.ArgumentParser()
