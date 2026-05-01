@@ -280,10 +280,10 @@ class Source:
                 # for angles make sure conforms to units
                 if key in z_angles:
                     # triangle wave behaviour to map polar angle domain
-                    mapvals = (sig.sawtooth(2*np.pi*(mapvals/amax),0.5) + 1)/2
+                    mapvals = (sig.sawtooth(2*np.pi*(np.array(mapvals)/amax),0.5) + 1)/2
                 else:
                     # sawtooth wave behaviour to map azimuthal angle domain
-                    mapvals = (mapvals%amax)/amax
+                    mapvals = (np.array(mapvals)%amax)/amax
                 vallims = (0, 1)
             else:
                 vallims = ('0%','100%')

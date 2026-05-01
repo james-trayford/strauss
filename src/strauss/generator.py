@@ -1255,6 +1255,7 @@ class Spectralizer(Generator):
         if np.array(spectrum).ndim == 1:
             # number of discrete frequencies available in ifft between freq. limits 
             discrete_freqs = duration*(params['max_freq']-params['min_freq'])
+
             
             # how many spectra points fit into the available intermediate frequencies
             spectra_multiples = (discrete_freqs - 1)/(spectrum.size - 1)
@@ -1271,7 +1272,7 @@ class Spectralizer(Generator):
             # the frequency bound indices which the spectrum will be mapped into
             mindx = int(params['min_freq'] * duration * buffer_factor)
             maxdx = int(params['max_freq'] * duration * buffer_factor)
-
+            
             if params['equal_loudness_normalisation']:
                 freqs =  np.linspace(params['min_freq'], params['max_freq'], len(spectrum))
                 norm = self.eq.get_relative_loudness_norm(freqs)
@@ -1283,7 +1284,7 @@ class Spectralizer(Generator):
                 
             # hardcode phase randomisation for now
             phases = 2*np.pi*np.random.random(new_nlen)
-            
+
             # generate stream values
             sstream.values = self.spectrum_to_signal(spectrum, phases, new_nlen, mindx, maxdx, interp_type)[:nlength]
         else:
@@ -1379,7 +1380,7 @@ class Spectralizer(Generator):
 
         # apply volume normalisation or modulation (TO DO: envelope, pre or post filter?)
         sstream.values *= utils.const_or_evo(params['volume'], sstream.sampfracs) * env
-
+        
         # filter stream
         if params['filter'] == "on":
             if hasattr(params['cutoff'], "__iter__"):
