@@ -25,7 +25,7 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy import signal as sig
-from utilities import rescale_values 
+from .utilities import rescale_values 
 import warnings
 
 mappable = ['polar',
@@ -59,11 +59,12 @@ evolvable = ['polar',
              'cutoff',
              'time_evo',
              'pitch_shift',
-             'pan'
+             'pan',
              'volume_lfo/freq_shift',
              'volume_lfo/amount',
              'pitch_lfo/freq_shift',
              'pitch_lfo/amount']
+
 param_limits = [(0,1),#np.pi),
                 (0,1),#2*np.pi),
                 (0,1),#np.pi),
@@ -292,32 +293,9 @@ class Source:
                 plims = param_lims[key]
             else:
                 plims = param_lim_dict[key]
-                
-            lims = []
-            # scale mapped values within limits if specified
-            for l in vallims:
-                if isinstance(l, str):
-                    if '%' not in l:
-                        warnings.warn("Specifying percentiles without appending a '%' character "
-                                      "(e.g. XX%) currently works but is deprecated for more "
-                                      "explicit syntax.", stacklevel=2)
-                    else:
-                        l = l.strip('%')
-                    # string values notate percentile limits
-                    pc = float(l)
-                    buff = 1
-                    sub = 0
-                    if pc > 100:
-                        # if percentile over 100 we add 
-                        buff = pc/100.
-                        pc = 100
-                        sub = lims[0]
-                    lim = sub + (np.percentile(np.hstack([mapvals]), pc) - sub)*buff
-                    lims.append(lim)
-                else:
-                    # numerical values notate absolute limits
-                    lims.append(l)
-    
+
+            # set the limits in input units
+            lims = set_limits(vallims, mapvals, warn=True)
 
             # lets store the limits from input for later conversion
             self.lims[key] = lims
@@ -431,6 +409,32 @@ class Objects(Source):
                 Exception(f"Mapped property {key} not in datadict.")
         self.n_sources = np.array(self.raw_mapping[key]).shape[0]
 
+def set_limits(vallims, mapvals, warn=True):
+    lims = []
+    for l in vallims:
+        if isinstance(l, str):
+            if ('%' not in l) and warn:
+                warnings.warn("Specifying percentiles without appending a '%' character "
+                              "(e.g. XX%) currently works but is deprecated for more "
+                              "explicit syntax.", stacklevel=2)
+            else:
+                # string values notate percentile limits
+                l = l.strip('%')
+            pc = float(l)
+            buff = 1
+            sub = 0
+            if pc > 100:
+                # if percentile over 100 we add 
+                buff = pc/100.
+                pc = 100
+                sub = lims[0]
+            lim = sub + (np.percentile(np.hstack([mapvals]), pc) - sub)*buff
+            lims.append(lim)
+        else:
+            # numerical values notate absolute limits
+            lims.append(l)
+    return lims
+        
 class UnrecognisedProperty(Exception):
     "Error raised when trying to map unrecognised parameters"
     pass

@@ -1,0 +1,308 @@
+import numpy as np
+from . import channels
+from .stream import Stream
+from .channels import audio_channels
+from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
+from .tts_caption import render_caption, get_ttsMode, default_tts_voice
+from scipy.io import wavfile
+import IPython.display as ipd
+import subprocess as sp
+import tempfile
+try:
+    if is_notebook:
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
+except ModuleNotFoundError:
+    tqdm = list
+
+
+INTMAX32 = (pow(2, 31)-1)
+
+class AudioFigure:
+    """
+    A figure-like wrapper to manage, mix, and render multiple STRAUSS sonifications.
+    """
+    def __init__(self, length, samprate=48000, system="stereo"):
+        self.length = length             # Master duration in seconds
+        self.samprate = samprate         # Master sampling rate
+        self.system = system             # Master channel format (mono/stereo/etc.)
+
+        # We set up the master channels for the audio figure
+        self.channels = channels.audio_channels(setup=system)
+
+        # with the individual channel arrays
+        self.channel_arrays = {}
+        for c in range(self.channels.Nmics):
+            self.channel_arrays[str(c)] = Stream(self.length, self.samprate)
+
+        # Store sonifications in a dict for easy access and modification
+        self.sonifications = {}
+        
+        # Store mixing levels
+        self.levels = {}
+
+        # Store any prescribed styles
+        self.styles = {}
+        
+        # The final mixed audio array
+        self.master_audio = None
+
+        # has this figure been rendered?
+        self.is_rendered = False
+        
+    def list_sonifications(self):
+        for i, k in enumerate(self.sonifications.keys()):
+            print(f"\t{i+1}.\t {k}")
+
+    def rename(self, old, new):
+        dicts = [self.sonifications, self.levels, self.styles, self.style_hashes]
+        for d in dicts:
+            d[new] = d[old]
+            del d[old]
+            
+    def add(self, soni, name=None, level='0dB', style=None):
+        """
+        Add a sonification to the figure.
+        Enforces the common timebase so it can be mixed seamlessly.
+        
+        Parameters:
+            soni: The sonification object.
+            name (str): Optional name for the track.
+            level (str or float): Mixing level (e.g., '0dB', '-6dB', 0.5).
+        """
+        # Enforce global timebase on the child
+        soni.samprate = self.samprate
+        soni.system = self.system
+        # (Assuming the length is set on the generator, score, or sonification itself in your architecture)
+        # soni.generator.length = self.length 
+
+        if self.sonifications:
+            # preliminary check if sonification is consistent with existing timebase
+            # TODO: build this out to a better overall system
+            pre_soni = list(self.sonifications.values())[0]
+            mssg = ''
+            if pre_soni.channels.setup != soni.channels.setup:
+                mssg += (f"Clashing sonification channel setup: added setup '{soni.channels.setup}' does not "
+                         f"match existing '{pre_soni.channels.setup}.'")
+
+            new_length = np.round(soni.score.length, decimals=1)
+            old_length = np.round(pre_soni.score.length, decimals=1)
+            if old_length != new_length:
+                mssg += (f"Clashing sonification length: added duration {new_length} s does not "
+                         f"match existing '{old_length} s.'")
+            if mssg:
+                raise ValueError(mssg)
+
+            
+        # Determine key name
+        if name is None:
+            name = f"sonification_{len(self.sonifications) + 1}"
+            
+        # will need to re-render now there's a new sonification
+        self.is_rendered = False
+
+        # reset flag for reprocessing in style
+        # style.reset_processing_flag()
+        
+        self.sonifications[name] = soni
+        self.levels[name] = level
+        self.styles[name] = style
+        
+        return name
+        
+    def remove(self, name):
+        """Remove a sonification from the figure."""
+        if name in self.sonifications:
+            del self.sonifications[name]
+        if name in self.levels:
+            del self.levels[name]
+
+        # change in state, need to re-render
+        self.is_rendered = False
+            
+    def set_level(self, name, level):
+        """
+        Update the mixing level for a specific sonification.
+        
+        Parameters:
+            name (str): The name of the sonification.
+            level (str or float): The new level (e.g., '-3dB', 0.8).
+        """
+        if name in self.sonifications:
+            self.levels[name] = level
+            
+            # change in state, need to re-render
+            self.is_rendered = False
+
+        else:
+            raise KeyError(f"Sonification '{name}' not found in AudioFigure.")
+
+    def _parse_level(self, level):
+        """
+        Parses a mixing level to a linear amplitude fraction.
+        
+        Supports:
+        - Strings ending in 'dB' (e.g., '-6 dB', '-inf dB')
+        - Floats/linear fractions (0.0 to 1.0)
+        """
+        if isinstance(level, str):
+            level_clean = level.strip().lower()
+            if level_clean == '-inf db':
+                return 0.0
+            elif level_clean.endswith('db'):
+                try:
+                    db_val = float(level_clean.replace('db', '').strip())
+                    # Convert dB to amplitude: 10^(dB/20)
+                    return 10 ** (db_val / 20.0)
+                except ValueError:
+                    raise ValueError(f"Invalid dB format: {level}")
+            else:
+                # specific case for just a number in string format
+                try:
+                    return float(level)
+                except ValueError:
+                    raise ValueError(f"Unknown level format: {level}")
+        elif isinstance(level, (int, float)):
+            return float(level)
+        else:
+            raise TypeError(f"Level must be str or float, got {type(level)}")
+
+    def render(self, progress=True, normalize='peak'):
+        """
+        Regenerate all attached sonifications and mix them additively.
+        
+        Parameters:
+        normalize (str): 'peak', 'soft', or None to handle clipping.
+        """
+        
+        # Initialize master audio buffer
+        # Shape: (N_channels, N_samples) or (N_samples, N_channels) depending on STRAUSS convention.
+        # Assuming (N_channels, N_samples) based on _align_audio and standard audio libs
+        n_samples = int(self.length * self.samprate)
+        self.master_audio = np.zeros((self.channel_arrays['0'].values.size, len(self.channel_arrays)))
+
+        if progress:
+            print('Processing audio figure...')
+        self.list_sonifications()
+        for name, soni in tqdm(self.sonifications.items()) if progress else self.sonifications.items():
+            # 1. Generate the individual track
+            soni.render(progress=False)
+            
+            # 2. Extract the rendered numpy array 
+            track_audio = soni._make_out_array(embed_caption=False)
+
+            # 3. Apply Mixing Level
+            if name in self.levels:
+                amp = self._parse_level(self.levels[name])
+                track_audio = track_audio * amp
+            # 4. Align timebases (safety catch in case of rounding errors in generation)
+            # track_audio = self._align_audio(track_audio, self.channels.Nmics, n_samples)
+            
+            # 5. Additive mixing
+            # Ensure shapes match before adding; if strict alignment isn't enabled, 
+            # we assume strauss generation is accurate to the sample.
+            if track_audio.shape == self.master_audio.shape:
+                self.master_audio += track_audio
+            else:
+                # Basic safety add if dimensions differ slightly (e.g. 1 sample off)
+                aligned_audio = self._align_audio(track_audio, self.channels.Nmics, n_samples)
+                self.master_audio += aligned_audio
+
+        # 6. Apply clipping protection
+        # self._apply_normalization(normalize)
+        vmax = abs(self.master_audio).max()
+        self.master_audio *= (pow(2, 31)-1)/vmax
+        self.master_audio = self.master_audio.astype('int32')
+        self.is_rendered = True
+        
+    def notebook_display(self, show_waveform=True):
+        if not self.is_rendered:
+            self.render()
+
+        has_ticks = hasattr(self, 'tick_channels')
+        if len(self.channels.labels) == 1:             
+            outfmt = np.column_stack([self.master_audio]*2)
+        else:
+            outfmt = self.master_audio[:,:2]
+        if len(self.channels.labels) > 2:
+            print("Warning: for more than two channels, only first two channels are mapped to L and R, respectively.")
+        if has_ticks:
+            # add the ticks
+            for c in range(outfmt.shape[0]):
+                outfmt[c] += self.tick_channels['0'].values*self.tick_vol / vmax
+        display(ipd.Audio(outfmt.T,rate=self.samprate, autoplay=False))
+
+    def save(self, fname):
+        # combine and write out file. first check extension
+        if not self.is_rendered:
+            self.render()
+
+        fsplit = str(fname).split('.')
+        if len(fsplit) < 2:
+            warnings.warn('No file extension in provided fname. Assuming WAV...')
+        ext = fsplit[-1].lower()
+        if ext != 'wav':
+            # check we can use ffmpeg binary 
+            try:
+                sp.run(['ffmpeg','-h'],capture_output=1, check=1)
+            except FileNotFoundError as e: 
+                raise FileNotFoundError(f"""
+                'ffmpeg' doesn't appear to be available in the local environment.
+                This may need to be installed manually. To install ffmpeg visit
+                https://www.ffmpeg.org/download.html.
+                {str(e)}
+                """)
+            with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
+                # now first write the wav to a temporary file
+                wavfile.write(tmp.name, self.samprate, self.master_audio)
+                try:
+                    # try (naive) convert with ffmpeg
+                    sp.run(['ffmpeg', '-i', f'{tmp.name}', f'{fname}'],
+                           capture_output=1, check=1)
+                except sp.CalledProcessError as e:
+                    # if ffmpeg can't do it for whatever reason, raise
+                    raise Exception(f"""
+                    'ffmpeg' failed to convert '.wav' to '.{ext}' succesfully:
+                    {str(e)}
+                    {e.stderr}""")
+        else:
+            wavfile.write(fname, self.samprate, self.master_audio)
+        
+        print(f"Saved {fname}")
+
+        
+    def _align_audio(self, audio, expected_channels, expected_samples):
+        """
+        Helper method to guarantee the audio array perfectly matches the master track shape.
+        Pads with zeros or truncates the end if there is a mismatch.
+        """
+        # Check channel shape
+        if audio.shape[0] != expected_channels:
+            # If mono source in stereo system, duplication might be needed, 
+            # but strictly raising error for now as per original code.
+            self.remove()
+            raise ValueError(f"Channel mismatch: Source has {audio.shape[0]}, Master has {expected_channels}")
+            
+        current_samples = audio.shape[1]
+        
+        if current_samples < expected_samples:
+            # Pad with silence at the end
+            padding = np.zeros((expected_channels, expected_samples - current_samples))
+            return np.concatenate((audio, padding), axis=1)
+        elif current_samples > expected_samples:
+            # Truncate
+            return audio[:, :expected_samples]
+        
+        return audio
+
+    def _apply_normalization(self, method):
+        """Prevents the additive mix from causing digital clipping (>1.0 or <-1.0)."""
+        if method == 'peak':
+            # Scales everything down proportionally if it breaches 1.0
+            peak = np.max(np.abs(self.master_audio))
+            if peak > 1.0:
+                self.master_audio /= peak
+        elif method == 'soft':
+            # Applies a soft-clipping limiter (tanh) for a warmer, compressed mix
+            self.master_audio = np.tanh(self.master_audio)

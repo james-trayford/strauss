@@ -15,7 +15,7 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice
+from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,7 +35,10 @@ try:
 except (OSError, ModuleNotFoundError) as sderr:
     sd = NoSoundDevice(sderr)
 try:
-    from tqdm import tqdm
+    if is_notebook:
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
 except ModuleNotFoundError:
     tqdm = list
 
@@ -113,7 +116,20 @@ class Sonification:
         for c in range(self.channels.Nmics):
             self.out_channels[str(c)] = Stream(self.score.length, self.samprate)
 
-    def render(self, downsamp=1):
+    def clear(self):
+        """
+        Clears the audio buffers in all output channels by setting values to 0.
+        This prevents audio from accumulating if render() is called multiple times.
+        """
+        # Iterate over the dictionary of channels (usually '0', '1', etc.)
+        for chan in self.out_channels:
+            if hasattr(self.out_channels[chan], 'values'):
+                self.out_channels[chan].values[:] = 0.
+            # Fallback if the channel is a raw numpy array
+            elif isinstance(self.out_channels[chan], np.ndarray):
+                self.out_channels[chan][:] = 0.
+            
+    def render(self, downsamp=1, progress=True):
         """Render the sonification.
         
         Generates the sonification by running the  Synthesizer
@@ -129,7 +145,10 @@ class Sonification:
            render by some integer factor.
         """
 
-        # first determine if time is provided, if not assume all start at zero
+        # first, clear the audio channels
+        self.clear()
+        
+        # determine if time is provided, if not assume all start at zero
         # and last the duration of sonification
 
         if "time" not in self.sources.mapping:
@@ -153,7 +172,9 @@ class Sonification:
         Nchan = len(self.out_channels.keys())
         indices = range(0,self.sources.n_sources, downsamp)
 
-        for source in tqdm(indices):
+        if progress:
+            print('Processing sonification..')
+        for source in tqdm(indices) if progress else indices:
 
             # index note properties
             t = self.sources.mapping['time'][source]
@@ -567,3 +588,37 @@ class Sonification:
             self.loop_channels[str(c)].values[:buffsize] *= ramp[:-1]
             self.loop_channels[str(c)].values[:buffsize] += ramp[::-1][:-1] * self.out_channels[str(c)].values[-buffsize:]
             
+    def _make_out_array(self, master_volume=1., embed_caption=True):
+        channels = []
+        vmax = 0.
+
+        has_ticks = hasattr(self, 'tick_channels')
+
+        # first pass - find max amplitude value to normalise output
+        for c in range(len(self.out_channels)):
+                
+            channel_values = np.concatenate(int(embed_caption)*[self.caption_channels[str(c)].values,]+
+                                            [apply_fades(self.out_channels[str(c)].values,
+                                                         self.out_channels['0'].samprate,
+                                                         fdur=self.declick_time)])
+            channels.append(channel_values)
+            vmax = max(
+                abs(channels[c].max()),
+                abs(channels[c].min()),
+                vmax
+            ) * 1.05
+
+        # normalisation for conversion to int32 bitdepth wav
+        norm = master_volume * (pow(2, 31)-1) / vmax
+
+        # setup array to house wav stream data 
+        chans = np.zeros((channels[0].size, len(channels)))
+        
+        # normalise and collect channels into a list
+        for c in range(len(self.out_channels)):
+            signal = channels[c]*norm
+            if has_ticks:
+                # add the ticks
+                signal += self.tick_channels[str(c)].values*norm*self.tick_vol
+            chans[:,c] = (signal)
+        return chans

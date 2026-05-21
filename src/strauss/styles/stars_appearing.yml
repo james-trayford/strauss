@@ -4,23 +4,26 @@ description: 'Brightest stars appear first, pitch mapped to colour. Glockenspiel
 
 generator:
   type: 'sampler'
-  sample: 'Glockenspiel'
+  sample: 'glockenspiel'
 
 sources: 'events'
 
 map:
-  
-  - input_range: ['0%', '110%']
+
+  - input: 'magnitude'
+    input_range: ['0%', '110%']
     output: 'time'
 
-  - output: 'pitch'
-    function: '-x'
+  - input: 'colour'
+    output: 'pitch'
 
-  - output: 'volume'
+  - input: 'magnitude'
+    output: 'volume'
     output_range: [0.2, 1]
-    function: 'log(x)'
 
-  - output: 'pan'
+  - input: 'ra'
+    output: 'pan'
+
 
 notes: ['G2', 'D3', 'G3', 'B4', 'F#4']
   

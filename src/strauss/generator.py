@@ -706,8 +706,7 @@ class Sampler(Generator):
                     self.sf_preset = sf_preset
                     hdr = self.sf2.raw.pdta['Phdr'][sf_preset-1]
                     self.sf_preset_name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
-                    
-                    
+                self.load_samples()
             else:
                 self.sampsource = 'directory'
                 wavs = sorted(Path(sampfiles).glob("*.[wW][aA][vV]"))
@@ -731,7 +730,6 @@ class Sampler(Generator):
                     warnings.warn("Mix of sample filenames with and without specified notes. \n"
                                   "Assigning unspecified samples to remaining notes.")
                     self.load_samples(unassigned_wavs=unassigned_wavs)
-                    
 
 
     def get_sfpreset_samples(self, sfpreset):
@@ -833,7 +831,6 @@ class Sampler(Generator):
         maxkey = sfpre_dict['max_note']
         smap = sfpre_dict['sample_map']
         sampdict = {}
-        
         for i in range(max(minkey,16), min(maxkey, 115)+1):
             wave_stack = []
             maxlen = 0
@@ -851,7 +848,7 @@ class Sampler(Generator):
                 compwave[:wave.size] += wave//nwave
             nte = notes.mkey_to_note(i)
             sampdict[nte] = compwave # return notes using sharps
-            if nte[1] == '#':
+            if nte[1] == '#' and (nte[0] not in ['C', 'F']):
                 # if a sharp, also assign flat...
                 sampdict[nte.replace('#','b')] = compwave
             # outname = f'../../example_wavs/out_{nte}.wav'
@@ -882,7 +879,11 @@ class Sampler(Generator):
             sintp, slen = process_sample(self.sampdict[note], self.samprate)
             self.samples[note] = sintp
             self.samplens[note] = slen
-            self.aliases[note] = Path(self.sampdict[note]).stem
+            if isinstance(self.sampdict[note], str):
+                self.aliases[note] = Path(self.sampdict[note]).stem
+            else:
+                # TODO: reassess auto aliasing for soundfonts
+                self.aliases[note] = note
             mkeys.append(mkey)
             root_notes.append(note)
         for wav in unassigned_wavs:

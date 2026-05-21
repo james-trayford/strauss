@@ -1,0 +1,22 @@
+name: 'windy'
+
+description: ''
+
+sources: 'objects'
+
+generator:
+  type: 'synthesizer'
+  preset: 'windy'
+
+map:
+
+  - input: 'time'
+    input_range: ['0%', '100%']
+    output: 'time_evo'
+  
+  - input: 'cutoff'
+    input_range: ['0%', '100%']
+    output_range: [0.35, 0.8]
+    output: 'cutoff'
+    
+notes: ['C2']
