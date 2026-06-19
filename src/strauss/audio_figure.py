@@ -48,6 +48,7 @@ import warnings
 from pathlib import Path
 import hashlib
 import json
+import pandas as pd
 
 p = Path(__file__)
 thisdir = p.parent
@@ -55,7 +56,6 @@ thisdir = p.parent
 INTMAX32 = (pow(2, 31)-1)
 
 _kw_defaults = {
-    'channels': 'stereo',
     'duration': 10,
     'is_mapped': ['pitch', 'time_evo'],
     # Style File
@@ -153,7 +153,8 @@ class AudioFigure:
         Generate a sonification in a matplotlib-like interface and add it to the AudioFigure.
 
         Args:
-            data: The input data for sonification.
+            data: The input data for sonification. This can be multiple arrays, 
+                    a path to a CSV file, or a Pandas DataFrame.
             style (dict, optional): A dictionary defining the sonification style,
                                     including parameters for score, sources, and generator.
             **kwargs: Additional parameters to override or supplement the style.
@@ -162,9 +163,58 @@ class AudioFigure:
             The generated Sonification object.
         """
         
-        sonpars, is_default = fill_from_kwargs(kwargs)            
+        sonpars, is_default = fill_from_kwargs(kwargs)
+        
+        # Load style
+        if not sonpars['style']:
+            sonpars['style'] = 'default'
+        style = styles.Style(**load_style(sonpars['style']))
+        
+        # Check if data is in CSV or Pandas DataFrame format
+        if len(args) == 1:
+            arg = args[0]
+            if isinstance(arg, (str, Path)) and Path(arg).suffix.lower() == '.csv':
+                df = pd.read_csv(arg)
+            elif isinstance(arg, pd.DataFrame):
+                df = arg.copy()
+            else:
+                df = None
+            
+            # If using CSV or DF, check for specified 'input' columns in style and resolve these
+            if df is not None:
+                resolved = []
+                for i, mapping in enumerate(style.map):
+                    col = getattr(mapping, 'input', None)
+                    if col is None:
+                        # If no input, default to auto-mapping based on position in style file
+                        if i < len(df.columns):
+                            resolved.append(df.iloc[:, i].to_numpy(dtype=float, na_value=np.nan))
+                        else:
+                            break
+                    elif isinstance(col, int):
+                        # If input is int, use that column index
+                        if col >= len(df.columns):
+                            raise IndexError(
+                                f"Column index {col} out of range. "
+                                f"DataFrame has {len(df.columns)} columns."
+                            )
+                        resolved.append(df.iloc[:, col].to_numpy(dtype=float, na_value=np.nan))
+                    elif isinstance(col, str):
+                        # If string, use that column name
+                        if col not in df.columns:
+                            raise KeyError(
+                                f"Column '{col}' not found in data. "
+                                f"Available columns: {list(df.columns)}"
+                            )
+                        resolved.append(df[col].to_numpy(dtype=float, na_value=np.nan))
+                    else:
+                        raise TypeError(
+                            f"style.map[i].input must be an int (column index) or str "
+                            f"(column name), got {type(col).__name__!r}"
+                        )
+                args = tuple(resolved)            
 
-        # We first analyse if this is a repeat sonification...
+        # We analyse if this is a repeat sonification...
         # Initially filter relevent keys
         kwargs_to_hash = {k: v for k, v in sonpars.items() if k not in _exclude_keys}
         args_to_hash = [arg_hash(arg) for arg in args]
@@ -198,10 +248,6 @@ class AudioFigure:
             self.figure_hashes[current_hash] = name
             return self.sonifications[name]
                 
-        if not sonpars['style']:
-            sonpars['style'] = 'default'
-        style = styles.Style(**load_style(sonpars['style']))
-        
         if len(args) == 0:
             raise Exception("No data to sonify!")
         elif len(args) == 1:
@@ -296,7 +342,7 @@ class AudioFigure:
             score=_score,
             sources=_sources,
             generator=_generator,
-            audio_setup=sonpars['channels'],
+            audio_setup=self.system,
             caption=sonpars["caption"],
             samprate=_generator.samprate, # Use generator's samprate for consistency
         )

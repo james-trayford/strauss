@@ -1,21 +1,16 @@
-name: 'default'
+name: "default"
 
-description: ''
+description: ""
 
-sources: 'events'
+sources: "objects"
 
 generator:
-  type: 'synthesizer'
-  preset: 'pitch_mapper'
+  type: "synthesizer"
+  preset: "pitch_mapper"
 
 map:
+  - output: "time_evo"
 
-  - input: 'time'
-    input_range: ['0%', '100%']
-    output: 'time_evo'
-  
-  - input: 'pitch'
-    input_range: ['0%', '100%']
-    output: 'pitch_shift'
-    
-notes: ['C2']
+  - output: "pitch_shift"
+
+notes: ["C2"]
