@@ -498,6 +498,16 @@ class Style(MonitoredBaseModel):
         ),
         examples=[['G2', 'D3', 'G3', 'B4', 'F#4'], 'Esus4', 'D Mixolydian']
     )
+    
+    pitch_binning: Literal['adaptive', 'uniform'] = Field(
+        default='adaptive',
+        title='Pitch Binning Mode',
+        description='The method used to determine how the data is binned into discrete pitches (if using pitch as a parameter).'
+                    'choose from "adaptive", where sources are binned by the pitch mapping such that each '
+                    'interval is represented the same fraction of the time, and "uniform" where the pitch binning '
+                    'is based on uniform size bins in the mapped pitch parameter.',
+        examples=['adaptive', 'uniform']
+    )
 
 
     @field_validator('sources', mode='before')
