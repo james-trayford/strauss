@@ -516,6 +516,12 @@ class Style(MonitoredBaseModel):
         # Convert string to lowercase so that 'Objects', 'objects', and 'OBJECTS' are all valid.
         return value.lower()
     
+    @field_validator('pitch_binning', mode='before')
+    @classmethod
+    def lowercase_pitch_binning(cls, value: str):
+        # Convert string to lowercase so that 'Adaptive', 'adaptive', and 'ADAPTIVE' are all valid.
+        return value.lower()
+    
     
     @field_validator('max_notes_per_sec')
     @classmethod

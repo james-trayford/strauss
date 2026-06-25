@@ -348,6 +348,10 @@ def apply_fades(samples, srate, fdur=0.03):
         pass
     return samps
 
+def adjust_octaves():
+    # TODO - Add constrain_notes function from the Suite
+    pass
+
 class Capturing(list):
     """
     Context manager for handling stdout (see https://stackoverflow.com/a/16571630)

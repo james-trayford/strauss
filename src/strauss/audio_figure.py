@@ -268,14 +268,12 @@ class AudioFigure:
                     in_lims[prop] = (0,1)
                 to_map.append(prop)
 
-        snotes = style.notes
-        if not isinstance(style.notes, str):
-            snotes = [snotes]
-        _score = Score(snotes, length=sonpars['duration'])
+       
         _sources = getattr(sources, style.sources.capitalize())(to_map)
         _sources.fromdict(map_data)
         _sources.apply_mapping_functions(map_lims=in_lims, param_lims=out_lims)
 
+        # Set up Generator
         gentype = style.generator.type
         
         if gentype == 'sampler':
@@ -292,6 +290,14 @@ class AudioFigure:
         _generator.load_preset(style.generator.preset)
         if style.generator.mods:
             _generator.modify_preset(style.generator.mods)
+            
+        # Set up Score
+        snotes = style.notes
+        if not isinstance(style.notes, str):
+            snotes = [snotes]
+        _score = Score(snotes, length=sonpars['duration'], pitch_binning=style.pitch_binning)
+        
+        # Combine into Sonification object
         _sonification = Sonification(
             score=_score,
             sources=_sources,
