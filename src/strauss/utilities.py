@@ -15,6 +15,7 @@ import sys
 from scipy.stats import binned_statistic as bs1d
 from pathlib import Path
 
+
 # Some utility classes (these may graduate to somewhere else eventually)
 
 class NoSoundDevice:
@@ -348,9 +349,70 @@ def apply_fades(samples, srate, fdur=0.03):
         pass
     return samps
 
-def adjust_octaves():
-    # TODO - Add constrain_notes function from the Suite
-    pass
+def adjust_octaves(samples_dir, desired_notes):
+    """ Compare the user's chosen musical notes with the available notes in 
+        the sample directory and nudge them into the available octave range if necessary.
+
+    Args:
+        samples_dir (str or Path): the path to the samples
+        desired_notes (list): the list of requested notes
+
+    Returns:
+        adjusted (list): the updated note list including any adjustments
+    """
+    
+    samples_path = Path(samples_dir)
+    
+    if samples_path.suffix == '.sf2':
+        return desired_notes # We cannot iterate through a soundfont file
+    
+    available_notes = [p.stem for p in samples_path.iterdir() if p.is_file()]
+    
+    available_note_set = {stem.split('_')[-1] for stem in available_notes}
+    
+    # The new note set, including notes that were already in the available set
+    adjusted = []
+    
+    # Only the notes that were swapped for different octaves
+    swapped = []
+    
+    for note in desired_notes:
+        if note in available_note_set:
+            adjusted.append(note)
+        else:
+            pitch_class = ''.join(c for c in note if not c.isdigit())
+            octave = int(''.join(c for c in note if c.isdigit()))
+            
+            matched = None
+            max_range = 10
+            for delta in range(1, max_range):
+                for direction in (delta, -delta):
+                    candidate = f"{pitch_class}{octave + direction}"
+                    if candidate in available_note_set:
+                        matched = candidate
+                        break
+                if matched:
+                    break
+            
+            if matched:
+                adjusted.append(matched)
+                swapped.append([note, matched])
+                
+    if swapped:
+        changes = "\n".join(
+            f"  - {original} → {replacement}"
+            for original, replacement in swapped
+        )
+
+        print(
+            f"The following requested notes were not found in the sample library at\n"
+            f"'{samples_dir}'\n"
+            f"and have been replaced with the nearest available octave:\n"
+            f"{changes}"
+            f"\n"
+        )
+    
+    return adjusted
 
 class Capturing(list):
     """

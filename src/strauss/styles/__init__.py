@@ -245,7 +245,7 @@ class GeneratorStyle(MonitoredBaseModel):
         default=None,
         title='Sample',
         description=(
-            'If using Sampler, this is the either the name of the sample/instrument (case insensitive), '
+            'If using Sampler, this is the either the name of the sample/instrument, '
             'a file path to a directory of audio files, or a web URL to an audio file. '
             "If it's a name, STRAUSS will first check if the sample(s) are already downloaded, "
             "and if not, it will fetch them from the online library."
@@ -286,19 +286,13 @@ class GeneratorStyle(MonitoredBaseModel):
         if value is None:
             return value
         
-        # String means it's a name or a web URL
         if isinstance(value, str):
-            if value.startswith(('http', 'www')):
-                # Do something here to validate URLs?
+            if any(c in value for c in ('/', '\\', '.')):
+                # It's a filepath
                 return value
-            
-            # Case insensitive if it's a sample name
-            return value.lower()
-        
-        # It's a local path
-        if isinstance(value, Path):
-            if not value.exists():
-                raise ValueError('The Generator path provided does not exist.')
+            else:
+                # It's the name of a built-in sample
+                return value.lower()
         
         return value
     
