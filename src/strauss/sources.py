@@ -180,7 +180,7 @@ class Source:
                 err_text = f"As spatial angle {ang} is cyclic, a limited range cannot be supported in param_lims. "
                 err_text += f"Instead, provide the units of input values for {ang} using the angle_unit argument via"
                 err_text += f"of apply_mapping_functions, or use the 'pan' parameter to simply map stereo effects.\n\n"
-                err_text.append(err_text)
+                errs.append(err_text)
             if (ang in params) and not (ang in self.map_lims) and not (self.angle_unit):
                 warn_text += f" - no angle unit or map_lims entry for {ang}, assuming values (0,1] for fractions of a circle (cycles)  \n"
             if (ang in self.map_lims) and (self.angle_unit):
