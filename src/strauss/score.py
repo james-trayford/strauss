@@ -75,6 +75,17 @@ class Score:
         if isinstance(chord_sequence, str):
             self.note_sequence = parse_chord_sequence(chord_sequence)
 
+            
+        # ensure note order is always low -> high
+        conforming_sequence = []
+        for chord in self.note_sequence:
+            freqs = []
+            for note in chord:
+                freqs.append(notes.parse_note(note))
+            newchord = [x for _,x in sorted(zip(freqs, chord))]
+            conforming_sequence.append(newchord)    
+        self.note_sequence = conforming_sequence
+                
         if pitch_binning in ['adaptive','uniform']:
             self.pitch_binning = pitch_binning
         else:

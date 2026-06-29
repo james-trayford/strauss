@@ -115,6 +115,9 @@ class audio_channels:
         ##############################################
         # Channel properties for preset audio setups
         ##############################################
+
+        # store the setup
+        self.setup = setup
         
         # mic angles in radians
         mono_azimuths = [0.]

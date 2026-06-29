@@ -12,6 +12,7 @@ from contextlib import contextmanager,redirect_stderr,redirect_stdout
 from os import devnull
 from io import StringIO 
 import sys
+from scipy.stats import binned_statistic as bs1d
 from pathlib import Path
 
 # Some utility classes (these may graduate to somewhere else eventually)
@@ -290,7 +291,42 @@ def get_supported_coqui_voices():
 
     return voices
 
+def merge_events_original(duration, max_rate, time, arglist):
+    nevents = len(time)
+    nbin = int(duration*max_rate)+1
+    bins = np.linspace(0,1, nbin)
+    newargs = []
+    for i in range(len(arglist)):
+        mean, _, _ = bs1d(time, arglist[i], statistic='mean', bins=bins)
+        newargs.append(mean[~np.isnan(mean)])
+    return newargs
 
+def merge_events(duration, max_rate, time, arglist):
+    min_gap = 1./(max_rate*duration)
+    sortdx = np.argsort(time)
+    sort_time = time[sortdx]
+    
+    gaps = np.diff(sort_time)
+    new_cluster_mask = gaps >= min_gap
+    start_indices = [0]
+    anchor = sort_time[0]
+
+    for i in range(1, len(sort_time)):
+        if (sort_time[i] - anchor) >= min_gap:
+            start_indices.append(i)
+            anchor = sort_time[i]
+
+    start_indices = np.array(start_indices)
+    end_indices = np.append(start_indices[1:], len(sort_time))
+    cluster_sizes = end_indices - start_indices
+    sort_args = []
+    for i in range(len(arglist)):
+        sortvals = np.array(arglist[i])[sortdx]
+        merged_values = np.add.reduceat(sortvals, start_indices) / cluster_sizes
+        sort_args.append(merged_values)
+    return sort_args
+                
+        
 def apply_fades(samples, srate, fdur=0.03):
     """ Apply de-click fades to a sample array
 
@@ -324,3 +360,23 @@ class Capturing(list):
         self.extend(self._stringio.getvalue().splitlines())
         del self._stringio    # free up some memory
         sys.stdout = self._stdout
+
+def is_notebook() -> bool:
+    """
+    check if we are in a notebook environment or not
+    """
+    try:
+        from IPython import get_ipython
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter notebook or qtconsole
+        elif shell == 'google.colab._shell':
+            return True   # Google Colab
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False      # Probably standard Python interpreter
+    except ImportError:
+        return False      # IPython not installed

@@ -1,0 +1,30 @@
+name: 'Sci-Fi'
+
+description: >
+  This style uses a spacey strings sample and maps the dependent variable
+  to filter cutoff. This is particularly effective for one dimensional or
+  time series data sonifications.
+
+generator:
+  type: 'sampler'
+  preset: 'sustain'
+  sample: 'Space Strings'
+  mods:
+    looping: 'forwardback'
+    loop_start: 0.2
+    loop_end: 5.
+    filter: 'on'
+
+sources: 'objects'
+
+map:
+  - output: 'cutoff'
+    output_range: [0.3, 1]  
+
+
+
+
+
+
+
+

@@ -1,3 +1,4 @@
 include src/strauss/presets/*/*.yml
 include src/strauss/presets/*/*/*.yml
 include src/strauss/data/*.csv
+include src/strauss/styles/*.yml
