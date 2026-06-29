@@ -3,10 +3,23 @@ from typing import Optional, Literal, Dict, List, Union, Tuple
 from ..sources import param_lim_dict as valid_params
 from pathlib import Path
 import random
+import numpy as np
 
-FUNCTION_WHITELIST = [
-    # Our 'whitelisted' functions can go here
-]
+# Helper to ensure the right mapping function is used whether input is np array or list of np arrays
+def get_func(func):
+    def wrapper(x):
+        if isinstance(x, list):
+            return [func(v) for v in x]
+        return func(x)
+    return wrapper
+
+# The list of available mapping functions
+MAPPING_FUNCTIONS = {
+    "log2": get_func(np.log2),
+    "log10": get_func(np.log10),
+    "invert": get_func(np.negative),
+    "abs": get_func(np.abs)
+}
 
 def get_presets(generator_type):
 
@@ -180,10 +193,15 @@ class Mapping(MonitoredBaseModel):
             return value
         
         funcs = [value] if isinstance(value, str) else value
+        
+        valid_functions = ", ".join(sorted(MAPPING_FUNCTIONS))
 
         for func in funcs:
-            if func not in FUNCTION_WHITELIST:
-                raise ValueError(f'{func} is not a valid mapping function.')
+            if func not in MAPPING_FUNCTIONS:
+                raise ValueError(
+                    f"'{func}' is not a valid mapping function. "
+                    f"Available functions: {valid_functions}."
+                )
             
         return value
     
@@ -222,11 +240,11 @@ class Mapping(MonitoredBaseModel):
 class GeneratorStyle(MonitoredBaseModel):
 
     # Generator type - defaults to Synthesizer 
-    type: Literal['sampler', 'synthesizer', 'spectralizer'] = Field(
+    type: Literal['sampler', 'synthesizer', 'synth', 'spectralizer'] = Field(
         default='synthesizer',
         title='Generator Type',
-        description='The Generator type to use. This field accepts any capitalisation of the string.',
-        examples=['sampler', 'Synthesizer', 'SPECTRALIZER']
+        description='The Generator type to use. This field accepts any capitalisation of the string. Also accepts "synth" as a shortcut for Synthesizer.',
+        examples=['sampler', 'Synthesizer', 'SPECTRALIZER', 'synth']
     )
 
     # Generator preset. Can be either a path to a user preset or the name of a Generator preset. Defaults to 'default' because every Generator has a default.yml
@@ -275,9 +293,13 @@ class GeneratorStyle(MonitoredBaseModel):
 
     @field_validator('type', mode='before')
     @classmethod
-    def lowercase_type(cls, value: str):
+    def valiadate_type(cls, value: str):
+        
         # Convert string to lowercase so that 'Sampler', 'sampler', and 'SAMPLER' are all valid.
-        return value.lower()
+        value = value.lower()
+        value = 'synthesizer' if value == 'synth' else value # allow synth shortcut
+       
+        return value
     
     @field_validator('sample')
     @classmethod

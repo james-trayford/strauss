@@ -207,27 +207,45 @@ class AudioFigure:
         elif len(args) == 1:
             args = [np.arange(len(args[0])), args[0]]
             tlims = (0,args[0][-1])
-
+                
+        nmap = min(len(args), len(style.map))
+        
         if (style.sources.lower() == 'events') and style.max_notes_per_sec:
-            if style.map[0].output == 'time':
-                tlims = style.map[0].input_range
-            tlims = set_limits(tlims, args[0], warn=False)
-            time = rescale_values(args[0], tlims, (0,1))
+            for i in range(nmap):
+                if style.map[i].output == 'time':
+                    tlims = style.map[i].input_range
+                    tlims = set_limits(tlims, args[i], warn=False)
+                    time = rescale_values(args[i], tlims, (0,1))
+                    break
             
             # lets now thin the data according to max events per second if using events
             args = merge_events(sonpars['duration'], style.max_notes_per_sec, time, args)
-                
-        nmap = min(len(args), len(style.map))
         
         to_map = []
         in_lims = {}
         out_lims = {}
+        mapping_functions = {}
+        
+        # Iterate through the mappings and add lims and funcs to their own dicts
         for i in range(nmap):
-            to_map.append(style.map[i].output)
-            if style.map[i].input_range:
-                in_lims[to_map[-1]] = style.map[i].input_range
-            if style.map[i].output_range:
-                out_lims[to_map[-1]] = style.map[i].output_range
+            mapping = style.map[i]
+            
+            if mapping.output == 'time' and style.sources == 'objects':
+                # Automatically swap time for time_evo if using Objects
+                mapping.output = 'time_evo'
+                
+            if mapping.output == "cutoff":
+                # Automatically turn on cutoff filter
+                style.generator.mods = style.generator.mods or {}
+                style.generator.mods["filter"] = "on" 
+                
+            to_map.append(mapping.output)
+            if mapping.input_range:
+                in_lims[to_map[-1]] = mapping.input_range
+            if mapping.output_range:
+                out_lims[to_map[-1]] = mapping.output_range
+            if mapping.function:
+                mapping_functions[to_map[-1]] = styles.MAPPING_FUNCTIONS[mapping.function]
         map_data = dict(zip(to_map, args[:nmap]))
         
         if 'pitch' not in to_map:
@@ -271,7 +289,7 @@ class AudioFigure:
        
         _sources = getattr(sources, style.sources.capitalize())(to_map)
         _sources.fromdict(map_data)
-        _sources.apply_mapping_functions(map_lims=in_lims, param_lims=out_lims)
+        _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims, param_lims=out_lims)
 
         # Set up Generator
         gentype = style.generator.type
@@ -286,7 +304,7 @@ class AudioFigure:
                 asset = assets.get_asset_path(s.lower())
             _generator = getattr(generator, "Sampler")(asset, sf_preset=style.generator.sf_preset)
         else:
-            _generator = getattr(generator, style.generator.type.capitalize())()
+            _generator = getattr(generator, gentype.capitalize())()
         _generator.load_preset(style.generator.preset)
         if style.generator.mods:
             _generator.modify_preset(style.generator.mods)
@@ -295,7 +313,7 @@ class AudioFigure:
         snotes = style.notes
         
         if not isinstance(style.notes, str):
-            if asset is not None:
+            if gentype == 'sampler':
                 # Note: this only currently works if the user gives a single list of notes
                 # and won't work for a list of chord names
                 snotes = adjust_octaves(asset, snotes)
