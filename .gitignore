@@ -45,6 +45,9 @@ ENV/
 env.bak/
 venv.bak/
 
+build/
+strauss.egg-info
+
 # Spyder project settings
 .spyderproject
 .spyproject

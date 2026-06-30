@@ -15,11 +15,14 @@ def get_func(func):
 
 # The list of available mapping functions
 MAPPING_FUNCTIONS = {
-    "log2": get_func(np.log2),
+    "log2": get_func(np.log2), # TODO - need to deal with non-positive inputs for log functions
     "log10": get_func(np.log10),
     "invert": get_func(np.negative),
-    "abs": get_func(np.abs)
+    "abs": get_func(np.abs),
+    "reciprocal": get_func(np.reciprocal)
 }
+
+AVAILABLE_FUNCTIONS = ", ".join(MAPPING_FUNCTIONS)
 
 def get_presets(generator_type):
 
@@ -106,10 +109,10 @@ class Mapping(MonitoredBaseModel):
             'The mathematical function to apply when mapping this parameter data. '
             'This is useful for scaling the data (e.g logarithmically) or reversing the polarity (-x) '
             'so that the biggest values become the smallest values. '
-            'The string must correspond to one of the pre-defined functions in the whitelist. '
-            'Multiple functions can be applied at once by providing a list of strings.'
+            f'The string must correspond to one of the pre-defined functions: {AVAILABLE_FUNCTIONS}'
+            'Multiple functions can be applied at once by providing a list of strings in the order you want the functions applied.'
         ),
-        examples=['log(x)', ['-x', 'log(x)']]
+        examples=['log2', ['invert', 'log10']]
     )
 
     fixed: Union[int, float, None] = Field(

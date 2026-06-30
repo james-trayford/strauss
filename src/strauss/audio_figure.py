@@ -245,7 +245,8 @@ class AudioFigure:
             if mapping.output_range:
                 out_lims[to_map[-1]] = mapping.output_range
             if mapping.function:
-                mapping_functions[to_map[-1]] = styles.MAPPING_FUNCTIONS[mapping.function]
+                funcs = [mapping.function] if isinstance(mapping.function, str) else mapping.function
+                mapping_functions[to_map[-1]] = [styles.MAPPING_FUNCTIONS[f] for f in funcs]
         map_data = dict(zip(to_map, args[:nmap]))
         
         if 'pitch' not in to_map:

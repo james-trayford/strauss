@@ -264,7 +264,12 @@ class Source:
 
             # apply mapping functions if specified
             if key in map_funcs:
-                mapvals = map_funcs[key](rawvals)
+                func = map_funcs[key]
+                func_list = [func] if callable(func) else func
+                mapvals = rawvals
+                for f in func_list: # Allow multiple functions to be applied in order given
+                    mapvals = f(mapvals)
+                
             else:
                 mapvals = rawvals
 
