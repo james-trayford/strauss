@@ -321,19 +321,30 @@ class GeneratorStyle(MonitoredBaseModel):
         
         return value
     
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_preset(self):
 
-        if isinstance(self.preset, Path):
-            return self
+        # Accept explicit paths
+        if isinstance(self.preset, (str, Path)):
+            preset_path = Path(self.preset)
+            if preset_path.exists():
+                return self
 
-        # Check that the preset exists for this Generator type
-        dirs = {'synthesizer': 'synth', 'sampler': 'sampler', 'spectralizer': 'spec'}
+        # Otherwise treat it as a preset name
+        dirs = {
+            "synthesizer": "synth",
+            "sampler": "sampler",
+            "spectralizer": "spec",
+        }
         valid_presets = get_presets(generator_type=dirs[self.type])
 
         if self.preset not in valid_presets:
-            raise ValueError(f'{self.preset} is not a valid preset for {self.type} Generator type. Please choose from the yaml file names in the /presets/ directory or provide a valid path.')
-        
+            raise ValueError(
+                f"{self.preset} is not a valid preset for {self.type} "
+                "Generator type. Please choose from the preset names or "
+                "provide a valid path."
+            )
+
         return self
 
     
