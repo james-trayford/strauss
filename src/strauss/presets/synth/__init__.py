@@ -17,12 +17,21 @@ def load_ranges(name="default"):
     return read_yaml(filename)
 
 def load_preset(name="default"):
-    if Path(name).name == Path(name):
-        # if open user directly
-        filename = Path(f"{name}.yml")
+
+    path = Path(name)
+
+    # Full or relative path to an existing YAML file
+    if path.suffix == ".yml":
+        filename = path
+
+    # Just a preset name
+    elif path.name == str(path):
+        filename = Path(f"{thisdir}", f"{path}.yml")
+
+    # Path without extension
     else:
-        # else load built-in preset of that name
-        filename = Path(f"{thisdir}", f"{name}.yml")
+        filename = path.with_suffix(".yml")
+
     return read_yaml(filename)
 
 def preset_details(name='*'):
