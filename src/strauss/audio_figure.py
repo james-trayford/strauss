@@ -258,17 +258,17 @@ class AudioFigure:
             to_map.append('pitch')
         
         # we now iterate through style fixed values
-        if len(args) > nmap: 
-            for i in range(nmap, len(args)):
-                if style.map[i].fixed:
-                    if style.map[i].input_range:
-                        in_lims[to_map[-1]] = style.map[i].input_range
-                    if style.map[i].output_range:
-                        out_lims[to_map[-1]] = style.map[i].output_range
+        for i in range(nmap, len(style.map)):
+            mapping = style.map[i]
+            if mapping.fixed:
+                if mapping.input_range:
+                    in_lims[to_map[-1]] = mapping.input_range
+                if mapping.output_range:
+                    out_lims[to_map[-1]] = mapping.output_range
 
-                    fix_array =  len(map_data[to_map[0]])*[style.map[i].fixed]
-                    to_map.append(style.map[i].output)
-                    map_data[style.map[i].output] = fix_array
+                fix_array =  len(map_data[to_map[0]])*[mapping.fixed]
+                to_map.append(mapping.output)
+                map_data[mapping.output] = fix_array
                     
         # and finally overwrite with any kwarg fixed values:
         for k in sonpars.keys():
