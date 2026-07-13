@@ -260,8 +260,7 @@ class AudioFigure:
                 map_data['pitch'] = list(range(nnote))
             
             else:  # Events
-                n_events = len(map_data[to_map[0]])
-                map_data["pitch"] = [0] * n_events
+                map_data["pitch"] = [0]
         
         # we now iterate through style fixed values
         for i in range(nmap, len(style.map)):
