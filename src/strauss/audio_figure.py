@@ -22,7 +22,7 @@ from .score import Score
 from .sources import Events, Objects, set_limits
 from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
-from .utilities import nested_dict_reassign, merge_events, rescale_values, adjust_octaves
+from .utilities import nested_dict_reassign, merge_events, rescale_values
 
 import numpy as np
 from . import channels
@@ -317,14 +317,10 @@ class AudioFigure:
             
         # Set up Score
         snotes = style.notes
-        
-        if not isinstance(style.notes, str):
-            if gentype == 'sampler':
-                # Note: this only currently works if the user gives a single list of notes
-                # and won't work for a list of chord names
-                snotes = adjust_octaves(asset, snotes)
-                
+    
+        if not isinstance(style.notes, str):    
             snotes = [snotes]
+            
         _score = Score(snotes, length=sonpars['duration'], pitch_binning=style.pitch_binning)
         
         # Combine into Sonification object
