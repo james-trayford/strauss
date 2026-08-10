@@ -15,6 +15,7 @@ import sys
 from scipy.stats import binned_statistic as bs1d
 from pathlib import Path
 
+
 # Some utility classes (these may graduate to somewhere else eventually)
 
 class NoSoundDevice:
@@ -219,10 +220,10 @@ def rescale_values(x, oldlims, newlims):
     """
     olo, ohi = oldlims
     nlo, nhi = newlims
-    if len(x) == 1:
+    if np.size(x) == 1:
         olo, ohi = (0,1)
     if (ohi == olo):
-        return np.ones(len(x))*nlo
+        return np.ones(np.size(x))*nlo
     else:
         descale = np.clip((x - olo) / (ohi-olo), 0 , 1)
     return (nhi-nlo)*descale + nlo
@@ -352,6 +353,7 @@ def apply_fades(samples, srate, fdur=0.03):
     else:
         pass
     return samps
+
 
 class Capturing(list):
     """

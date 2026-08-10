@@ -253,49 +253,73 @@ class AudioFigure:
         elif len(args) == 1:
             args = [np.arange(len(args[0])), args[0]]
             tlims = (0,args[0][-1])
-
+                
+        nmap = min(len(args), len(style.map))
+        
         if (style.sources.lower() == 'events') and style.max_notes_per_sec:
-            if style.map[0].output == 'time':
-                tlims = style.map[0].input_range
-            tlims = set_limits(tlims, args[0], warn=False)
-            time = rescale_values(args[0], tlims, (0,1))
+            for i in range(nmap):
+                if style.map[i].output == 'time':
+                    tlims = style.map[i].input_range
+                    tlims = set_limits(tlims, args[i], warn=False)
+                    time = rescale_values(args[i], tlims, (0,1))
+                    break
             
             # lets now thin the data according to max events per second if using events
             args = merge_events(sonpars['duration'], style.max_notes_per_sec, time, args)
-                
-        nmap = min(len(args), len(style.map))
         
         to_map = []
         in_lims = {}
         out_lims = {}
+        mapping_functions = {}
+        
+        # Iterate through the mappings and add lims and funcs to their own dicts
         for i in range(nmap):
-            to_map.append(style.map[i].output)
-            if style.map[i].input_range:
-                in_lims[to_map[-1]] = style.map[i].input_range
-            if style.map[i].output_range:
-                out_lims[to_map[-1]] = style.map[i].output_range
+            mapping = style.map[i]
+            
+            if mapping.output == 'time' and style.sources == 'objects':
+                # Automatically swap time for time_evo if using Objects
+                mapping.output = 'time_evo'
+                
+            if mapping.output == "cutoff":
+                # Automatically turn on cutoff filter
+                style.generator.mods = style.generator.mods or {}
+                style.generator.mods["filter"] = "on" 
+                
+            to_map.append(mapping.output)
+            if mapping.input_range:
+                in_lims[to_map[-1]] = mapping.input_range
+            if mapping.output_range:
+                out_lims[to_map[-1]] = mapping.output_range
+            if mapping.function:
+                funcs = [mapping.function] if isinstance(mapping.function, str) else mapping.function
+                mapping_functions[to_map[-1]] = [styles.MAPPING_FUNCTIONS[f] for f in funcs]
         map_data = dict(zip(to_map, args[:nmap]))
         
         if 'pitch' not in to_map:
             to_map.append('pitch')
-            nnote = len(style.notes)
-            for k in map_data.keys():
-                map_data[k] = [map_data[k]]*nnote
-            map_data['pitch'] = list(range(nnote))
-            to_map.append('pitch')
+            
+            if style.sources == 'objects':
+                nnote = len(style.notes)
+                for k in map_data.keys():
+                    # Use a list of arrays for Objects
+                    map_data[k] = [map_data[k]]*nnote
+                map_data['pitch'] = list(range(nnote))
+            
+            else:  # Events
+                map_data["pitch"] = np.zeros(len(map_data[to_map[0]]))
         
         # we now iterate through style fixed values
-        if len(args) > nmap: 
-            for i in range(nmap, len(args)):
-                if style.map[i].fixed:
-                    if style.map[i].input_range:
-                        in_lims[to_map[-1]] = style.map[i].input_range
-                    if style.map[i].output_range:
-                        out_lims[to_map[-1]] = style.map[i].output_range
+        for i in range(nmap, len(style.map)):
+            mapping = style.map[i]
+            if mapping.fixed:
+                if mapping.input_range:
+                    in_lims[to_map[-1]] = mapping.input_range
+                if mapping.output_range:
+                    out_lims[to_map[-1]] = mapping.output_range
 
-                    fix_array =  len(map_data[to_map[0]])*[style.map[i].fixed]
-                    to_map.append(style.map[i].output)
-                    map_data[style.map[i].output] = fix_array
+                fix_array =  len(map_data[to_map[0]])*[mapping.fixed]
+                to_map.append(mapping.output)
+                map_data[mapping.output] = fix_array
                     
         # and finally overwrite with any kwarg fixed values:
         for k in sonpars.keys():
@@ -314,14 +338,12 @@ class AudioFigure:
                     in_lims[prop] = (0,1)
                 to_map.append(prop)
 
-        snotes = style.notes
-        if not isinstance(style.notes, str):
-            snotes = [snotes]
-        _score = Score(snotes, length=sonpars['duration'])
+       
         _sources = getattr(sources, style.sources.capitalize())(to_map)
         _sources.fromdict(map_data)
-        _sources.apply_mapping_functions(map_lims=in_lims, param_lims=out_lims)
+        _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims, param_lims=out_lims)
 
+        # Set up Generator
         gentype = style.generator.type
         
         if gentype == 'sampler':
@@ -332,12 +354,22 @@ class AudioFigure:
             else:
                 # if not, assume intention is in-built name
                 asset = assets.get_asset_path(s.lower())
-            _generator = getattr(generator, "Sampler")(asset)
+            _generator = getattr(generator, "Sampler")(asset, sf_preset=style.generator.sf_preset)
         else:
-            _generator = getattr(generator, style.generator.type.capitalize())()
+            _generator = getattr(generator, gentype.capitalize())()
         _generator.load_preset(style.generator.preset)
         if style.generator.mods:
             _generator.modify_preset(style.generator.mods)
+            
+        # Set up Score
+        snotes = style.notes
+    
+        if not isinstance(style.notes, str):    
+            snotes = [snotes]
+            
+        _score = Score(snotes, length=sonpars['duration'], pitch_binning=style.pitch_binning)
+        
+        # Combine into Sonification object
         _sonification = Sonification(
             score=_score,
             sources=_sources,

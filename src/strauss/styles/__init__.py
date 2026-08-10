@@ -3,10 +3,26 @@ from typing import Optional, Literal, Dict, List, Union, Tuple
 from ..sources import param_lim_dict as valid_params
 from pathlib import Path
 import random
+import numpy as np
 
-FUNCTION_WHITELIST = [
-    # Our 'whitelisted' functions can go here
-]
+# Helper to ensure the right mapping function is used whether input is np array or list of np arrays
+def get_func(func):
+    def wrapper(x):
+        if isinstance(x, list):
+            return [func(v) for v in x]
+        return func(x)
+    return wrapper
+
+# The list of available mapping functions
+MAPPING_FUNCTIONS = {
+    "log2": get_func(np.log2), # TODO - need to deal with non-positive inputs for log functions
+    "log10": get_func(np.log10),
+    "invert": get_func(np.negative),
+    "abs": get_func(np.abs),
+    "reciprocal": get_func(np.reciprocal)
+}
+
+AVAILABLE_FUNCTIONS = ", ".join(MAPPING_FUNCTIONS)
 
 def get_presets(generator_type):
 
@@ -93,10 +109,10 @@ class Mapping(MonitoredBaseModel):
             'The mathematical function to apply when mapping this parameter data. '
             'This is useful for scaling the data (e.g logarithmically) or reversing the polarity (-x) '
             'so that the biggest values become the smallest values. '
-            'The string must correspond to one of the pre-defined functions in the whitelist. '
-            'Multiple functions can be applied at once by providing a list of strings.'
+            f'The string must correspond to one of the pre-defined functions: {AVAILABLE_FUNCTIONS}'
+            'Multiple functions can be applied at once by providing a list of strings in the order you want the functions applied.'
         ),
-        examples=['log(x)', ['-x', 'log(x)']]
+        examples=['log2', ['invert', 'log10']]
     )
 
     fixed: Union[int, float, None] = Field(
@@ -180,10 +196,15 @@ class Mapping(MonitoredBaseModel):
             return value
         
         funcs = [value] if isinstance(value, str) else value
+        
+        valid_functions = ", ".join(sorted(MAPPING_FUNCTIONS))
 
         for func in funcs:
-            if func not in FUNCTION_WHITELIST:
-                raise ValueError(f'{func} is not a valid mapping function.')
+            if func not in MAPPING_FUNCTIONS:
+                raise ValueError(
+                    f"'{func}' is not a valid mapping function. "
+                    f"Available functions: {valid_functions}."
+                )
             
         return value
     
@@ -222,11 +243,11 @@ class Mapping(MonitoredBaseModel):
 class GeneratorStyle(MonitoredBaseModel):
 
     # Generator type - defaults to Synthesizer 
-    type: Literal['sampler', 'synthesizer', 'spectralizer'] = Field(
+    type: Literal['sampler', 'synthesizer', 'synth', 'spectralizer'] = Field(
         default='synthesizer',
         title='Generator Type',
-        description='The Generator type to use. This field accepts any capitalisation of the string.',
-        examples=['sampler', 'Synthesizer', 'SPECTRALIZER']
+        description='The Generator type to use. This field accepts any capitalisation of the string. Also accepts "synth" as a shortcut for Synthesizer.',
+        examples=['sampler', 'Synthesizer', 'SPECTRALIZER', 'synth']
     )
 
     # Generator preset. Can be either a path to a user preset or the name of a Generator preset. Defaults to 'default' because every Generator has a default.yml
@@ -245,7 +266,7 @@ class GeneratorStyle(MonitoredBaseModel):
         default=None,
         title='Sample',
         description=(
-            'If using Sampler, this is the either the name of the sample/instrument (case insensitive), '
+            'If using Sampler, this is the either the name of the sample/instrument, '
             'a file path to a directory of audio files, or a web URL to an audio file. '
             "If it's a name, STRAUSS will first check if the sample(s) are already downloaded, "
             "and if not, it will fetch them from the online library."
@@ -275,9 +296,13 @@ class GeneratorStyle(MonitoredBaseModel):
 
     @field_validator('type', mode='before')
     @classmethod
-    def lowercase_type(cls, value: str):
+    def valiadate_type(cls, value: str):
+        
         # Convert string to lowercase so that 'Sampler', 'sampler', and 'SAMPLER' are all valid.
-        return value.lower()
+        value = value.lower()
+        value = 'synthesizer' if value == 'synth' else value # allow synth shortcut
+       
+        return value
     
     @field_validator('sample')
     @classmethod
@@ -286,35 +311,40 @@ class GeneratorStyle(MonitoredBaseModel):
         if value is None:
             return value
         
-        # String means it's a name or a web URL
         if isinstance(value, str):
-            if value.startswith(('http', 'www')):
-                # Do something here to validate URLs?
+            if any(c in value for c in ('/', '\\', '.')):
+                # It's a filepath
                 return value
-            
-            # Case insensitive if it's a sample name
-            return value.lower()
-        
-        # It's a local path
-        if isinstance(value, Path):
-            if not value.exists():
-                raise ValueError('The Generator path provided does not exist.')
+            else:
+                # It's the name of a built-in sample
+                return value.lower()
         
         return value
     
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_preset(self):
 
-        if isinstance(self.preset, Path):
-            return self
+        # Accept explicit paths
+        if isinstance(self.preset, (str, Path)):
+            preset_path = Path(self.preset)
+            if preset_path.exists():
+                return self
 
-        # Check that the preset exists for this Generator type
-        dirs = {'synthesizer': 'synth', 'sampler': 'sampler', 'spectralizer': 'spec'}
+        # Otherwise treat it as a preset name
+        dirs = {
+            "synthesizer": "synth",
+            "sampler": "sampler",
+            "spectralizer": "spec",
+        }
         valid_presets = get_presets(generator_type=dirs[self.type])
 
         if self.preset not in valid_presets:
-            raise ValueError(f'{self.preset} is not a valid preset for {self.type} Generator type. Please choose from the yaml file names in the /presets/ directory or provide a valid path.')
-        
+            raise ValueError(
+                f"{self.preset} is not a valid preset for {self.type} "
+                "Generator type. Please choose from the preset names or "
+                "provide a valid path."
+            )
+
         return self
 
     
@@ -498,12 +528,28 @@ class Style(MonitoredBaseModel):
         ),
         examples=[['G2', 'D3', 'G3', 'B4', 'F#4'], 'Esus4', 'D Mixolydian']
     )
+    
+    pitch_binning: Literal['adaptive', 'uniform'] = Field(
+        default='adaptive',
+        title='Pitch Binning Mode',
+        description='The method used to determine how the data is binned into discrete pitches (if using pitch as a parameter).'
+                    'choose from "adaptive", where sources are binned by the pitch mapping such that each '
+                    'interval is represented the same fraction of the time, and "uniform" where the pitch binning '
+                    'is based on uniform size bins in the mapped pitch parameter.',
+        examples=['adaptive', 'uniform']
+    )
 
 
     @field_validator('sources', mode='before')
     @classmethod
     def lowercase_type(cls, value: str):
         # Convert string to lowercase so that 'Objects', 'objects', and 'OBJECTS' are all valid.
+        return value.lower()
+    
+    @field_validator('pitch_binning', mode='before')
+    @classmethod
+    def lowercase_pitch_binning(cls, value: str):
+        # Convert string to lowercase so that 'Adaptive', 'adaptive', and 'ADAPTIVE' are all valid.
         return value.lower()
     
     
