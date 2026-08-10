@@ -1,22 +1,17 @@
-name: 'windy'
+name: "windy"
 
-description: ''
+description: ""
 
-sources: 'objects'
+sources: "objects"
 
 generator:
-  type: 'synthesizer'
-  preset: 'windy'
+  type: "synthesizer"
+  preset: "windy"
 
 map:
+  - output: "time_evo"
 
-  - input: 'time'
-    input_range: ['0%', '100%']
-    output: 'time_evo'
-  
-  - input: 'cutoff'
-    input_range: ['0%', '100%']
+  - output: "cutoff"
     output_range: [0.35, 0.8]
-    output: 'cutoff'
-    
-notes: ['C2']
+
+notes: ["C2"]

@@ -9,7 +9,7 @@ __version__ = "1.0.3"
 
 _current_figure = ContextVar('current_figure', default=None)
 
-def _get_current_figure():
+def _get_current_figure(system='stereo'):
     """
     Get the current AudioFigure object, or create one if there isn't one.
 
@@ -20,13 +20,13 @@ def _get_current_figure():
     fig = _current_figure.get()
 
     if fig is None:
-        fig = AudioFigure()
+        fig = AudioFigure(system=system)
         _current_figure.set(fig)
 
     return fig
 
-def sonify(*args, **kwargs):
-    fig = _get_current_figure()
+def sonify(*args, channels='stereo', **kwargs):
+    fig = _get_current_figure(system=channels)
     return fig.sonify(*args, **kwargs)
 
 def close():

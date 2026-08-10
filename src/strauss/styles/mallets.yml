@@ -17,10 +17,6 @@ map:
 
   - output: 'pitch'
 
-  - output: 'pan'
-    fixed: true
-    input_range: [0, 1]
-
 notes: 'C11'
   
   
