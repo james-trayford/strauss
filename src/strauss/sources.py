@@ -130,6 +130,8 @@ class Source:
         mapped values of evolving parameters rather than replacing
         them with interpolation functions. Set by
         :meth:`apply_mapping_functions`.
+      names (:obj:`list(str)`): name of each source, used to look up
+        its table. Defaults to `source_0` to `source_N`.
       origin (:obj:`dict`): keys are `mapped_quantities`, entries say
         where each mapping came from - `'mapped'` where requested
         directly, or `'auto'` or `'fixed'` where a higher-level
@@ -158,9 +160,75 @@ class Source:
         self.mapping = {}
         self.mapped_samples = {}
 
+        # names are generated from n_sources on demand, until set
+        self._names = None
+
         # everything asked for here is user-specified by definition, higher
         # level interfaces overwrite this where they add parameters themselves
         self.origin = {q: 'mapped' for q in mapped_quantities}
+
+    @property
+    def names(self):
+        """:obj:`list(str)`: name of each source.
+
+        Names identify sources when looking up their tables. Where none
+        are set, sources are named `source_0` to `source_N` in the order
+        they were provided. Setting requires the data to have been read
+        in already, as the number of sources follows from it.
+
+        Raises:
+          Exception: if set before any data is read in.
+          ValueError: if the number of names does not match the number
+            of sources, or if any name repeats.
+        """
+        if self._names is not None:
+            return self._names
+        return [f'source_{i}' for i in range(getattr(self, 'n_sources', 0))]
+
+    @names.setter
+    def names(self, names):
+        if not hasattr(self, 'n_sources'):
+            raise Exception("Cannot name sources before reading in data - "
+                            "use 'fromdict' or 'fromfile' first.")
+
+        names = [str(n) for n in names]
+
+        if len(names) != self.n_sources:
+            raise ValueError(f"Got {len(names)} source names for "
+                             f"{self.n_sources} sources.")
+
+        if len(set(names)) != len(names):
+            repeats = sorted({n for n in names if names.count(n) > 1})
+            raise ValueError("Source names must be unique, but multiple"
+                             f"insatances of {repeats} found.")
+
+        self._names = names
+
+    def source_index(self, source):
+        """Resolve a source to its index.
+
+        Args:
+          source (:obj:`str` or :obj:`int`): name of the source, as in
+            :attr:`names`, or its index.
+
+        Returns:
+          index (:obj:`int`): index of the source
+
+        Raises:
+          KeyError: if no source goes by that name.
+          IndexError: if the index falls outside the sources.
+        """
+        if isinstance(source, (int, np.integer)):
+            if not -self.n_sources <= source < self.n_sources:
+                raise IndexError(f"Source index {source} is outside the "
+                                 f"{self.n_sources} sources.")
+            return int(source) % self.n_sources
+
+        names = self.names
+        if source not in names:
+            raise KeyError(f"No source named '{source}'. Choose from: {names}")
+
+        return names.index(source)
 
     def validate_mapping(self):
         """ Validate the mapping choices, warn and/or except on issues.

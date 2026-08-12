@@ -60,6 +60,8 @@ _kw_defaults = {
     'is_mapped': ['pitch', 'time_evo'],
     # units assumed for spatial angles (polar, azimuth, theta, phi)
     'angle_unit': 'degrees',
+    # names to identify each source by, when looking up its table
+    'source_names': None,
     # Style File
     'style' : None,
     'caption': None,
@@ -356,6 +358,10 @@ class AudioFigure:
         _sources = getattr(sources, style.sources.capitalize())(to_map)
         _sources.origin = origin
         _sources.fromdict(map_data)
+
+        # name the sources, now that we know how many there are
+        if sonpars['source_names'] is not None:
+            _sources.names = sonpars['source_names']
         _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims,
                                          param_lims=out_lims, angle_unit=sonpars['angle_unit'])
 
