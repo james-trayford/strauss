@@ -307,13 +307,52 @@ def merge_events_original(duration, max_rate, time, arglist):
         newargs.append(mean[~np.isnan(mean)])
     return newargs
 
-def merge_events(duration, max_rate, time, arglist):
+def merge_events(duration, max_rate, time, arglist, mode='average',
+                 time_index=None, cyclic=None, return_index=False):
+    """ Thin events down to a maximum rate.
+
+    Events are sorted by time and grouped into clusters no closer
+    together than the maximum rate allows, each cluster then yielding a
+    single event. Every cluster sounds at its mean time, which keeps
+    events at least a gap apart and so holds the rate to `max_rate`.
+
+    How the remaining properties are decided depends on `mode`:
+    `'average'` takes the mean of the cluster, so the event represents
+    all of its members but corresponds to no one input event, while
+    `'central'` takes them from the member sounding closest to the mean
+    time, so the event remains a real data point.
+
+    Args:
+      duration (:obj:`float`): sonification duration in seconds
+      max_rate (:obj:`float`): maximum events per second
+      time (:obj:`ndarray`): event times, as a fraction of the
+        sonification length
+      arglist (:obj:`list(ndarray)`): input data arrays, one value per
+        event
+      mode (`optional`, :obj:`str`): `'average'` to average each
+        cluster, or `'central'` to take its most central event
+      time_index (`optional`, :obj:`int`): index in `arglist` of the
+        data mapped to time, which is always averaged so that events
+        keep to `max_rate`
+      cyclic (`optional`, :obj:`dict`): indices in `arglist` of data
+        that wraps around, with entries giving the value it wraps at
+        (e.g. 360, for an azimuth in degrees). These are averaged as
+        directions rather than as numbers, so that a cluster straddling
+        the wrap point does not average to the opposite direction.
+      return_index (`optional`, :obj:`bool`): if True, also return the
+        index of each cluster's most central event. Values that cannot
+        be averaged (e.g. names) can be carried through the thinning by
+        indexing them with this.
+
+    Returns:
+      sort_args (:obj:`list(ndarray)`): merged data arrays, in time order
+      repdx (:obj:`ndarray`, `optional`): index into the input events of
+      the most central event of each merged event
+    """
     min_gap = 1./(max_rate*duration)
     sortdx = np.argsort(time)
     sort_time = time[sortdx]
-    
-    gaps = np.diff(sort_time)
-    new_cluster_mask = gaps >= min_gap
+
     start_indices = [0]
     anchor = sort_time[0]
 
@@ -325,11 +364,40 @@ def merge_events(duration, max_rate, time, arglist):
     start_indices = np.array(start_indices)
     end_indices = np.append(start_indices[1:], len(sort_time))
     cluster_sizes = end_indices - start_indices
+
+    # the event of each cluster sounding closest to the cluster's mean
+    # time best represents it, whether or not we take its properties
+    mean_times = np.add.reduceat(sort_time, start_indices) / cluster_sizes
+    repdx = np.empty(start_indices.size, dtype=int)
+    for i in range(start_indices.size):
+        lo, hi = start_indices[i], end_indices[i]
+        repdx[i] = lo + np.argmin(abs(sort_time[lo:hi] - mean_times[i]))
+
+    cyclic = cyclic or {}
+
     sort_args = []
     for i in range(len(arglist)):
         sortvals = np.array(arglist[i])[sortdx]
-        merged_values = np.add.reduceat(sortvals, start_indices) / cluster_sizes
+        if (mode == 'central') and (i != time_index):
+            merged_values = sortvals[repdx]
+        elif i in cyclic:
+            # average as a direction, so that a cluster straddling the wrap
+            # point averages to the direction it lies in, rather than to the
+            # opposite one (e.g. 359 and 1 degrees to 0, not to 180)
+            period = cyclic[i]
+            phase = 2*np.pi*sortvals/period
+            sines = np.add.reduceat(np.sin(phase), start_indices)
+            cosines = np.add.reduceat(np.cos(phase), start_indices)
+            merged_values = np.arctan2(sines, cosines) % (2*np.pi)
+            merged_values *= period/(2*np.pi)
+        else:
+            # time is averaged whatever the mode, to hold the event rate
+            merged_values = np.add.reduceat(sortvals, start_indices) / cluster_sizes
         sort_args.append(merged_values)
+
+    if return_index:
+        return sort_args, sortdx[repdx]
+
     return sort_args
                 
         

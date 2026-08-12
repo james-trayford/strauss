@@ -260,16 +260,41 @@ class AudioFigure:
                 
         nmap = min(len(args), len(style.map))
         
+        source_names = sonpars['source_names']
+
         if (style.sources.lower() == 'events') and style.max_notes_per_sec:
+            tdx = None
             for i in range(nmap):
                 if style.map[i].output == 'time':
+                    tdx = i
                     tlims = style.map[i].input_range
                     tlims = set_limits(tlims, args[i], warn=False)
                     time = rescale_values(args[i], tlims, (0,1))
                     break
-            
+
+            # names are given per input event, so must be thinned alongside
+            # the data they name
+            if (source_names is not None) and (len(source_names) != len(args[0])):
+                raise ValueError(f"Got {len(source_names)} source names for "
+                                 f"{len(args[0])} input events.")
+
+            # azimuthal angles wrap around the circle, so must be merged as
+            # directions. Any angle given an input_range is mapped linearly
+            # rather than wrapped, so is merged that way too
+            amax = sources.angle_unit_maxs[sonpars['angle_unit']]
+            cyclic = {i: amax for i in range(nmap)
+                      if (style.map[i].output in sources.azimuthal_angles)
+                      and ('input_range' not in style.map[i].model_fields_set)}
+
             # lets now thin the data according to max events per second if using events
-            args = merge_events(sonpars['duration'], style.max_notes_per_sec, time, args)
+            args, repdx = merge_events(sonpars['duration'], style.max_notes_per_sec,
+                                       time, args, mode=style.merge_mode,
+                                       time_index=tdx, cyclic=cyclic,
+                                       return_index=True)
+
+            if source_names is not None:
+                # each merged event takes the name of the event representing it
+                source_names = [source_names[i] for i in repdx]
         
         to_map = []
         in_lims = {}
@@ -360,8 +385,8 @@ class AudioFigure:
         _sources.fromdict(map_data)
 
         # name the sources, now that we know how many there are
-        if sonpars['source_names'] is not None:
-            _sources.names = sonpars['source_names']
+        if source_names is not None:
+            _sources.names = source_names
         _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims,
                                          param_lims=out_lims, angle_unit=sonpars['angle_unit'])
 

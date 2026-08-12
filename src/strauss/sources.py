@@ -94,6 +94,7 @@ param_lim_dict = dict(zip(mappable, param_limits))
 
 spatial_angles = ('azimuth', 'polar', 'theta', 'phi')
 z_angles = ('polar', 'theta')
+azimuthal_angles = ('azimuth', 'phi')
 angle_unit_maxs = {'degrees': 360,
                    'radians': 2*np.pi,
                    'cycles': 1}
