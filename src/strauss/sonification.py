@@ -307,8 +307,9 @@ class Sonification:
           `pitch` parameters, which are internal fractions rather than
           what is heard - `time` is the time of the event in the
           sonification in seconds, and `note` the note it ultimately
-          sounds. Spatial angles are given in the sonification's
-          `angle_unit` rather than as mapped fractions.
+          sounds. Spatial angles are given in degrees, or in the
+          sonification's `angle_unit` where one was asked for, rather
+          than as mapped fractions.
 
         Args:
           include_input (`optional`, :obj:`bool`): if True, also give the
@@ -376,7 +377,8 @@ class Sonification:
         Note:
           As for :meth:`event_table`, `time` is given in seconds, and
           replaces the mapped `time_evo` parameter, and spatial angles
-          are given in the sonification's `angle_unit`. The note the
+          are given in degrees, or in the sonification's `angle_unit`
+          where one was asked for. The note the
           object plays, and its name, are given by the `note` and
           `source` entries of the table's `attrs`.
 
@@ -449,8 +451,8 @@ class Sonification:
           to source (e.g. the `pitch` assigned to each Object of a
           chord) have no one value to report, and are left out. Given a
           `source`, they take their value for that source, so are
-          listed. Spatial angles are given in the sonification's
-          `angle_unit`.
+          listed. Spatial angles are given in degrees, or in the
+          sonification's `angle_unit` where one was asked for.
 
         Args:
           source (`optional`, :obj:`str` or :obj:`int`): name or index

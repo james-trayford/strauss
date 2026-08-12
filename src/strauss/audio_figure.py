@@ -63,6 +63,9 @@ _kw_defaults = {
     'angle_unit': 'cycles',
     # names to identify each source by, when looking up its table
     'source_names': None,
+    # how events merged by max_notes_per_sec take their values, overriding
+    # the style's own merge_mode where given
+    'merge_mode': None,
     # Style File
     'style' : None,
     'caption': None,
@@ -263,6 +266,12 @@ class AudioFigure:
         
         source_names = sonpars['source_names']
 
+        # a merge_mode keyword overrides the style
+        merge_mode = sonpars['merge_mode'] or style.merge_mode
+        if merge_mode not in ('average', 'central'):
+            raise ValueError(f"merge_mode '{merge_mode}' is not recognised, "
+                             "choose from 'average' or 'central'.")
+
         if (style.sources.lower() == 'events') and style.max_notes_per_sec:
             tdx = None
             for i in range(nmap):
@@ -289,12 +298,12 @@ class AudioFigure:
 
             # lets now thin the data according to max events per second if using events
             args, clusters = merge_events(sonpars['duration'], style.max_notes_per_sec,
-                                          time, args, mode=style.merge_mode,
+                                          time, args, mode=merge_mode,
                                           time_index=tdx, cyclic=cyclic,
                                           return_index=True)
 
             if source_names is not None:
-                if style.merge_mode == 'central':
+                if merge_mode == 'central':
                     # the merged event is the event representing it, so is named
                     # by it
                     source_names = [source_names[i] for i in clusters['central']]
@@ -392,6 +401,11 @@ class AudioFigure:
        
         _sources = getattr(sources, style.sources.capitalize())(to_map)
         _sources.origin = origin
+
+        # report angles in whatever units they were given in, or in degrees
+        # where the user expressed no preference
+        if not is_default['angle_unit']:
+            _sources.table_angle_unit = sonpars['angle_unit']
         _sources.fromdict(map_data)
 
         # name the sources, now that we know how many there are

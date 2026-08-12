@@ -133,6 +133,9 @@ class Source:
         :meth:`apply_mapping_functions`.
       names (:obj:`list(str)`): name of each source, used to look up
         its table. Defaults to `source_0` to `source_N`.
+      table_angle_unit (:obj:`str`): units to report spatial angles
+        in, rather than as the mapped fractions the sonification works
+        in. Defaults to degrees where unset.
       origin (:obj:`dict`): keys are `mapped_quantities`, entries say
         where each mapping came from - `'mapped'` where requested
         directly, or `'auto'` or `'fixed'` where a higher-level
@@ -163,6 +166,9 @@ class Source:
 
         # names are generated from n_sources on demand, until set
         self._names = None
+
+        # units to report spatial angles in, degrees unless asked otherwise
+        self.table_angle_unit = None
 
         # everything asked for here is user-specified by definition, higher
         # level interfaces overwrite this where they add parameters themselves
@@ -232,13 +238,19 @@ class Source:
         return names.index(source)
 
     def in_angle_unit(self, key, values):
-        """Express mapped values of a spatial angle in its input unit.
+        """Express mapped values of a spatial angle in reporting units.
 
         Spatial angles are mapped to a fraction of the angular range
         they span, as this is what the sonification works in. This
-        converts such values back to the unit they were given in (see
-        the `angle_unit` argument of :meth:`apply_mapping_functions`),
-        leaving any other parameter alone.
+        converts such values to `table_angle_unit`, leaving any other
+        parameter alone. Where no unit was asked for, angles are
+        reported in degrees as the most readable choice, whatever units
+        they were given in.
+
+        Note:
+          Angles given `map_lims` are mapped linearly rather than
+          wrapped, so are not angular quantities to convert, and are
+          left alone too.
 
         Args:
           key (:obj:`str`): name of the mapped parameter
@@ -246,12 +258,12 @@ class Source:
 
         Returns:
           values (:obj:`array-like` or :obj:`float`): the values in
-          units of `angle_unit`, if `key` is a spatial angle
+          units of `table_angle_unit`, if `key` is a spatial angle
         """
         if (key not in spatial_angles) or (key in getattr(self, 'map_lims', {})):
             return values
 
-        amax = angle_unit_maxs[getattr(self, 'angle_unit', None) or 'cycles']
+        amax = angle_unit_maxs[getattr(self, 'table_angle_unit', None) or 'degrees']
 
         if key in z_angles:
             # polar angles are folded onto half a turn
