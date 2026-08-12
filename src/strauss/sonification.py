@@ -15,9 +15,11 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
+from .sources import Events
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import sys
 import os
@@ -129,6 +131,57 @@ class Sonification:
             elif isinstance(self.out_channels[chan], np.ndarray):
                 self.out_channels[chan][:] = 0.
             
+    def _assign_notes(self):
+        """Determine the note played by each source, and when.
+
+        Combines the :obj:`Sources` `time` and `pitch` mappings with the
+        :obj:`Score` chord sequence to decide which note each source
+        sounds, and at what point in the sonification. Used by
+        :meth:`render`, and by the table methods so that a table can be
+        produced without rendering any audio.
+
+        Note:
+          As in :meth:`render`, sources with no `time` mapping are all
+          assumed to start at zero and last the full sonification.
+
+        Returns:
+          notes (:obj:`list(str)`): note played by each source, in
+            scientific pitch notation (e.g. :obj:`'A4'`)
+          times (:obj:`ndarray`): start time of each source in seconds
+        """
+        # determine if time is provided, if not assume all start at zero
+        # and last the duration of sonification
+        if "time" not in self.sources.mapping:
+            self.sources.mapping['time'] = [0.] * self.sources.n_sources
+            self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources
+
+        # index each chord
+        cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
+        cbin = np.clip(cbin-1, 0, self.score.nchords-1)
+
+        # pitch rank of each source divided by the number of sources
+        pitch = np.asarray(self.sources.mapping['pitch'])
+        pitchfrac = np.empty_like(pitch)
+        if self.score.pitch_binning == 'adaptive' and np.unique(pitch).size > 1:
+            idxs = np.argsort(pitch)
+            pitchfrac[idxs] = np.arange(self.sources.n_sources)/self.sources.n_sources
+        else:
+            # a single pitch value has no ranking to adapt to - ranking it
+            # would spread sources over the chord in whatever order they
+            # arrived in, so bin it as a fixed pitch, as uniform binning does
+            pitchfrac = np.clip(pitch, 0, 9.999999e-1)
+
+        notes = []
+        for source in range(self.sources.n_sources):
+            chord = self.score.note_sequence[cbin[source]]
+            nints = self.score.nintervals[cbin[source]]
+            notes.append(chord[int(pitchfrac[source] * nints)])
+
+        # mapped time is a fraction of the sonification length
+        times = np.array(self.sources.mapping['time']) * self.score.length
+
+        return notes, times
+
     def render(self, downsamp=1, progress=True):
         """Render the sonification.
         
@@ -148,24 +201,10 @@ class Sonification:
         # first, clear the audio channels
         self.clear()
         
-        # determine if time is provided, if not assume all start at zero
-        # and last the duration of sonification
+        # determine the note played by each source and when it starts
+        # (this also defaults the time mapping, if none was provided)
+        notes, _ = self._assign_notes()
 
-        if "time" not in self.sources.mapping:
-            self.sources.mapping['time'] = [0.] * self.sources.n_sources
-            self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources
-            
-        # index each chord
-        cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
-        cbin = np.clip(cbin-1, 0, self.score.nchords-1)
-
-        # pitch rank of each source divided by the number of sources
-        pitchfrac = np.empty_like(self.sources.mapping['pitch'])
-        if self.score.pitch_binning == 'adaptive':
-            pitchfrac[np.argsort(self.sources.mapping['pitch'])] = np.arange(self.sources.n_sources)/self.sources.n_sources
-        elif self.score.pitch_binning == 'uniform':
-            pitchfrac = np.clip(self.sources.mapping['pitch'], 0, 9.999999e-1)
-            
         # get some relevant numbers before iterating through sources
         Nsamp = self.out_channels['0'].values.size
         lastsamp = Nsamp - 1
@@ -179,10 +218,7 @@ class Sonification:
             # index note properties
             t = self.sources.mapping['time'][source]
             tsamp = int((Nsamp-1) * t)
-            chord = self.score.note_sequence[cbin[source]]
-            nints = self.score.nintervals[cbin[source]]
-            pitch = pitchfrac[source]
-            note = chord[int(pitch * nints)]
+            note = notes[source]
 
             # make dictionary for feeding to play function with each notes properties
             sourcemap = {}
@@ -250,6 +286,89 @@ class Sonification:
             for c in range(Nchan):
                 self.caption_channels[str(c)] = Stream(0, self.samprate) 
 
+
+    def _check_can_tabulate(self):
+        """Check the sources carry the mapped values a table needs."""
+        if not getattr(self.sources, 'mapped_samples', {}):
+            raise Exception("Sources have no mapped values to tabulate - run "
+                            "'apply_mapping_functions' on the sources first.")
+
+    def event_table(self, include_input=False):
+        """Tabulate the events of the sonification.
+
+        Produces a table with a row per event, giving the time at which
+        it sounds, the note played, and the value of each user-specified
+        mapped parameter. Parameters added automatically or held at fixed
+        values are excluded, and are instead listed by
+        :meth:`fixed_table`.
+
+        Note:
+          The `time` column is the time of the event in the sonification,
+          in seconds, and so replaces any mapped `time` parameter (which
+          is a fraction of the sonification length). Where events have
+          been thinned by a `max_notes_per_sec` limit, rows represent the
+          events that sound rather than the input data points.
+
+        Args:
+          include_input (`optional`, :obj:`bool`): if True, also give the
+            input data value of each parameter, before mapping, in a
+            column suffixed `'_input'`.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per event
+        """
+        self._check_can_tabulate()
+        if not isinstance(self.sources, Events):
+            raise TypeError(f"'event_table' is for Events sources, but these "
+                            f"sources are {type(self.sources).__name__}.")
+
+        notes, times = self._assign_notes()
+        table = {'time': times, 'note': notes}
+
+        for key in self.sources.mapped_quantities:
+            if self.sources.origin.get(key, 'mapped') != 'mapped':
+                continue
+            if key not in ('time', 'time_evo'):
+                # time is already the index of each row
+                table[key] = np.asarray(self.sources.mapped_samples[key])
+            if include_input:
+                table[f'{key}_input'] = np.asarray(self.sources.raw_mapping[key])
+
+        return pd.DataFrame(table)
+
+    def fixed_table(self):
+        """Tabulate parameters the user did not map.
+
+        Companion to :meth:`event_table`, listing the parameters the
+        user did not map - those held at a fixed value, and those
+        STRAUSS assigned itself where no mapping was given (`'fixed'`
+        and `'auto'` in the `origin` column, respectively) - alongside
+        the value each takes.
+
+        Note:
+          Parameters varying from source to source (e.g. the `pitch`
+          assigned to each Object of a chord) have no one value to
+          report, and are left out.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per unmapped parameter
+        """
+        self._check_can_tabulate()
+
+        rows = []
+        for key in self.sources.mapped_quantities:
+            origin = self.sources.origin.get(key, 'mapped')
+            if origin == 'mapped':
+                continue
+            values = np.unique(np.asarray(self.sources.mapped_samples[key]))
+            if values.size != 1:
+                # not held at one value, so don't claim it is
+                continue
+            rows.append({'parameter': key,
+                         'value': values[0],
+                         'origin': origin})
+
+        return pd.DataFrame(rows, columns=['parameter', 'value', 'origin'])
 
     def add_ticks(self, increment, duration=0.04, tick_vol=0.25):
         # TODO this should probably use a dedicated generator...
