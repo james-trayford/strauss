@@ -273,6 +273,10 @@ class AudioFigure:
         in_lims = {}
         out_lims = {}
         mapping_functions = {}
+
+        # track where each mapping came from, so that tables and summaries
+        # can tell user-specified mappings from those we add here
+        origin = {}
         
         # Iterate through the mappings and add lims and funcs to their own dicts
         for i in range(nmap):
@@ -288,8 +292,9 @@ class AudioFigure:
                 style.generator.mods["filter"] = "on" 
                 
             to_map.append(mapping.output)
+            origin[to_map[-1]] = 'mapped'
 
-            # only limits explicitly  asked for given angle_unit handling 
+            # only limits explicitly  asked for given angle_unit handling
             if 'input_range' in mapping.model_fields_set:
                 in_lims[to_map[-1]] = mapping.input_range
             if mapping.output_range:
@@ -301,7 +306,8 @@ class AudioFigure:
         
         if 'pitch' not in to_map:
             to_map.append('pitch')
-            
+            origin['pitch'] = 'auto'
+
             if style.sources == 'objects':
                 nnote = len(style.notes)
                 for k in map_data.keys():
@@ -317,6 +323,7 @@ class AudioFigure:
             mapping = style.map[i]
             if mapping.fixed is not None:
                 to_map.append(mapping.output)
+                origin[mapping.output] = 'fixed'
 
                 if mapping.output not in sources.spatial_angles:
                     lims = sources.param_lim_dict[mapping.output]
@@ -343,9 +350,11 @@ class AudioFigure:
                     in_lims[prop] = sources.param_lim_dict[prop]
                     out_lims[prop] = sources.param_lim_dict[prop]
                 to_map.append(prop)
+                origin[prop] = 'fixed'
 
        
         _sources = getattr(sources, style.sources.capitalize())(to_map)
+        _sources.origin = origin
         _sources.fromdict(map_data)
         _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims,
                                          param_lims=out_lims, angle_unit=sonpars['angle_unit'])

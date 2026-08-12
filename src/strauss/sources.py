@@ -25,8 +25,9 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy import signal as sig
-from .utilities import rescale_values 
+from .utilities import rescale_values
 import warnings
+import copy
 
 mappable = ['polar',
             'azimuth',
@@ -125,7 +126,15 @@ class Source:
       mapping (:obj:`dict`): processed mapping :obj:`dict` rescaled
         to parameter ranges, or interpolation funtions for evolving
         parameters.
-    
+      mapped_samples (:obj:`dict`): as `mapping`, but retaining the
+        mapped values of evolving parameters rather than replacing
+        them with interpolation functions. Set by
+        :meth:`apply_mapping_functions`.
+      origin (:obj:`dict`): keys are `mapped_quantities`, entries say
+        where each mapping came from - `'mapped'` where requested
+        directly, or `'auto'` or `'fixed'` where a higher-level
+        interface (e.g. `AudioFigure`) added it.
+
     Raises:
     	UnrecognisedProperty: if `mapped_quantities` entry not in `mappable`.
     """
@@ -147,6 +156,11 @@ class Source:
         self.mapped_quantities = mapped_quantities
         self.raw_mapping = {}
         self.mapping = {}
+        self.mapped_samples = {}
+
+        # everything asked for here is user-specified by definition, higher
+        # level interfaces overwrite this where they add parameters themselves
+        self.origin = {q: 'mapped' for q in mapped_quantities}
 
     def validate_mapping(self):
         """ Validate the mapping choices, warn and/or except on issues.
@@ -315,8 +329,13 @@ class Source:
             else:
                 scaledvals = rescale_values(np.array(mapvals), lims, plims)
                 self.mapping[key] =  list(scaledvals)
-            
-        # finally, iterate through sources and interpolate evo functions 
+
+        # keep the mapped values themselves before evolving parameters are
+        # replaced by interpolation functions below. Deep copy as the angle
+        # unwrapping further down modifies the mapped arrays in place.
+        self.mapped_samples = copy.deepcopy(self.mapping)
+
+        # finally, iterate through sources and interpolate evo functions
         for key in self.mapping:
             if key == "time_evo":
                 continue
