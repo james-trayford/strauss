@@ -303,11 +303,11 @@ class Sonification:
         :meth:`fixed_table`.
 
         Note:
-          The `time` column is the time of the event in the sonification,
-          in seconds, and so replaces any mapped `time` parameter (which
-          is a fraction of the sonification length). Where events have
-          been thinned by a `max_notes_per_sec` limit, rows represent the
-          events that sound rather than the input data points.
+          The `time` and `note` columns replace any mapped `time` and
+          `pitch` parameters, which are internal fractions rather than
+          what is heard - `time` is the time of the event in the
+          sonification in seconds, and `note` the note it ultimately
+          sounds.
 
         Args:
           include_input (`optional`, :obj:`bool`): if True, also give the
@@ -328,8 +328,9 @@ class Sonification:
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':
                 continue
-            if key not in ('time', 'time_evo'):
-                # time is already the index of each row
+            if key not in ('time', 'time_evo', 'pitch'):
+                # time and pitch are already given by the time and note
+                # of each row, in the terms actually heard
                 table[key] = np.asarray(self.sources.mapped_samples[key])
             if include_input:
                 table[f'{key}_input'] = np.asarray(self.sources.raw_mapping[key])
