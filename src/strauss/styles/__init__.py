@@ -443,7 +443,7 @@ class Style(MonitoredBaseModel):
         )
 
     merge_mode: Literal['average', 'central'] = Field(
-        default='average',
+        default='central',
         title='Event Merge Mode',
         description='How events merged together by "max_notes_per_sec" take their values. '
                     'Choose from "average", where the merged event takes the mean of all the '

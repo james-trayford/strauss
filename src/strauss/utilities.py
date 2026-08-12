@@ -339,15 +339,17 @@ def merge_events(duration, max_rate, time, arglist, mode='average',
         (e.g. 360, for an azimuth in degrees). These are averaged as
         directions rather than as numbers, so that a cluster straddling
         the wrap point does not average to the opposite direction.
-      return_index (`optional`, :obj:`bool`): if True, also return the
-        index of each cluster's most central event. Values that cannot
-        be averaged (e.g. names) can be carried through the thinning by
+      return_index (`optional`, :obj:`bool`): if True, also return how
+        the input events fall into clusters. Values that cannot be
+        averaged (e.g. names) can be carried through the thinning by
         indexing them with this.
 
     Returns:
       sort_args (:obj:`list(ndarray)`): merged data arrays, in time order
-      repdx (:obj:`ndarray`, `optional`): index into the input events of
-      the most central event of each merged event
+      clusters (:obj:`dict`, `optional`): describing the cluster behind
+      each merged event, with `'central'`, `'first'` and `'last'`
+      indexing the input events of its most central, earliest and latest
+      members, and `'size'` giving the number of events merged
     """
     min_gap = 1./(max_rate*duration)
     sortdx = np.argsort(time)
@@ -396,7 +398,11 @@ def merge_events(duration, max_rate, time, arglist, mode='average',
         sort_args.append(merged_values)
 
     if return_index:
-        return sort_args, sortdx[repdx]
+        clusters = {'central': sortdx[repdx],
+                    'first': sortdx[start_indices],
+                    'last': sortdx[end_indices-1],
+                    'size': cluster_sizes}
+        return sort_args, clusters
 
     return sort_args
                 

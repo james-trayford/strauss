@@ -58,8 +58,9 @@ INTMAX32 = (pow(2, 31)-1)
 _kw_defaults = {
     'duration': 10,
     'is_mapped': ['pitch', 'time_evo'],
-    # units assumed for spatial angles (polar, azimuth, theta, phi)
-    'angle_unit': 'degrees',
+    # units assumed for spatial angles (polar, azimuth, theta, phi), where
+    # a cycle is a full turn, as the mapped parameters themselves are
+    'angle_unit': 'cycles',
     # names to identify each source by, when looking up its table
     'source_names': None,
     # Style File
@@ -287,14 +288,23 @@ class AudioFigure:
                       and ('input_range' not in style.map[i].model_fields_set)}
 
             # lets now thin the data according to max events per second if using events
-            args, repdx = merge_events(sonpars['duration'], style.max_notes_per_sec,
-                                       time, args, mode=style.merge_mode,
-                                       time_index=tdx, cyclic=cyclic,
-                                       return_index=True)
+            args, clusters = merge_events(sonpars['duration'], style.max_notes_per_sec,
+                                          time, args, mode=style.merge_mode,
+                                          time_index=tdx, cyclic=cyclic,
+                                          return_index=True)
 
             if source_names is not None:
-                # each merged event takes the name of the event representing it
-                source_names = [source_names[i] for i in repdx]
+                if style.merge_mode == 'central':
+                    # the merged event is the event representing it, so is named
+                    # by it
+                    source_names = [source_names[i] for i in clusters['central']]
+                else:
+                    # the merged event is an average of several, so name it for
+                    # the span it covers, from the earliest event to the latest
+                    source_names = [source_names[a] if a == b else
+                                    f'{source_names[a]}->{source_names[b]}'
+                                    for a, b in zip(clusters['first'],
+                                                    clusters['last'])]
         
         to_map = []
         in_lims = {}
