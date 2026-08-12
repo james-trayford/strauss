@@ -405,6 +405,73 @@ class AudioFigure:
         for i, k in enumerate(self.sonifications.keys()):
             print(f"\t{i+1}.\t {k}")
 
+    def _get_sonification(self, name=None):
+        """Look up one of the figure's sonifications by name.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+
+        Returns:
+          soni (:class:`~strauss.sonification.Sonification`): the named
+          sonification
+
+        Raises:
+          KeyError: if no such sonification exists, or if no name is
+            given for a figure holding more than one.
+        """
+        if not self.sonifications:
+            raise KeyError("AudioFigure has no sonifications yet.")
+
+        if name is None:
+            if len(self.sonifications) > 1:
+                raise KeyError("AudioFigure has more than one sonification, so "
+                               "a 'name' is needed. Choose from: "
+                               f"{list(self.sonifications)}")
+            return next(iter(self.sonifications.values()))
+
+        if name not in self.sonifications:
+            raise KeyError(f"No sonification named '{name}' in this AudioFigure. "
+                           f"Choose from: {list(self.sonifications)}")
+
+        return self.sonifications[name]
+
+    def get_event_table(self, name=None, include_input=False):
+        """Get the table of events for a sonification.
+
+        Wrapper for
+        :meth:`~strauss.sonification.Sonification.event_table`, giving a
+        row per event with the time it sounds, the note played and the
+        value of each user-specified mapped parameter.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+          include_input (`optional`, :obj:`bool`): if True, also give
+            the input data value of each parameter, before mapping.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per event
+        """
+        return self._get_sonification(name).event_table(include_input=include_input)
+
+    def get_fixed_table(self, name=None):
+        """Get the table of unmapped parameters for a sonification.
+
+        Wrapper for
+        :meth:`~strauss.sonification.Sonification.fixed_table`, giving a
+        row per parameter that the user did not map, and the value it
+        takes.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per unmapped parameter
+        """
+        return self._get_sonification(name).fixed_table()
+
     def rename(self, old, new):
         dicts = [self.sonifications, self.levels, self.styles, self.figure_hashes]
         for d in dicts:
