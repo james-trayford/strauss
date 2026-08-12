@@ -461,7 +461,30 @@ class AudioFigure:
         """
         return self._get_sonification(name).event_table(include_input=include_input)
 
-    def get_fixed_table(self, name=None):
+    def get_object_table(self, name=None, source=None, include_input=False):
+        """Get the table of one object's evolution in a sonification.
+
+        Wrapper for
+        :meth:`~strauss.sonification.Sonification.object_table`, giving
+        a row per point in the object's evolution.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of the source. Can be omitted where the sonification has
+            only one.
+          include_input (`optional`, :obj:`bool`): if True, also give
+            the input data value of each parameter, before mapping.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per point in the
+          object's evolution
+        """
+        soni = self._get_sonification(name)
+        return soni.object_table(source, include_input=include_input)
+
+    def get_fixed_table(self, name=None, source=None):
         """Get the table of unmapped parameters for a sonification.
 
         Wrapper for
@@ -472,11 +495,68 @@ class AudioFigure:
         Args:
           name (`optional`, :obj:`str`): name of the sonification. Can
             be omitted where the figure holds only one.
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of a source to report values for. If omitted, values are
+            reported for the sonification as a whole.
 
         Returns:
           table (:obj:`pandas.DataFrame`): one row per unmapped parameter
         """
-        return self._get_sonification(name).fixed_table()
+        return self._get_sonification(name).fixed_table(source)
+
+    def get_table(self, name=None, source=None, include_input=False):
+        """Get the timing table for a sonification.
+
+        Returns the table appropriate to the sonification's source type
+        - :meth:`get_event_table` for `Events`, where the sonification
+        has a single table of events, and :meth:`get_object_table` for
+        `Objects`, where each source has a table of its own evolution.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of the source, for `Objects` sonifications. Can be omitted
+            where the sonification has only one.
+          include_input (`optional`, :obj:`bool`): if True, also give
+            the input data value of each parameter, before mapping.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): the sonification's table of
+          events, or the named source's table of evolution
+
+        Raises:
+          TypeError: if a `source` is given for an `Events`
+            sonification, where events are not divided by source.
+        """
+        soni = self._get_sonification(name)
+
+        if isinstance(soni.sources, sources.Events):
+            if source is not None:
+                raise TypeError("Events sonifications have a single table of "
+                                f"all events, so cannot take source '{source}'.")
+            return soni.event_table(include_input=include_input)
+
+        return soni.object_table(source, include_input=include_input)
+
+    def list_tables(self):
+        """Print the tables available from this figure.
+
+        Lists each sonification with the tables it offers - a single
+        table of events for `Events` sonifications, or one per named
+        source, with the note it plays, for `Objects`.
+        """
+        for i, (name, soni) in enumerate(self.sonifications.items()):
+            stype = type(soni.sources).__name__
+            print(f"\t{i+1}.\t {name} ({stype})")
+
+            if isinstance(soni.sources, sources.Events):
+                print(f"\t\t - {soni.sources.n_sources} events")
+                continue
+
+            notes, _ = soni._assign_notes()
+            for sname, note in zip(soni.sources.names, notes):
+                print(f"\t\t - {sname} ({note})")
 
     def rename(self, old, new):
         dicts = [self.sonifications, self.levels, self.styles, self.figure_hashes]

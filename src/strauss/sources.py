@@ -230,6 +230,34 @@ class Source:
 
         return names.index(source)
 
+    def in_angle_unit(self, key, values):
+        """Express mapped values of a spatial angle in its input unit.
+
+        Spatial angles are mapped to a fraction of the angular range
+        they span, as this is what the sonification works in. This
+        converts such values back to the unit they were given in (see
+        the `angle_unit` argument of :meth:`apply_mapping_functions`),
+        leaving any other parameter alone.
+
+        Args:
+          key (:obj:`str`): name of the mapped parameter
+          values (:obj:`array-like` or :obj:`float`): mapped values
+
+        Returns:
+          values (:obj:`array-like` or :obj:`float`): the values in
+          units of `angle_unit`, if `key` is a spatial angle
+        """
+        if (key not in spatial_angles) or (key in getattr(self, 'map_lims', {})):
+            return values
+
+        amax = angle_unit_maxs[getattr(self, 'angle_unit', None) or 'cycles']
+
+        if key in z_angles:
+            # polar angles are folded onto half a turn
+            amax *= 0.5
+
+        return np.asarray(values) * amax
+
     def validate_mapping(self):
         """ Validate the mapping choices, warn and/or except on issues.
 

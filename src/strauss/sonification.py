@@ -15,7 +15,7 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .sources import Events
+from .sources import Events, Objects
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
@@ -296,18 +296,19 @@ class Sonification:
     def event_table(self, include_input=False):
         """Tabulate the events of the sonification.
 
-        Produces a table with a row per event, giving the time at which
-        it sounds, the note played, and the value of each user-specified
-        mapped parameter. Parameters added automatically or held at fixed
-        values are excluded, and are instead listed by
-        :meth:`fixed_table`.
+        Produces a table with a row per event, giving the name of the
+        source it represents, the time at which it sounds, the note
+        played, and the value of each user-specified mapped parameter.
+        Parameters added automatically or held at fixed values are
+        excluded, and are instead listed by :meth:`fixed_table`.
 
         Note:
           The `time` and `note` columns replace any mapped `time` and
           `pitch` parameters, which are internal fractions rather than
           what is heard - `time` is the time of the event in the
           sonification in seconds, and `note` the note it ultimately
-          sounds.
+          sounds. Spatial angles are given in the sonification's
+          `angle_unit` rather than as mapped fractions.
 
         Args:
           include_input (`optional`, :obj:`bool`): if True, also give the
@@ -323,7 +324,9 @@ class Sonification:
                             f"sources are {type(self.sources).__name__}.")
 
         notes, times = self._assign_notes()
-        table = {'time': times, 'note': notes}
+
+        # each event is a source, so is named by it
+        table = {'source': self.sources.names, 'time': times, 'note': notes}
 
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':
@@ -331,13 +334,108 @@ class Sonification:
             if key not in ('time', 'time_evo', 'pitch'):
                 # time and pitch are already given by the time and note
                 # of each row, in the terms actually heard
-                table[key] = np.asarray(self.sources.mapped_samples[key])
+                table[key] = self.sources.in_angle_unit(
+                    key, np.asarray(self.sources.mapped_samples[key]))
             if include_input:
                 table[f'{key}_input'] = np.asarray(self.sources.raw_mapping[key])
 
         return pd.DataFrame(table)
 
-    def fixed_table(self):
+    def _resolve_source(self, source=None):
+        """Resolve a source name or index, defaulting to a lone source.
+
+        Args:
+          source (`optional`, :obj:`str` or :obj:`int`): name or index of
+            the source. Can be omitted where there is only one.
+
+        Returns:
+          index (:obj:`int`): index of the source
+
+        Raises:
+          KeyError: if omitted where there is more than one source.
+        """
+        if source is None:
+            if self.sources.n_sources > 1:
+                raise KeyError("Sonification has more than one source, so a "
+                               "'source' is needed. Choose from: "
+                               f"{self.sources.names}")
+            return 0
+
+        return self.sources.source_index(source)
+
+    def object_table(self, source=None, include_input=False):
+        """Tabulate the evolution of one object of the sonification.
+
+        Produces a table for a single source, with a row per point in
+        its continuous evolution, giving the time and the value of each
+        user-specified mapped parameter at that point. Parameters that
+        do not evolve hold the same value down their column. Those the
+        user did not map are excluded, and are instead listed by
+        :meth:`fixed_table`.
+
+        Note:
+          As for :meth:`event_table`, `time` is given in seconds, and
+          replaces the mapped `time_evo` parameter, and spatial angles
+          are given in the sonification's `angle_unit`. The note the
+          object plays, and its name, are given by the `note` and
+          `source` entries of the table's `attrs`.
+
+        Args:
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of the source, as in :attr:`Source.names`. Can be omitted
+            where the sonification has only one source.
+          include_input (`optional`, :obj:`bool`): if True, also give the
+            input data value of each parameter, before mapping, in a
+            column suffixed `'_input'`.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per point in the
+          object's evolution
+        """
+        self._check_can_tabulate()
+        if not isinstance(self.sources, Objects):
+            raise TypeError(f"'object_table' is for Objects sources, but these "
+                            f"sources are {type(self.sources).__name__}.")
+
+        index = self._resolve_source(source)
+
+        # objects with nothing evolving have no time base, and so are a
+        # single unchanging state
+        if 'time_evo' in self.sources.mapped_samples:
+            times = np.asarray(self.sources.mapped_samples['time_evo'][index])
+            times = times * self.score.length
+        else:
+            times = np.zeros(1)
+
+        def _down_column(values):
+            """Broadcast an unevolving value down the time column."""
+            values = np.asarray(values)
+            if values.ndim == 0:
+                return np.broadcast_to(values, times.shape)
+            return values
+
+        table = {'time': times}
+
+        for key in self.sources.mapped_quantities:
+            if self.sources.origin.get(key, 'mapped') != 'mapped':
+                continue
+            if key not in ('time', 'time_evo', 'pitch'):
+                # time and pitch are already given by the time column and
+                # the note of the object, in the terms actually heard
+                table[key] = self.sources.in_angle_unit(
+                    key, _down_column(self.sources.mapped_samples[key][index]))
+            if include_input:
+                table[f'{key}_input'] = _down_column(self.sources.raw_mapping[key][index])
+
+        table = pd.DataFrame(table)
+
+        notes, _ = self._assign_notes()
+        table.attrs['source'] = self.sources.names[index]
+        table.attrs['note'] = notes[index]
+
+        return table
+
+    def fixed_table(self, source=None):
         """Tabulate parameters the user did not map.
 
         Companion to :meth:`event_table`, listing the parameters the
@@ -347,26 +445,39 @@ class Sonification:
         the value each takes.
 
         Note:
-          Parameters varying from source to source (e.g. the `pitch`
-          assigned to each Object of a chord) have no one value to
-          report, and are left out.
+          Across the whole sonification, parameters varying from source
+          to source (e.g. the `pitch` assigned to each Object of a
+          chord) have no one value to report, and are left out. Given a
+          `source`, they take their value for that source, so are
+          listed. Spatial angles are given in the sonification's
+          `angle_unit`.
+
+        Args:
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of a source, as in :attr:`Source.names`, to report values
+            for. If omitted, values are reported for the sonification as
+            a whole.
 
         Returns:
           table (:obj:`pandas.DataFrame`): one row per unmapped parameter
         """
         self._check_can_tabulate()
 
+        index = None if source is None else self._resolve_source(source)
+
         rows = []
         for key in self.sources.mapped_quantities:
             origin = self.sources.origin.get(key, 'mapped')
             if origin == 'mapped':
                 continue
-            values = np.unique(np.asarray(self.sources.mapped_samples[key]))
+            values = self.sources.mapped_samples[key]
+            values = np.unique(np.asarray(values if index is None
+                                          else values[index]))
             if values.size != 1:
                 # not held at one value, so don't claim it is
                 continue
             rows.append({'parameter': key,
-                         'value': values[0],
+                         'value': self.sources.in_angle_unit(key, values[0]),
                          'origin': origin})
 
         return pd.DataFrame(rows, columns=['parameter', 'value', 'origin'])
