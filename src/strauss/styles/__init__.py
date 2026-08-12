@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, PrivateAttr, Field, field_validator, model_validator
 from typing import Optional, Literal, Dict, List, Union, Tuple
-from ..sources import param_lim_dict as valid_params
+from ..sources import param_lim_dict as valid_params, spatial_angles
 from pathlib import Path
 import random
 import numpy as np
@@ -231,12 +231,17 @@ class Mapping(MonitoredBaseModel):
         
         if self.fixed is None:
             return self
-        
+
+        if self.output in spatial_angles:
+            # spatial angles are cyclic, so any value is valid - it is wrapped
+            # around the circle in the units given by angle_unit
+            return self
+
         valid_min, valid_max = valid_params[self.output]
-        
+
         if not valid_min <= self.fixed <= valid_max:
             raise ValueError('Fixed value must be between the limits of the output parameter.')
-        
+
         return self
     
 

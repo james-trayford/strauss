@@ -184,7 +184,7 @@ class Source:
             if (ang in params) and not (ang in self.map_lims) and not (self.angle_unit):
                 warn_text += f" - no angle unit or map_lims entry for {ang}, assuming values (0,1] for fractions of a circle (cycles)  \n"
             if (ang in self.map_lims) and (self.angle_unit):
-                warn_text += f" - map_lims entry for '{ang}' ('{ang}':{self.map_lims['ang']}) provided alongside "
+                warn_text += f" - map_lims entry for '{ang}' ('{ang}':{self.map_lims[ang]}) provided alongside "
                 warn_text += f"angle_unit={self.angle_unit}. Ignoring angle_unit for '{ang}'.\n"
                 
         # Finally, warn or except about any issues after full audit of mapping

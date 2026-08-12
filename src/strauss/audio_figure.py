@@ -58,6 +58,8 @@ INTMAX32 = (pow(2, 31)-1)
 _kw_defaults = {
     'duration': 10,
     'is_mapped': ['pitch', 'time_evo'],
+    # units assumed for spatial angles (polar, azimuth, theta, phi)
+    'angle_unit': 'degrees',
     # Style File
     'style' : None,
     'caption': None,
@@ -286,7 +288,9 @@ class AudioFigure:
                 style.generator.mods["filter"] = "on" 
                 
             to_map.append(mapping.output)
-            if mapping.input_range:
+
+            # only limits explicitly  asked for given angle_unit handling 
+            if 'input_range' in mapping.model_fields_set:
                 in_lims[to_map[-1]] = mapping.input_range
             if mapping.output_range:
                 out_lims[to_map[-1]] = mapping.output_range
@@ -311,16 +315,20 @@ class AudioFigure:
         # we now iterate through style fixed values
         for i in range(nmap, len(style.map)):
             mapping = style.map[i]
-            if mapping.fixed:
-                if mapping.input_range:
-                    in_lims[to_map[-1]] = mapping.input_range
-                if mapping.output_range:
-                    out_lims[to_map[-1]] = mapping.output_range
+            if mapping.fixed is not None:
+                to_map.append(mapping.output)
+
+                if mapping.output not in sources.spatial_angles:
+                    lims = sources.param_lim_dict[mapping.output]
+                    in_lims[mapping.output] = lims
+                    out_lims[mapping.output] = lims
+                # spatial angles are left to apply_mapping_functions, which
+                # scales them by angle_unit and wraps them around the circle
 
                 fix_array =  len(map_data[to_map[0]])*[mapping.fixed]
-                to_map.append(mapping.output)
+
                 map_data[mapping.output] = fix_array
-                    
+
         # and finally overwrite with any kwarg fixed values:
         for k in sonpars.keys():
             ksplit = k.split('fix_')
@@ -329,19 +337,18 @@ class AudioFigure:
                 if prop in to_map:
                     print(f'Overwriting {prop} with fixed value...')
                 map_data[prop] = [sonpars[k]]*len(map_data[to_map[0]])
-                if prop in ['azimuth', 'polar']:
-                    if prop == 'polar':
-                        in_lims[prop] = (0,180)
-                    if prop == 'azimuth':
-                        in_lims[prop] = (0,360)
-                else:
-                    in_lims[prop] = (0,1)
+                # as above: angles are scaled and wrapped later
+                
+                if prop not in sources.spatial_angles:
+                    in_lims[prop] = sources.param_lim_dict[prop]
+                    out_lims[prop] = sources.param_lim_dict[prop]
                 to_map.append(prop)
 
        
         _sources = getattr(sources, style.sources.capitalize())(to_map)
         _sources.fromdict(map_data)
-        _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims, param_lims=out_lims)
+        _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims,
+                                         param_lims=out_lims, angle_unit=sonpars['angle_unit'])
 
         # Set up Generator
         gentype = style.generator.type
