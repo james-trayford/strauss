@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.5
+
+### Added
+
+- Timing tables, describing what sounded and when. `Events` sonifications have a single
+  table of events, `Objects` sonifications one per source, via `Sonification.event_table()`
+  and `.object_table(source)`, or `AudioFigure.get_table()` which picks the right one.
+  `.fixed_table()` lists the parameters the user didn't map and the value each took.
+  `AudioFigure.list_tables()` shows what's tabulated. Tables are built from the mapping,
+  prior to render, and report what's heard: notes rather than pitch fractions, seconds
+  rather than fractions of the duration and degrees rather than cycles.
+- Sources can be named, via `sonify(source_names=[...])` or `Sources.names`, and their
+  tables looked up by name. For `Events` give one name per input event, and they are
+  thinned along with the data.
+- `merge_mode`, a `Style` field also settable per `sonify` call, choosing how events
+  merged by `max_notes_per_sec` take their values (see **Changed**).
+
+### Changed
+
+- Events merged by `max_notes_per_sec` now take the values of the event closest to the
+  middle of those merged, rather than the mean of them, so each remains a real data point.
+  Merged events still sound at the mean time, so the maximum rate still holds. Use
+  `merge_mode: 'average'` for the previous behaviour.
+- Azimuthal angles are merged as directions rather than numbers, so that a cluster of
+  events straddling the wrap point no longer merges to the opposite direction.
+- `angle_unit` defaults to `'cycles'` rather than `'degrees'`, matching the mapped
+  parameters themselves. Spatial angles are still reported in degrees in tables unless
+  an `angle_unit` is asked for.
+- Adaptive pitch binning no longer spreads a constant pitch across the chord in input
+  order, instead binning it as `'uniform'` does. Affects `Events` sonifications with no
+  `pitch` mapping.
+
 ## v1.3
 
 ### Added
