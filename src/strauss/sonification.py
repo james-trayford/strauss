@@ -303,6 +303,7 @@ class Sonification:
         excluded, and are instead listed by :meth:`fixed_table`.
 
         Note:
+          Rows are ordered in time, whatever order the data was given in.
           The `time` and `note` columns replace any mapped `time` and
           `pitch` parameters, which are internal fractions rather than
           what is heard - `time` is the time of the event in the
@@ -340,7 +341,9 @@ class Sonification:
             if include_input:
                 table[f'{key}_input'] = np.asarray(self.sources.raw_mapping[key])
 
-        return pd.DataFrame(table)
+
+        return pd.DataFrame(table).sort_values('time', kind='stable',
+                                               ignore_index=True)
 
     def _resolve_source(self, source=None):
         """Resolve a source name or index, defaulting to a lone source.
@@ -375,6 +378,7 @@ class Sonification:
         :meth:`fixed_table`.
 
         Note:
+          Rows are ordered in time, whatever order the data was given in.
           As for :meth:`event_table`, `time` is given in seconds, and
           replaces the mapped `time_evo` parameter, and spatial angles
           are given in degrees, or in the sonification's `angle_unit`
@@ -429,7 +433,9 @@ class Sonification:
             if include_input:
                 table[f'{key}_input'] = _down_column(self.sources.raw_mapping[key][index])
 
-        table = pd.DataFrame(table)
+
+        table = pd.DataFrame(table).sort_values('time', kind='stable',
+                                                ignore_index=True)
 
         notes, _ = self._assign_notes()
         table.attrs['source'] = self.sources.names[index]

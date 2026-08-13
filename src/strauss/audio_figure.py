@@ -177,6 +177,12 @@ class AudioFigure:
         if not sonpars['style']:
             sonpars['style'] = 'default'
         style = styles.Style(**load_style(sonpars['style']))
+
+        # an entry is a data mapping or a fixed value by what it holds, not by
+        # where it sits in the map. Data mappings take the input data in the
+        # order they are given
+        data_maps = [m for m in style.map if m.fixed is None]
+        fixed_maps = [m for m in style.map if m.fixed is not None]
         
         # Check if data is in CSV or Pandas DataFrame format
         if len(args) == 1:
@@ -191,7 +197,7 @@ class AudioFigure:
             # If using CSV or DF, check for specified 'input' columns in style and resolve these
             if df is not None:
                 resolved = []
-                for i, mapping in enumerate(style.map):
+                for i, mapping in enumerate(data_maps):
                     col = getattr(mapping, 'input', None)
                     if col is None:
                         # If no input, default to auto-mapping based on position in style file
@@ -262,8 +268,15 @@ class AudioFigure:
             args = [np.arange(len(args[0])), args[0]]
             tlims = (0,args[0][-1])
                 
-        nmap = min(len(args), len(style.map))
-        
+        if len(data_maps) > len(args):
+            # a style may map more than the data given, drop these quietly for now.
+            data_maps = data_maps[:len(args)]
+        elif len(args) > len(data_maps):
+            # data given that no mapping asks for is more likely a mistake
+            warnings.warn(f"{len(args)} data arrays were given but the style "
+                          f"maps only {len(data_maps)} parameters, so the last "
+                          f"{len(args) - len(data_maps)} will not be used.")
+
         source_names = sonpars['source_names']
 
         # a merge_mode keyword overrides the style
@@ -274,10 +287,10 @@ class AudioFigure:
 
         if (style.sources.lower() == 'events') and style.max_notes_per_sec:
             tdx = None
-            for i in range(nmap):
-                if style.map[i].output == 'time':
+            for i, mapping in enumerate(data_maps):
+                if mapping.output == 'time':
                     tdx = i
-                    tlims = style.map[i].input_range
+                    tlims = mapping.input_range
                     tlims = set_limits(tlims, args[i], warn=False)
                     time = rescale_values(args[i], tlims, (0,1))
                     break
@@ -292,9 +305,9 @@ class AudioFigure:
             # directions. Any angle given an input_range is mapped linearly
             # rather than wrapped, so is merged that way too
             amax = sources.angle_unit_maxs[sonpars['angle_unit']]
-            cyclic = {i: amax for i in range(nmap)
-                      if (style.map[i].output in sources.azimuthal_angles)
-                      and ('input_range' not in style.map[i].model_fields_set)}
+            cyclic = {i: amax for i, m in enumerate(data_maps)
+                      if (m.output in sources.azimuthal_angles)
+                      and ('input_range' not in m.model_fields_set)}
 
             # lets now thin the data according to max events per second if using events
             args, clusters = merge_events(sonpars['duration'], style.max_notes_per_sec,
@@ -325,9 +338,8 @@ class AudioFigure:
         origin = {}
         
         # Iterate through the mappings and add lims and funcs to their own dicts
-        for i in range(nmap):
-            mapping = style.map[i]
-            
+        for mapping in data_maps:
+
             if mapping.output == 'time' and style.sources == 'objects':
                 # Automatically swap time for time_evo if using Objects
                 mapping.output = 'time_evo'
@@ -348,7 +360,7 @@ class AudioFigure:
             if mapping.function:
                 funcs = [mapping.function] if isinstance(mapping.function, str) else mapping.function
                 mapping_functions[to_map[-1]] = [styles.MAPPING_FUNCTIONS[f] for f in funcs]
-        map_data = dict(zip(to_map, args[:nmap]))
+        map_data = dict(zip(to_map, args[:len(data_maps)]))
         
         if 'pitch' not in to_map:
             to_map.append('pitch')
@@ -365,26 +377,22 @@ class AudioFigure:
                 map_data["pitch"] = np.zeros(len(map_data[to_map[0]]))
         
         # we now iterate through style fixed values
-        for i in range(nmap, len(style.map)):
-            mapping = style.map[i]
-            if mapping.fixed is not None:
-                if mapping.output in to_map:
-                    warnings.warn(f"'{mapping.output}' is mapped earlier in the "
-                                  f"style, but is being fixed at {mapping.fixed}.")
-                else:
-                    to_map.append(mapping.output)
-                origin[mapping.output] = 'fixed'
+        for mapping in fixed_maps:
+            if mapping.output in to_map:
+                warnings.warn(f"'{mapping.output}' is mapped by the style, but "
+                              f"is also being fixed at {mapping.fixed}.")
+            else:
+                to_map.append(mapping.output)
+            origin[mapping.output] = 'fixed'
 
-                if mapping.output not in sources.spatial_angles:
-                    lims = sources.param_lim_dict[mapping.output]
-                    in_lims[mapping.output] = lims
-                    out_lims[mapping.output] = lims
-                # spatial angles are left to apply_mapping_functions, which
-                # scales them by angle_unit and wraps them around the circle
+            if mapping.output not in sources.spatial_angles:
+                lims = sources.param_lim_dict[mapping.output]
+                in_lims[mapping.output] = lims
+                out_lims[mapping.output] = lims
+            # spatial angles are left to apply_mapping_functions, which
+            # scales them by angle_unit and wraps them around the circle
 
-                fix_array =  len(map_data[to_map[0]])*[mapping.fixed]
-
-                map_data[mapping.output] = fix_array
+            map_data[mapping.output] = len(map_data[to_map[0]])*[mapping.fixed]
 
         # and finally overwrite with any kwarg fixed values:
         for k in sonpars.keys():
