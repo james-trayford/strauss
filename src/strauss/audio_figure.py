@@ -368,7 +368,11 @@ class AudioFigure:
         for i in range(nmap, len(style.map)):
             mapping = style.map[i]
             if mapping.fixed is not None:
-                to_map.append(mapping.output)
+                if mapping.output in to_map:
+                    warnings.warn(f"'{mapping.output}' is mapped earlier in the "
+                                  f"style, but is being fixed at {mapping.fixed}.")
+                else:
+                    to_map.append(mapping.output)
                 origin[mapping.output] = 'fixed'
 
                 if mapping.output not in sources.spatial_angles:
@@ -388,14 +392,18 @@ class AudioFigure:
             if len(ksplit) > 1:
                 prop = ksplit[1]
                 if prop in to_map:
-                    print(f'Overwriting {prop} with fixed value...')
+                    # already mapped, so overwrite it in place rather than
+                    # mapping the same parameter twice
+                    warnings.warn(f"'{prop}' is mapped by the style, but is being "
+                                  f"overwritten with the fixed value {sonpars[k]}.")
+                else:
+                    to_map.append(prop)
                 map_data[prop] = [sonpars[k]]*len(map_data[to_map[0]])
                 # as above: angles are scaled and wrapped later
                 
                 if prop not in sources.spatial_angles:
                     in_lims[prop] = sources.param_lim_dict[prop]
                     out_lims[prop] = sources.param_lim_dict[prop]
-                to_map.append(prop)
                 origin[prop] = 'fixed'
 
        
