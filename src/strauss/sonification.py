@@ -458,7 +458,9 @@ class Sonification:
           chord) have no one value to report, and are left out. Given a
           `source`, they take their value for that source, so are
           listed. Spatial angles are given in degrees, or in the
-          sonification's `angle_unit` where one was asked for.
+          sonification's `angle_unit` where one was asked for. A `pitch`
+          is reported as the `note` it resolves to, being what is
+          ultimately heard.
 
         Args:
           source (`optional`, :obj:`str` or :obj:`int`): name or index
@@ -478,13 +480,25 @@ class Sonification:
             origin = self.sources.origin.get(key, 'mapped')
             if origin == 'mapped':
                 continue
-            values = self.sources.mapped_samples[key]
-            values = np.unique(np.asarray(values if index is None
-                                          else values[index]))
-            if values.size != 1:
+
+            if key == 'pitch':
+                # a mapped pitch is an internal fraction, of no use to the
+                # reader - what is heard is the note it resolves to
+                notes, _ = self._assign_notes()
+                values = np.unique(notes if index is None else [notes[index]])
+                values = values.astype(str).tolist()
+                name = 'note'
+            else:
+                values = self.sources.mapped_samples[key]
+                values = np.unique(np.asarray(values if index is None
+                                              else values[index]))
+                name = key
+
+            if len(values) != 1:
                 # not held at one value, so don't claim it is
                 continue
-            rows.append({'parameter': key,
+
+            rows.append({'parameter': name,
                          'value': self.sources.in_angle_unit(key, values[0]),
                          'origin': origin})
 
