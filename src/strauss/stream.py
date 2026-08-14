@@ -13,6 +13,11 @@ import wavio
 import matplotlib.pyplot as plt
 from scipy.signal.windows import hann
 
+# frequency limits a filter cutoff sweeps between, in Hz, from the bottom
+# of hearing to just under the Nyquist frequency of a 44.1 kHz signal. The
+# cutoff parameter is mapped logarithmically between them
+filter_freq_lims = (20., 2.205e4)
+
 class Stream:
     """
     Stream object representing audio samples.
@@ -83,7 +88,8 @@ class Stream:
         self.values = self.buffers.to_stream()
         
     def filt_sweep(self, ffunc, fmap, qmap=lambda x:x*0 + 0.1,
-                   flo=20, fhi=2.205e4, qlo=0.5, qhi=10):
+                   flo=filter_freq_lims[0], fhi=filter_freq_lims[1],
+                   qlo=0.5, qhi=10):
         """
         Apply time varying filter to buffered stream
 

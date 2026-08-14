@@ -22,7 +22,8 @@ from .score import Score
 from .sources import Events, Objects, set_limits
 from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
-from .utilities import nested_dict_reassign, merge_events, rescale_values
+from .utilities import (nested_dict_reassign, merge_events, rescale_values,
+                        db_to_amplitude)
 
 import numpy as np
 from . import channels
@@ -733,8 +734,7 @@ class AudioFigure:
             elif level_clean.endswith('db'):
                 try:
                     db_val = float(level_clean.replace('db', '').strip())
-                    # Convert dB to amplitude: 10^(dB/20)
-                    return 10 ** (db_val / 20.0)
+                    return float(db_to_amplitude(db_val))
                 except ValueError:
                     raise ValueError(f"Invalid dB format: {level}")
             else:

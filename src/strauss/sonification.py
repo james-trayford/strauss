@@ -15,7 +15,9 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
-from .sources import Events, Objects
+from .sources import (Events, Objects, spatial_angles, display_name,
+                      param_converters, param_lim_dict)
+from .utilities import decimals_for_range
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
@@ -293,6 +295,165 @@ class Sonification:
             raise Exception("Sources have no mapped values to tabulate - run "
                             "'apply_mapping_functions' on the sources first.")
 
+    def _param_unit(self, key):
+        """The unit a mapped parameter is reported in.
+
+        Units come from three places, in order: the table columns that
+        replace a mapped parameter with what is heard (`time` in
+        seconds, `note` in place of `pitch`), the units spatial angles
+        are reported in, and otherwise the `<parameter>_unit` entries of
+        the :obj:`Generator` ranges. Anything else, and anything the
+        ranges call `unitless`, has no unit to report.
+
+        Args:
+          key (:obj:`str`): name of the mapped parameter, or of a table
+            column
+
+        Returns:
+          unit (:obj:`str`): the unit, or an empty string where the
+          quantity has none
+        """
+        if key in param_converters:
+            # the value is converted for reporting, so takes the unit of
+            # whatever it is converted into
+            return param_converters[key][1]
+
+        if key in spatial_angles:
+            return self.sources.table_angle_unit or 'degrees'
+
+        # otherwise ask the generator what it calls this parameter's units
+        node = self.generator.preset.get('ranges', {})
+        parts = key.split('/')
+        for part in parts[:-1]:
+            node = node.get(part, {})
+            if not isinstance(node, dict):
+                return ''
+        unit = node.get(f'{parts[-1]}_unit', '')
+
+        return '' if unit == 'unitless' else unit
+
+    def _display_values(self, key, values):
+        """Put mapped values into the terms they are reported in.
+
+        A mapped value is not always the quantity worth reporting - a
+        spatial angle is a fraction of a turn rather than an angle, and
+        `pan` a fraction rather than a share of the output. Parameters
+        with an entry in `param_converters` are converted by it, and
+        spatial angles by the units angles are reported in. Anything
+        else is already in the terms it is reported in.
+
+        Args:
+          key (:obj:`str`): name of the mapped parameter
+          values (:obj:`array-like` or :obj:`float`): mapped values
+
+        Returns:
+          values (:obj:`array-like` or :obj:`float`): the values as they
+          are reported
+        """
+        if key in param_converters:
+            convert, _ = param_converters[key]
+            return convert(values)
+
+        return self.sources.in_angle_unit(key, values)
+
+    def _display_range(self, key):
+        """The range a parameter covers, as it is reported.
+
+        Args:
+          key (:obj:`str`): name of the mapped parameter
+
+        Returns:
+          span (:obj:`float`): the range it covers, or `None` where the
+          parameter has no known limits
+        """
+        if key in ('time', 'time_evo'):
+            return float(self.score.length)
+
+        lims = self.sources.plims.get(key, param_lim_dict.get(key))
+        if lims is None:
+            return None
+
+        lims = np.asarray(self._display_values(key, np.asarray(lims)),
+                          dtype=float)
+
+        return float(abs(np.diff(lims)[0]))
+
+    def _round_numbers(self, table):
+        """Round a table's numbers to what is worth reading.
+
+        Each column is rounded to the decimal places that resolve its
+        range into a thousand steps, so that a column of angles in
+        degrees is given to a tenth of a degree and the same angles in
+        cycles to a thousandth. Columns whose range is unknown, input
+        data among them, are resolved by the values they hold. Times are
+        never coarser than 10 ms, however long the sonification.
+
+        Args:
+          table (:obj:`pandas.DataFrame`): table to round
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): the same table, rounded
+        """
+        for name in table.columns:
+            if not pd.api.types.is_numeric_dtype(table[name]):
+                continue
+
+            values = table[name].to_numpy(dtype=float)
+
+            span = self._display_range(name)
+            if span is None:
+                # no declared range, as for input data in the user's own
+                # units, so resolve what the column holds
+                finite = values[np.isfinite(values)]
+                span = float(finite.max() - finite.min()) if finite.size else 0.
+
+            decimals = decimals_for_range(span)
+            if name in ('time', 'time_evo'):
+                # times keep to the nearest 10 ms however long the
+                # sonification, rather than coarsening with its length
+                decimals = max(decimals, 2)
+
+            table[name] = np.round(values, decimals)
+
+        return table
+
+    def _with_units(self, table):
+        """Label a table's columns with the units of their contents.
+
+        Columns become a two-level :obj:`pandas.MultiIndex` of name and
+        unit, so that units travel with the table rather than living in
+        its formatting - they survive `to_csv`, and are read back with
+        `header=[0,1]`.
+
+        Note:
+          Columns holding no numerical quantity (e.g. `source`, `note`)
+          and input data columns, whose units are the user's own, are
+          labelled with an empty unit.
+
+        Args:
+          table (:obj:`pandas.DataFrame`): table with plain columns
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): the same table, with name and
+          unit columns
+        """
+        names, units = [], []
+        for column in table.columns:
+            if column.endswith('_input'):
+                # input values are the data as given, in the user's own units
+                key = column[:-len('_input')]
+                names.append(f'{display_name(key)} (input)')
+                units.append('')
+            else:
+                names.append(display_name(column))
+                unit = self._param_unit(column)
+                # bracket it, to read as a unit rather than as a second name
+                units.append(f'[{unit}]' if unit else '')
+
+        table.columns = pd.MultiIndex.from_arrays([names, units])
+
+        return table
+
     def event_table(self, include_input=False):
         """Tabulate the events of the sonification.
 
@@ -328,7 +489,9 @@ class Sonification:
         notes, times = self._assign_notes()
 
         # each event is a source, so is named by it
-        table = {'source': self.sources.names, 'time': times, 'note': notes}
+        table = {'source': self.sources.names,
+                 'time': self._display_values('time', times),
+                 'note': notes}
 
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':
@@ -336,14 +499,16 @@ class Sonification:
             if key not in ('time', 'time_evo', 'pitch'):
                 # time and pitch are already given by the time and note
                 # of each row, in the terms actually heard
-                table[key] = self.sources.in_angle_unit(
+                table[key] = self._display_values(
                     key, np.asarray(self.sources.mapped_samples[key]))
             if include_input:
                 table[f'{key}_input'] = np.asarray(self.sources.raw_mapping[key])
 
 
-        return pd.DataFrame(table).sort_values('time', kind='stable',
-                                               ignore_index=True)
+        table = pd.DataFrame(table).sort_values('time', kind='stable',
+                                                ignore_index=True)
+
+        return self._with_units(self._round_numbers(table))
 
     def _resolve_source(self, source=None):
         """Resolve a source name or index, defaulting to a lone source.
@@ -409,7 +574,7 @@ class Sonification:
         # single unchanging state
         if 'time_evo' in self.sources.mapped_samples:
             times = np.asarray(self.sources.mapped_samples['time_evo'][index])
-            times = times * self.score.length
+            times = self._display_values('time', times * self.score.length)
         else:
             times = np.zeros(1)
 
@@ -428,7 +593,7 @@ class Sonification:
             if key not in ('time', 'time_evo', 'pitch'):
                 # time and pitch are already given by the time column and
                 # the note of the object, in the terms actually heard
-                table[key] = self.sources.in_angle_unit(
+                table[key] = self._display_values(
                     key, _down_column(self.sources.mapped_samples[key][index]))
             if include_input:
                 table[f'{key}_input'] = _down_column(self.sources.raw_mapping[key][index])
@@ -436,6 +601,7 @@ class Sonification:
 
         table = pd.DataFrame(table).sort_values('time', kind='stable',
                                                 ignore_index=True)
+        table = self._with_units(self._round_numbers(table))
 
         notes, _ = self._assign_notes()
         table.attrs['source'] = self.sources.names[index]
@@ -498,11 +664,20 @@ class Sonification:
                 # not held at one value, so don't claim it is
                 continue
 
-            rows.append({'parameter': name,
-                         'value': self.sources.in_angle_unit(key, values[0]),
+            value = self._display_values(key, values[0])
+
+            rows.append({'parameter': display_name(name),
+                         'value': value if isinstance(value, str) else
+                                  round(float(value),
+                                        decimals_for_range(
+                                            self._display_range(key) or 0.)),
+                         # a row per parameter, so the unit is a column of its
+                         # own rather than a second level of the column names
+                         'unit': self._param_unit(name),
                          'origin': origin})
 
-        return pd.DataFrame(rows, columns=['parameter', 'value', 'origin'])
+        return pd.DataFrame(rows, columns=['parameter', 'value', 'unit',
+                                           'origin'])
 
     def add_ticks(self, increment, duration=0.04, tick_vol=0.25):
         # TODO this should probably use a dedicated generator...
