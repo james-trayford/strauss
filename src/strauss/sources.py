@@ -25,7 +25,8 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy import signal as sig
-from .utilities import rescale_values
+from .utilities import rescale_values, amplitude_to_db
+from .stream import filter_freq_lims
 import warnings
 import copy
 
@@ -90,6 +91,107 @@ param_limits = [(0,1),#np.pi),
                 (0,2)]     
 
 param_lim_dict = dict(zip(mappable, param_limits))
+
+
+# readable names for the mapped parameters, for tables and other output.
+param_names = {'polar': 'Polar Angle',
+               'azimuth': 'Azimuthal Angle',
+               'theta': 'Polar Angle',
+               'phi': 'Azimuthal Angle',
+               'volume': 'Volume',
+               'pitch': 'Pitch',
+               'time': 'Time',
+               'cutoff': 'Cutoff Frequency',
+               'time_evo': 'Time',
+               'spectrum': 'Spectrum',
+               'pitch_shift': 'Pitch Shift',
+               'pan': 'Stereo Pan',
+               'volume_envelope/A': 'Volume Attack',
+               'volume_envelope/D': 'Volume Decay',
+               'volume_envelope/S': 'Volume Sustain',
+               'volume_envelope/R': 'Volume Release',
+               'volume_lfo/freq': 'Volume LFO Frequency',
+               'volume_lfo/freq_shift': 'Volume LFO Frequency Shift',
+               'volume_lfo/amount': 'Volume LFO Amount',
+               'pitch_lfo/freq': 'Pitch LFO Frequency',
+               'pitch_lfo/freq_shift': 'Pitch LFO Frequency Shift',
+               'pitch_lfo/amount': 'Pitch LFO Amount',
+               # not mapped parameters, but reported alongside them
+               'note': 'Note',
+               'source': 'Source',
+               'note_length': 'Note Length'}
+
+
+# conversions from a mapped value to the quantity it is worth reporting,
+def _cutoff_to_freq(values):
+    """Convert a mapped filter cutoff to the frequency it cuts at.
+
+    The cutoff is mapped logarithmically between the frequency limits
+    of the sweep applied in :meth:`strauss.stream.Stream.filt_sweep`.
+
+    Args:
+      values (:obj:`array-like` or :obj:`float`): mapped cutoff values
+
+    Returns:
+      freqs (:obj:`array-like` or :obj:`float`): cutoff frequencies in Hz
+    """
+    lolim, hilim = np.log10(filter_freq_lims)
+
+    return pow(10., np.asarray(values, dtype=float)*(hilim-lolim) + lolim)
+
+
+# below this, a sound is silent rather than quiet - well under the
+# dynamic range of 16-bit audio
+quiet_db = -100.
+
+def _amplitude_to_db(values):
+    """Convert a mapped amplitude to decibels.
+
+    Amplitudes are mapped as a fraction of the loudest the parameter
+    goes, which is 0 dB.
+
+    Note:
+      Nothing below `quiet_db` is audible, so everything quieter is
+      reported as minus infinity decibels rather than as a number that
+      suggests a distinction nobody can hear.
+
+    Args:
+      values (:obj:`array-like` or :obj:`float`): mapped amplitudes
+
+    Returns:
+      db (:obj:`array-like` or :obj:`float`): the amplitudes in decibels
+    """
+    db = amplitude_to_db(values)
+
+    return np.where(db < quiet_db, -np.inf, db)
+
+
+param_converters = {
+    # panning is the fraction of the amplitude from the right speaker
+    'pan': (lambda values: 100*np.asarray(values), '% right'),
+    # loudness is heard logarithmically, so is reported that way
+    'volume': (_amplitude_to_db, 'dB'),
+    # a cutoff is a fraction of a logarithmic sweep, not a frequency
+    'cutoff': (_cutoff_to_freq, 'Hz'),
+    'time': (lambda values: np.asarray(values, dtype=float), 'seconds'),
+    'time_evo': (lambda values: np.asarray(values, dtype=float), 'seconds'),
+}
+
+
+def display_name(key):
+    """A readable name for a mapped parameter.
+
+    Args:
+      key (:obj:`str`): name of the parameter
+
+    Returns:
+      name (:obj:`str`): its readable name, from `param_names`, or the
+      parameter name tidied up where it has no entry there
+    """
+    if key in param_names:
+        return param_names[key]
+
+    return key.replace('/', ' ').replace('_', ' ').title()
 
 
 spatial_angles = ('azimuth', 'polar', 'theta', 'phi')

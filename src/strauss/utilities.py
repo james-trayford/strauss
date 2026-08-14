@@ -205,6 +205,58 @@ def const_or_evo(x,t):
     else:
         return x
 
+def decimals_for_range(span, steps=1000):
+    """Decimal places that resolve a range into a number of steps.
+
+    A quantity is worth reporting to about a thousandth of the range it
+    covers, which is finer than any of it is heard. Spatial angles over
+    360 degrees are then given to a tenth of a degree, and the same
+    angles in cycles to a thousandth of a cycle.
+
+    Args:
+      span (:obj:`float`): the range the quantity covers
+      steps (`optional`, :obj:`int`): steps to resolve it into
+
+    Returns:
+      decimals (:obj:`int`): decimal places to round to, never negative
+    """
+    if (not np.isfinite(span)) or (span <= 0):
+        return 3
+
+    return int(max(0, -np.floor(np.log10(span/steps))))
+
+def amplitude_to_db(amplitude):
+    """Express an amplitude in decibels.
+
+    Amplitudes are fractions of the loudest signal, which is 0 dB, and
+    silence is minus infinity decibels. Decibels of amplitude are used
+    throughout, so a factor of 20 rather than the 10 used for power.
+
+    Args:
+      amplitude (:obj:`array-like` or :obj:`float`): amplitude, as a
+        fraction of the loudest signal
+
+    Returns:
+      db (:obj:`array-like` or :obj:`float`): the amplitude in decibels
+    """
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return 20*np.log10(np.asarray(amplitude, dtype=float))
+
+def db_to_amplitude(db):
+    """Express decibels as an amplitude.
+
+    Inverse of :func:`amplitude_to_db`, giving the amplitude as a
+    fraction of the loudest signal.
+
+    Args:
+      db (:obj:`array-like` or :obj:`float`): a level in decibels
+
+    Returns:
+      amplitude (:obj:`array-like` or :obj:`float`): the corresponding
+      amplitude
+    """
+    return pow(10., np.asarray(db, dtype=float)/20.)
+
 def rescale_values(x, oldlims, newlims):
     """
     Rescale x values defined by limits oldlims to new limits newlims
