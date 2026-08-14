@@ -1,0 +1,32 @@
+name: "Stars Appearing"
+
+description: "Brightest stars appear first, pitch mapped to colour. Glockenspiel base sound."
+
+generator:
+  type: "sampler"
+  sample: "glockenspiel"
+
+sources: "events"
+
+max_notes_per_sec: 5
+
+map:
+
+  - input: "magnitude"
+    input_range: ["0%", "110%"]
+    output: "time"
+
+  - input: "colour"
+    output: "pitch"
+
+  - input: "azimuth"
+    output: "azimuth"
+
+  - input: "polar"
+    output: "polar"
+
+
+notes: ["G2", "D3", "G3", "B4", "F#4"]
+  
+  
+
