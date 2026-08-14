@@ -49,21 +49,13 @@ def save(fname):
     fig = _get_current_figure()
     fig.save(fname)
     
-def get_event_table(name=None, include_input=False):
-    fig = _get_current_figure()
-    fig.get_event_table(name, include_input)
-    
-def get_object_table(name=None, source=None, include_input=False):
-    fig = _get_current_figure()
-    fig.get_object_table(source, include_input)
-    
 def get_fixed_table(name=None, source=None):
     fig = _get_current_figure()
-    fig.get_fixed_table(name, source)
+    return fig.get_fixed_table(name, source)
     
 def get_table(name=None, source=None, include_input=False):
     fig = _get_current_figure()
-    fig.get_table(name, source, include_input)
+    return fig.get_table(name, source, include_input)
     
 def list_tables():
     fig = _get_current_figure()
