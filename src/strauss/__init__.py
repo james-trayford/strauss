@@ -29,6 +29,32 @@ def sonify(*args, channels='stereo', **kwargs):
     fig = _get_current_figure(system=channels)
     return fig.sonify(*args, **kwargs)
 
+def get_table(*args, **kwargs):
+    """Get the timing table of a sonification in the current figure.
+
+    Takes the same arguments as, and is documented by,
+    :meth:`~strauss.audio_figure.AudioFigure.get_table`.
+    """
+    fig = _get_current_figure()
+    return fig.get_table(*args, **kwargs)
+
+def get_fixed_table(*args, **kwargs):
+    """Get the unmapped parameters of a sonification in the current figure.
+
+    Takes the same arguments as, and is documented by,
+    :meth:`~strauss.audio_figure.AudioFigure.get_fixed_table`.
+    """
+    fig = _get_current_figure()
+    return fig.get_fixed_table(*args, **kwargs)
+
+def list_tables():
+    """Print the tables available from the current figure.
+
+    Documented by :meth:`~strauss.audio_figure.AudioFigure.list_tables`.
+    """
+    fig = _get_current_figure()
+    return fig.list_tables()
+
 def close():
     _current_figure.set(None)
     
