@@ -271,9 +271,9 @@ def observed_sky(cfg):
 # <u> __The sonification:__ </u>
 #
 # Brightest stars sound first, so magnitude drives `time`. Colour drives
-# `pitch`, picking a note from the chord: blue stars take low notes and red
-# stars high ones, matching short-to-long wavelength onto short-to-long
-# vibration. Position drives the spatial angles.
+# `pitch`, picking a note from the chord: blue stars take high notes and red
+# stars low ones, carrying the short-to-long wavelength of the light onto the
+# short-to-long wavelength of the sound. Position drives the spatial angles.
 #
 # Note on angles: `strauss` measures azimuth **anticlockwise from straight
 # ahead** (`stereo` puts L at 90 degrees and R at 270), while astronomical
@@ -397,9 +397,15 @@ def render_frames(events, cfg):
     bv01 = unit_scale(np.clip(bv, *np.percentile(bv, [1, 99])))
     rgb = star_rgb(bv01[:, None])
 
-    # azimuthal stretch, so a pulse stays round once reprojected onto the dome
-    stretch = np.clip(1.0 / np.sin(np.pi * np.clip(cy, 0.5, H - 0.5) / H),
-                      1.0, cfg.max_stretch)
+    # azimuthal stretch, so a pulse stays round on the sky - and so stays
+    # round on the dome once reprojected. Two things stretch it. A pulse at
+    # polar angle `t` spans 1/sin(t) times as much azimuth as it does
+    # altitude, diverging at the poles. And the canvas carries 360 degrees
+    # across but only 180 down, so unless it is 2:1 its pixels are not square
+    # in angle, by a further factor of W/2H.
+    aspect = W / (2.0 * H)
+    stretch = np.clip(aspect / np.sin(np.pi * np.clip(cy, 0.5, H - 0.5) / H),
+                      aspect, cfg.max_stretch)
 
     # how long before and after its note a star is worth drawing at all
     reach = np.log(max(2.0 * amp.max(), np.e))
