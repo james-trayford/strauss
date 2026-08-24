@@ -34,6 +34,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom rounding per parameter for table display, resolving each column's range into
   about a thousand steps - a tenth of a degree for angles, a thousandth of a cycle for the
   same angles in cycles. Times are never coarser than 10 ms, for syncing to video.
+- `handle_nans`, a `Style` field also settable per `sonify` call and as a keyword on
+  `Sources` and `Sonification`, deciding what becomes of missing (`NaN` or infinite)
+  input data. Both modes record what was missing in `Sources.nan_mask` and linearly
+  interpolate it in time, so it can no longer propagate through the mapping.
+  `'interpolate'` then sounds the interpolated data as it is; `'silent'` (the default)
+  additionally silences the audio it would have made, so a gap in the data is heard as
+  a gap in the sound. `Events` missing a value are skipped outright, being discrete in
+  time, with their names thinned alongside them; `Objects` are muted over the interval
+  they are missing, ramping down over `declick_time` from the last point with data and
+  back up to the next one, so the gap doesn't click. A missing `spectrum` bin is the
+  exception, meaning no power at that frequency rather than a gap in the data, so it is
+  zeroed rather than interpolated and doesn't mute the time it sits at. Tables gain a
+  `Missing` column flagging what sounds at an interpolated value.
 
 ### Changed
 
@@ -56,6 +69,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - dB conversion now lives in `utilities`, as `amplitude_to_db` and `db_to_amplitude`, and
   is shared with `AudioFigure._parse_level` - so mixing levels and reported volumes use
   one definition of the convention.
+- Mapping limits ignore non-finite values, so one `NaN` in a column no longer returns
+  `NaN` from the percentiles and sets the limits every source is descaled by. Data with
+  no non-finite values renders bit-identically to before.
+- Events merged by `max_notes_per_sec` no longer let one missing value take its whole
+  cluster with it - a cluster averages to `NaN` only where none of its members has a
+  value. Events with a non-finite `time` are dropped before merging, having no point in
+  the sonification to be placed at.
+- `Events.fromdict` and `Objects.fromdict` now raise on a mapped property missing from
+  the data, rather than constructing an unraised `Exception` and failing later, and take
+  `n_sources` from the first mapped quantity rather than from whichever the loop left
+  behind.
 
 ## v1.3
 
