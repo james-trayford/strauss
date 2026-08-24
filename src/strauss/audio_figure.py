@@ -67,6 +67,9 @@ _kw_defaults = {
     # how events merged by max_notes_per_sec take their values, overriding
     # the style's own merge_mode where given
     'merge_mode': None,
+    # Treatment of non-finite (NaN or infinite) input data, overriding the
+    # style's own handle_nans where given
+    'handle_nans': None,
     # Style File
     'style' : None,
     'caption': None,
@@ -286,21 +289,39 @@ class AudioFigure:
             raise ValueError(f"merge_mode '{merge_mode}' is not recognised, "
                              "choose from 'average' or 'central'.")
 
+        # a handle_nans keyword overrides the style
+        handle_nans = sonpars['handle_nans'] or style.handle_nans
+        if handle_nans not in sources.nan_modes:
+            raise ValueError(f"handle_nans '{handle_nans}' is not recognised, "
+                             f"choose from {list(sources.nan_modes)}.")
+
         if (style.sources.lower() == 'events') and style.max_notes_per_sec:
+            # names are given per input event, so must be downsampled too
+            if (source_names is not None) and (len(source_names) != len(args[0])):
+                raise ValueError(f"Got {len(source_names)} source names for "
+                                 f"{len(args[0])} input events.")
+
             tdx = None
             for i, mapping in enumerate(data_maps):
                 if mapping.output == 'time':
                     tdx = i
-                    tlims = mapping.input_range
-                    tlims = set_limits(tlims, args[i], warn=False)
-                    time = rescale_values(args[i], tlims, (0,1))
                     break
 
-            # names are given per input event, so must be thinned alongside
-            # the data they name
-            if (source_names is not None) and (len(source_names) != len(args[0])):
-                raise ValueError(f"Got {len(source_names)} source names for "
-                                 f"{len(args[0])} input events.")
+            if tdx is not None:
+                # an event with no finite time has nowhere in the sonification
+                # to be placed, so cannot be sorted into a cluster to merge
+                # with. 
+                finite = np.isfinite(np.asarray(args[tdx], dtype=float))
+                if not finite.all():
+                    warnings.warn(f"Dropping {(~finite).sum()} events with a "
+                                  "non-finite 'time'")
+                    args = [np.asarray(a)[finite] for a in args]
+                    if source_names is not None:
+                        source_names = [n for n, f in zip(source_names, finite) if f]
+
+                tlims = data_maps[tdx].input_range
+                tlims = set_limits(tlims, args[tdx], warn=False)
+                time = rescale_values(args[tdx], tlims, (0,1))
 
             # azimuthal angles wrap around the circle, so must be merged as
             # directions. Any angle given an input_range is mapped linearly
@@ -416,7 +437,7 @@ class AudioFigure:
                 origin[prop] = 'fixed'
 
        
-        _sources = getattr(sources, style.sources.capitalize())(to_map)
+        _sources = getattr(sources, style.sources.capitalize())(to_map, handle_nans=handle_nans)
         _sources.origin = origin
 
         # report angles in whatever units they were given in, or in degrees
@@ -465,6 +486,7 @@ class AudioFigure:
             audio_setup=self.system,
             caption=sonpars["caption"],
             samprate=_generator.samprate, # Use generator's samprate for consistency
+            handle_nans=handle_nans,
         )
             
         name = self.add(_sonification, name=sonpars["name"], level=sonpars["level"])

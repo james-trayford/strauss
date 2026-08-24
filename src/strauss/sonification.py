@@ -30,6 +30,7 @@ import wavio as wav
 import IPython.display as ipd
 from IPython.display import display
 from scipy.io import wavfile
+from scipy.interpolate import interp1d
 import warnings
 import tempfile
 from pathlib import Path
@@ -60,7 +61,7 @@ class Sonification:
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
                  caption=None, samprate=48000, declick_time=0.03,
-                 ttsmodel=default_tts_voice):
+                 ttsmodel=default_tts_voice, handle_nans=None):
         """
         Args:
          score (:class:`~strauss.score.Score`): Sonification :obj:`Score`
@@ -81,9 +82,15 @@ class Sonification:
           on save and dispolay to remove audible clicks from sample
           discontinuity
          ttsmodel (:obj:`str` or :obj:`PosixPath`) file path to the
-          text-to-speech model used for captions. 
+          text-to-speech model used for captions.
+         handle_nans (:obj:`str`) how to treat the audio any source's
+          non-finite data corresponds to, either :obj:`'silent'` or
+          :obj:`'interpolate'`. Taken from the :obj:`Sources` where not
+          given, which is where the data itself is handled - see the
+          `handle_nans` argument of
+          :meth:`~strauss.sources.Source.__init__`.
         """
-        
+
         # sampling rate in Hz
         self.samprate = samprate
         
@@ -104,7 +111,17 @@ class Sonification:
 
         # sonification owns an instance of the Generator
         self.generator = generator
-        
+
+        # the Sources handle the data, and so decide what is
+        # interpolated and which events sound - from here these
+        # instructions are taken to part-mute or drop sources.
+        self.handle_nans = handle_nans or self.sources.handle_nans
+        if handle_nans and (handle_nans != self.sources.handle_nans):
+            warnings.warn(f"handle_nans='{handle_nans}' disagrees with the "
+                          f"Sources value of '{self.sources.handle_nans}', "
+                          "which has already been applied to the data. Pass " 
+                          "to the Sources too for correct behaviour.")
+
         # set up the audio channel routing for the sonification
         self.channels = audio_channels(setup=audio_setup)
 
@@ -215,7 +232,13 @@ class Sonification:
 
         if progress:
             print('Processing sonification..')
+        mute_nans = (self.handle_nans == 'silent')
+
         for source in tqdm(indices) if progress else indices:
+
+            # a source with no data at all has nothing to sound, so skip
+            if mute_nans and self.sources.all_missing(source):
+                continue
 
             # index note properties
             t = self.sources.mapping['time'][source]
@@ -233,6 +256,26 @@ class Sonification:
             # run generator to play each note
             sstream = self.generator.play(sourcemap)
             playlen = sstream.values.size
+
+            # silence the stretches the source has no data for, ramping in
+            # and out so the gaps don't click. Applied before spatialisation
+            # so that it costs one multiply rather than one per channel
+            if mute_nans:
+                nlength = sourcemap.get('note_length',
+                                        self.generator.preset.get('note_length'))
+                if not isinstance(nlength, (int, float, np.number)) or (nlength <= 0):
+                    # the sampler's 'sample' length runs as long as the sample
+                    nlength = playlen/self.samprate
+                knots = self.sources.mute_envelope(source,
+                                                   self.declick_time/nlength)
+                if knots is not None:
+                    x, y = knots
+                    # as with the evolving parameters, the curve is read at
+                    # the sample fractions of the note, holding its end value
+                    # through the release tail
+                    mutenv = interp1d(x, y, bounds_error=False,
+                                      fill_value=(y[0], y[-1]))
+                    sstream.values = sstream.values * mutenv(sstream.sampfracs)
 
             # place source on listener plane (quarter rotation) by default
             polar = 0.5 * np.pi
@@ -395,6 +438,9 @@ class Sonification:
           table (:obj:`pandas.DataFrame`): the same table, rounded
         """
         for name in table.columns:
+            # Avoid rounding booleans to e.g. 1.0
+            if pd.api.types.is_bool_dtype(table[name]):
+                continue
             if not pd.api.types.is_numeric_dtype(table[name]):
                 continue
 
@@ -493,6 +539,10 @@ class Sonification:
                  'time': self._display_values('time', times),
                  'note': notes}
 
+        # flag the events sounding using interpolated values
+        if (self.sources.nan_mask is not None) and np.any(self.sources.nan_mask):
+            table['missing'] = np.asarray(self.sources.nan_mask, dtype=bool)
+
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':
                 continue
@@ -586,6 +636,11 @@ class Sonification:
             return values
 
         table = {'time': times}
+
+        # flag the points sounding at interpolated values
+        if (self.sources.nan_mask is not None) and np.any(self.sources.nan_mask[index]):
+            table['missing'] = _down_column(
+                np.asarray(self.sources.nan_mask[index], dtype=bool))
 
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':

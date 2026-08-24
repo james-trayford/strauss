@@ -431,22 +431,31 @@ def merge_events(duration, max_rate, time, arglist, mode='average',
 
     sort_args = []
     for i in range(len(arglist)):
-        sortvals = np.array(arglist[i])[sortdx]
-        if (mode == 'central') and (i != time_index):
-            merged_values = sortvals[repdx]
-        elif i in cyclic:
-            # average as a direction, so that a cluster straddling the wrap
-            # point averages to the direction it lies in, rather than to the
-            # opposite one (e.g. 359 and 1 degrees to 0, not to 180)
-            period = cyclic[i]
-            phase = 2*np.pi*sortvals/period
-            sines = np.add.reduceat(np.sin(phase), start_indices)
-            cosines = np.add.reduceat(np.cos(phase), start_indices)
-            merged_values = np.arctan2(sines, cosines) % (2*np.pi)
-            merged_values *= period/(2*np.pi)
-        else:
-            # time is averaged whatever the mode, to hold the event rate
-            merged_values = np.add.reduceat(sortvals, start_indices) / cluster_sizes
+        sortvals = np.array(arglist[i], dtype=float)[sortdx]
+
+        # non-finite values are left out of the averages, so that one event
+        # with missing data does not take its whole cluster with it. A
+        # cluster averages to NaN only where none of its members has a value
+        good = np.isfinite(sortvals)
+        ngood = np.add.reduceat(good.astype(float), start_indices)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            if (mode == 'central') and (i != time_index):
+                merged_values = sortvals[repdx]
+            elif i in cyclic:
+                # average as a direction, so that a cluster straddling the wrap
+                # point averages to the direction it lies in, rather than to the
+                # opposite one (e.g. 359 and 1 degrees to 0, not to 180)
+                period = cyclic[i]
+                phase = 2*np.pi*np.where(good, sortvals, 0.)/period
+                sines = np.add.reduceat(np.where(good, np.sin(phase), 0.), start_indices)
+                cosines = np.add.reduceat(np.where(good, np.cos(phase), 0.), start_indices)
+                merged_values = np.arctan2(sines, cosines) % (2*np.pi)
+                merged_values *= period/(2*np.pi)
+                merged_values = np.where(ngood > 0, merged_values, np.nan)
+            else:
+                # time is averaged whatever the mode, to hold the event rate
+                merged_values = np.add.reduceat(np.where(good, sortvals, 0.),
+                                                start_indices) / ngood
         sort_args.append(merged_values)
 
     if return_index:
@@ -459,6 +468,82 @@ def merge_events(duration, max_rate, time, arglist, mode='average',
     return sort_args
                 
         
+def nan_mute_envelope(mask, times, ramp):
+    """ Build a gain curve muting the intervals where data is missing.
+
+    Returns the knots of a piecewise-linear curve that sits at full
+    volume where a source has data and at zero where it has none, with
+    a short ramp between the two so that the transition does not click.
+
+    The ramp down begins at the last sample before the gap, so that
+    sample still sounds at full volume, and the ramp up finishes at the
+    first sample after it, so that one does too. Where a gap is too
+    short to fit both ramps, the curve dips to zero at its midpoint
+    instead. A gap running to either end of the data has no sample on
+    that side to ramp from, and so simply starts or stays muted.
+
+    Args:
+      mask (:obj:`ndarray`): boolean, True where a sample is missing
+      times (:obj:`ndarray`): position of each sample on the axis the
+        knots are returned in, in ascending order
+      ramp (:obj:`float`): duration of the ramps, in the units of `times`
+
+    Returns:
+      knots (:obj:`tuple(ndarray)`): the `x` and `y` of the curve, or
+        :obj:`None` where nothing is missing and so nothing is muted
+    """
+    mask = np.asarray(mask, dtype=bool)
+    times = np.asarray(times, dtype=float)
+
+    if not mask.any():
+        return None
+
+    if mask.all():
+        return np.array([times[0], times[-1]]), np.zeros(2)
+
+    # bracket each contiguous run of missing samples, as the padding makes
+    # a run at either end of the data show up as a change like any other
+    padded = np.concatenate(([False], mask, [False]))
+    changes = np.flatnonzero(np.diff(padded.astype(int)))
+    starts, ends = changes[0::2], changes[1::2] - 1
+
+    xs = [times[0]]
+    ys = [0. if mask[0] else 1.]
+
+    for first, last in zip(starts, ends):
+        has_pre, has_post = first > 0, last < mask.size - 1
+        pre = times[first-1] if has_pre else None
+        post = times[last+1] if has_post else None
+
+        # ramp down from the last sample with data, and up to the next one
+        down = min(pre + ramp, times[first]) if has_pre else None
+        up = max(post - ramp, times[last]) if has_post else None
+
+        # a gap too short for both ramps dips to zero at its midpoint
+        if has_pre and has_post and (down > up):
+            down = up = 0.5*(pre + post)
+
+        if has_pre:
+            xs += [pre, down]
+            ys += [1., 0.]
+        if has_post:
+            xs += [up, post]
+            ys += [0., 1.]
+
+    xs.append(times[-1])
+    ys.append(0. if mask[-1] else 1.)
+
+    # knots must be strictly increasing to interpolate between. Sorting the
+    # quieter of any pair sharing a position to the front keeps a mute from
+    # being widened away by a ramp knot landing on top of it
+    xs, ys = np.array(xs, dtype=float), np.array(ys, dtype=float)
+    order = np.lexsort((ys, xs))
+    xs, ys = xs[order], ys[order]
+    unique = np.append(True, np.diff(xs) > 0)
+
+    return xs[unique], ys[unique]
+
+
 def apply_fades(samples, srate, fdur=0.03):
     """ Apply de-click fades to a sample array
 
