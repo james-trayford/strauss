@@ -558,6 +558,18 @@ class Style(MonitoredBaseModel):
     )
 
 
+    handle_nans: Literal['silent', 'interpolate'] = Field(
+        default='silent',
+        title='Non-finite Value Handling',
+        description='How missing (NaN or infinite) input data is handled. Both modes linearly '
+                    'interpolate the missing values in time, so that they do not propagate '
+                    'through the mapping; "interpolate" then sounds the interpolated data as it '
+                    'is, while "silent" additionally mutes the audio the missing data would have '
+                    'made, so that a gap in the data is heard as a gap in the sound.',
+        examples=['silent', 'interpolate']
+    )
+
+
     @field_validator('sources', mode='before')
     @classmethod
     def lowercase_type(cls, value: str):
@@ -575,6 +587,12 @@ class Style(MonitoredBaseModel):
     def lowercase_pitch_binning(cls, value: str):
         # Convert string to lowercase so that 'Adaptive', 'adaptive', and 'ADAPTIVE' are all valid.
         return value.lower()
+
+    @field_validator('handle_nans', mode='before')
+    @classmethod
+    def lowercase_handle_nans(cls, value: str):
+        # Convert string to lowercase so that 'Silent', 'silent', and 'SILENT' are all valid.
+        return value.lower() if isinstance(value, str) else value
     
     
     @field_validator('max_notes_per_sec')
