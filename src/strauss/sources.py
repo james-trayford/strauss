@@ -1138,10 +1138,18 @@ class Objects(Source):
         return nan_mute_envelope(mask, times, ramp)
 
 def set_limits(vallims, mapvals, warn=True):
+    # sources need not share a length - and do not, once samples with no
+    # finite time have been dropped from some of them - so flatten source by
+    # source rather than stacking, which cannot handle a ragged set
+    if isinstance(mapvals, (list, tuple)):
+        flat = np.concatenate([np.asarray(v, dtype=float).ravel()
+                               for v in mapvals])
+    else:
+        flat = np.asarray(mapvals, dtype=float).ravel()
+
     # non-finite values have no place in the range of the data. Taken
     # through np.percentile a single one of them would return NaN, setting
     # the limits every source is then descaled by
-    flat = np.hstack([mapvals]).astype(float)
     flat = np.where(np.isfinite(flat), flat, np.nan)
     nothing_finite = not np.isfinite(flat).any()
 
