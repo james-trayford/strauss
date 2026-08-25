@@ -5,18 +5,37 @@ description: "Brightest stars appear first, pitch mapped to colour. Glockenspiel
 generator:
   type: "sampler"
   sample: "glockenspiel"
+  # the long decay is what makes the piece shimmer: notes pile up and ring
+  # into each other rather than sounding one at a time
+  mods:
+    note_length: 5
+    volume_envelope:
+      use: "on"
+      A: 0.02     # fade in to full volume (s)
+      D: 4.5      # fall from full volume to the sustain level (s)
+      S: 0.0      # sustain level, as a fraction of full volume
+      R: 0.07     # release once the note is let go (s)
 
 sources: "events"
 
-max_notes_per_sec: 5
+# Note: 'max_notes_per_sec' is deliberately unset. Merging events would stop
+# each note standing for exactly one star, which matters wherever the
+# sonification is synced to something else - a visual, say, driven by the
+# event table.
 
 map:
 
+  # brightest first: magnitude sets when each star sounds. The range runs
+  # past 100% to leave a tail of silence for the last notes to ring out in
   - input: "magnitude"
-    input_range: ["0%", "110%"]
+    input_range: ["0%", "104%"]
     output: "time"
 
+  # colour picks the note from the chord. 'invert' negates it, so that blue
+  # stars (low B-V) take the high notes: short wavelength of light onto
+  # short wavelength of sound
   - input: "colour"
+    function: "invert"
     output: "pitch"
 
   - input: "azimuth"
@@ -25,8 +44,21 @@ map:
   - input: "polar"
     output: "polar"
 
+  # Anything below here is appended rather than inserted on purpose. Mappings
+  # are matched to positional arguments in the order they appear, so adding to
+  # the end leaves existing callers passing time/pitch/azimuth/polar alone,
+  # while callers naming their columns pick up all six.
 
-notes: ["G2", "D3", "G3", "B4", "F#4"]
-  
-  
+  # dimmer stars are far more numerous, so quietening them keeps the overall
+  # level roughly even through the piece
+  - input: "volume"
+    output: "volume"
 
+  # a touch of detune, so that stars sharing a note do not phase against
+  # each other
+  - input: "pitch_shift"
+    input_range: [0, 1]
+    output: "pitch_shift"
+
+
+notes: ["Db3", "Gb3", "Ab3", "Eb4", "F4"]
