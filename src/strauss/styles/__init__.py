@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, PrivateAttr, Field, field_validator, model_validator
 from typing import Optional, Literal, Dict, List, Union, Tuple
-from ..sources import param_lim_dict as valid_params
+from ..sources import param_lim_dict as valid_params, spatial_angles
 from pathlib import Path
 import random
 import numpy as np
@@ -231,12 +231,17 @@ class Mapping(MonitoredBaseModel):
         
         if self.fixed is None:
             return self
-        
+
+        if self.output in spatial_angles:
+            # spatial angles are cyclic, so any value is valid - it is wrapped
+            # around the circle in the units given by angle_unit
+            return self
+
         valid_min, valid_max = valid_params[self.output]
-        
+
         if not valid_min <= self.fixed <= valid_max:
             raise ValueError('Fixed value must be between the limits of the output parameter.')
-        
+
         return self
     
 
@@ -437,6 +442,19 @@ class Style(MonitoredBaseModel):
         examples=[15, 10, 7]
         )
 
+    merge_mode: Literal['average', 'central'] = Field(
+        default='central',
+        title='Event Merge Mode',
+        description='How events merged together by "max_notes_per_sec" take their values. '
+                    'Choose from "average", where the merged event takes the mean of all the '
+                    'events it stands for, and so represents all of them but corresponds to no '
+                    'single data point, and "central", where it takes the values of the event '
+                    'closest to the middle of those merged, and so remains a real data point. '
+                    'Merged events always sound at the mean time of those merged, whichever is '
+                    'used, so that the maximum event rate is kept to.',
+        examples=['average', 'central']
+        )
+
     # The map is the list of Mapping objects which set up the sonification parameters and limits.
     map: List[Mapping] = Field(
         ...,
@@ -546,6 +564,12 @@ class Style(MonitoredBaseModel):
         # Convert string to lowercase so that 'Objects', 'objects', and 'OBJECTS' are all valid.
         return value.lower()
     
+    @field_validator('merge_mode', mode='before')
+    @classmethod
+    def lowercase_merge_mode(cls, value: str):
+        # Convert string to lowercase so that 'Average', 'average', and 'AVERAGE' are all valid.
+        return value.lower() if isinstance(value, str) else value
+
     @field_validator('pitch_binning', mode='before')
     @classmethod
     def lowercase_pitch_binning(cls, value: str):

@@ -1,16 +1,16 @@
 # defaults parameter ranges for all mappable synth parameters
 
 # Numerical note length
-note_length: [1e-2, 30.]
+note_length: [1.0e-2, 30.]
 note_length_unit: 'seconds'
 
 # define the note volume envelope applied to the samples
 # A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
 volume_envelope:
-  A: [1e-2, 20.]
-  D: [1e-2, 20.]
+  A: [1.0e-2, 10.]
+  D: [1.0e-2, 10.]
   S: [0., 1.]
-  R: [1e-2, 20]
+  R: [1.0e-2, 10.]
   Ac: [-1. ,1.]
   Dc: [-1. ,1.]
   Rc: [-1. ,1.]
@@ -25,10 +25,10 @@ volume_envelope:
   level_unit: 'fraction'    
 
 volume_lfo:
-  A: [1e-2, 20.]
-  D: [1e-2, 20.]
+  A: [1.0e-2, 20.]
+  D: [1.0e-2, 20.]
   S: [0., 1.]
-  R: [1e-2, 20]
+  R: [1.0e-2, 20]
   Ac: [-1. ,1.]
   Dc: [-1. ,1.]
   Rc: [-1. ,1.]
@@ -44,14 +44,15 @@ volume_lfo:
   Dc_unit: 'unitless'
   Rc_unit: 'unitless'
   level_unit: 'fraction'    
+  amount_unit: 'fraction'
   freq_unit: 'Hz'
   freq_shift_unit: 'octave'
 
 pitch_lfo:
-  A: [1e-2, 20.]
-  D: [1e-2, 20.]
+  A: [1.0e-2, 20.]
+  D: [1.0e-2, 20.]
   S: [0., 1.]
-  R: [1e-2, 20]
+  R: [1.0e-2, 20]
   Ac: [-1. ,1.]
   Dc: [-1. ,1.]
   Rc: [-1. ,1.]
@@ -88,6 +89,10 @@ azimuth: [0., 1.]
 azimuth_unit: 'cycles'
 polar: [0.,1.]
 polar_unit: 'half-cycles'
+
+# stereo panning, as the fraction of amplitude from the right speaker
+pan: [0., 1.]
+pan_unit: 'fraction'
 
 # pitch range and default shift in semitones
 pitch_shift: [0., 24.]

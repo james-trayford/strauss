@@ -25,8 +25,10 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy import signal as sig
-from .utilities import rescale_values 
+from .utilities import rescale_values, amplitude_to_db
+from .stream import filter_freq_lims
 import warnings
+import copy
 
 mappable = ['polar',
             'azimuth',
@@ -91,8 +93,110 @@ param_limits = [(0,1),#np.pi),
 param_lim_dict = dict(zip(mappable, param_limits))
 
 
+# readable names for the mapped parameters, for tables and other output.
+param_names = {'polar': 'Polar Angle',
+               'azimuth': 'Azimuthal Angle',
+               'theta': 'Polar Angle',
+               'phi': 'Azimuthal Angle',
+               'volume': 'Volume',
+               'pitch': 'Pitch',
+               'time': 'Time',
+               'cutoff': 'Cutoff Frequency',
+               'time_evo': 'Time',
+               'spectrum': 'Spectrum',
+               'pitch_shift': 'Pitch Shift',
+               'pan': 'Stereo Pan',
+               'volume_envelope/A': 'Volume Attack',
+               'volume_envelope/D': 'Volume Decay',
+               'volume_envelope/S': 'Volume Sustain',
+               'volume_envelope/R': 'Volume Release',
+               'volume_lfo/freq': 'Volume LFO Frequency',
+               'volume_lfo/freq_shift': 'Volume LFO Frequency Shift',
+               'volume_lfo/amount': 'Volume LFO Amount',
+               'pitch_lfo/freq': 'Pitch LFO Frequency',
+               'pitch_lfo/freq_shift': 'Pitch LFO Frequency Shift',
+               'pitch_lfo/amount': 'Pitch LFO Amount',
+               # not mapped parameters, but reported alongside them
+               'note': 'Note',
+               'source': 'Source',
+               'note_length': 'Note Length'}
+
+
+# conversions from a mapped value to the quantity it is worth reporting,
+def _cutoff_to_freq(values):
+    """Convert a mapped filter cutoff to the frequency it cuts at.
+
+    The cutoff is mapped logarithmically between the frequency limits
+    of the sweep applied in :meth:`strauss.stream.Stream.filt_sweep`.
+
+    Args:
+      values (:obj:`array-like` or :obj:`float`): mapped cutoff values
+
+    Returns:
+      freqs (:obj:`array-like` or :obj:`float`): cutoff frequencies in Hz
+    """
+    lolim, hilim = np.log10(filter_freq_lims)
+
+    return pow(10., np.asarray(values, dtype=float)*(hilim-lolim) + lolim)
+
+
+# below this, a sound is silent rather than quiet - well under the
+# dynamic range of 16-bit audio
+quiet_db = -100.
+
+def _amplitude_to_db(values):
+    """Convert a mapped amplitude to decibels.
+
+    Amplitudes are mapped as a fraction of the loudest the parameter
+    goes, which is 0 dB.
+
+    Note:
+      Nothing below `quiet_db` is audible, so everything quieter is
+      reported as minus infinity decibels rather than as a number that
+      suggests a distinction nobody can hear.
+
+    Args:
+      values (:obj:`array-like` or :obj:`float`): mapped amplitudes
+
+    Returns:
+      db (:obj:`array-like` or :obj:`float`): the amplitudes in decibels
+    """
+    db = amplitude_to_db(values)
+
+    return np.where(db < quiet_db, -np.inf, db)
+
+
+param_converters = {
+    # panning is the fraction of the amplitude from the right speaker
+    'pan': (lambda values: 100*np.asarray(values), '% right'),
+    # loudness is heard logarithmically, so is reported that way
+    'volume': (_amplitude_to_db, 'dB'),
+    # a cutoff is a fraction of a logarithmic sweep, not a frequency
+    'cutoff': (_cutoff_to_freq, 'Hz'),
+    'time': (lambda values: np.asarray(values, dtype=float), 'seconds'),
+    'time_evo': (lambda values: np.asarray(values, dtype=float), 'seconds'),
+}
+
+
+def display_name(key):
+    """A readable name for a mapped parameter.
+
+    Args:
+      key (:obj:`str`): name of the parameter
+
+    Returns:
+      name (:obj:`str`): its readable name, from `param_names`, or the
+      parameter name tidied up where it has no entry there
+    """
+    if key in param_names:
+        return param_names[key]
+
+    return key.replace('/', ' ').replace('_', ' ').title()
+
+
 spatial_angles = ('azimuth', 'polar', 'theta', 'phi')
 z_angles = ('polar', 'theta')
+azimuthal_angles = ('azimuth', 'phi')
 angle_unit_maxs = {'degrees': 360,
                    'radians': 2*np.pi,
                    'cycles': 1}
@@ -125,7 +229,20 @@ class Source:
       mapping (:obj:`dict`): processed mapping :obj:`dict` rescaled
         to parameter ranges, or interpolation funtions for evolving
         parameters.
-    
+      mapped_samples (:obj:`dict`): as `mapping`, but retaining the
+        mapped values of evolving parameters rather than replacing
+        them with interpolation functions. Set by
+        :meth:`apply_mapping_functions`.
+      names (:obj:`list(str)`): name of each source, used to look up
+        its table. Defaults to `source_0` to `source_N`.
+      table_angle_unit (:obj:`str`): units to report spatial angles
+        in, rather than as the mapped fractions the sonification works
+        in. Defaults to degrees where unset.
+      origin (:obj:`dict`): keys are `mapped_quantities`, entries say
+        where each mapping came from - `'mapped'` where requested
+        directly, or `'auto'` or `'fixed'` where a higher-level
+        interface (e.g. `AudioFigure`) added it.
+
     Raises:
     	UnrecognisedProperty: if `mapped_quantities` entry not in `mappable`.
     """
@@ -147,6 +264,114 @@ class Source:
         self.mapped_quantities = mapped_quantities
         self.raw_mapping = {}
         self.mapping = {}
+        self.mapped_samples = {}
+
+        # names are generated from n_sources on demand, until set
+        self._names = None
+
+        # units to report spatial angles in, degrees unless asked otherwise
+        self.table_angle_unit = None
+
+        # everything asked for here is user-specified by definition, higher
+        # level interfaces overwrite this where they add parameters themselves
+        self.origin = {q: 'mapped' for q in mapped_quantities}
+
+    @property
+    def names(self):
+        """:obj:`list(str)`: name of each source.
+
+        Names identify sources when looking up their tables. Where none
+        are set, sources are named `source_0` to `source_N` in the order
+        they were provided. Setting requires the data to have been read
+        in already, as the number of sources follows from it.
+
+        Raises:
+          Exception: if set before any data is read in.
+          ValueError: if the number of names does not match the number
+            of sources, or if any name repeats.
+        """
+        if self._names is not None:
+            return self._names
+        return [f'source_{i}' for i in range(getattr(self, 'n_sources', 0))]
+
+    @names.setter
+    def names(self, names):
+        if not hasattr(self, 'n_sources'):
+            raise Exception("Cannot name sources before reading in data - "
+                            "use 'fromdict' or 'fromfile' first.")
+
+        names = [str(n) for n in names]
+
+        if len(names) != self.n_sources:
+            raise ValueError(f"Got {len(names)} source names for "
+                             f"{self.n_sources} sources.")
+
+        if len(set(names)) != len(names):
+            repeats = sorted({n for n in names if names.count(n) > 1})
+            raise ValueError("Source names must be unique, but multiple"
+                             f"insatances of {repeats} found.")
+
+        self._names = names
+
+    def source_index(self, source):
+        """Resolve a source to its index.
+
+        Args:
+          source (:obj:`str` or :obj:`int`): name of the source, as in
+            :attr:`names`, or its index.
+
+        Returns:
+          index (:obj:`int`): index of the source
+
+        Raises:
+          KeyError: if no source goes by that name.
+          IndexError: if the index falls outside the sources.
+        """
+        if isinstance(source, (int, np.integer)):
+            if not -self.n_sources <= source < self.n_sources:
+                raise IndexError(f"Source index {source} is outside the "
+                                 f"{self.n_sources} sources.")
+            return int(source) % self.n_sources
+
+        names = self.names
+        if source not in names:
+            raise KeyError(f"No source named '{source}'. Choose from: {names}")
+
+        return names.index(source)
+
+    def in_angle_unit(self, key, values):
+        """Express mapped values of a spatial angle in reporting units.
+
+        Spatial angles are mapped to a fraction of the angular range
+        they span, as this is what the sonification works in. This
+        converts such values to `table_angle_unit`, leaving any other
+        parameter alone. Where no unit was asked for, angles are
+        reported in degrees as the most readable choice, whatever units
+        they were given in.
+
+        Note:
+          Angles given `map_lims` are mapped linearly rather than
+          wrapped, so are not angular quantities to convert, and are
+          left alone too.
+
+        Args:
+          key (:obj:`str`): name of the mapped parameter
+          values (:obj:`array-like` or :obj:`float`): mapped values
+
+        Returns:
+          values (:obj:`array-like` or :obj:`float`): the values in
+          units of `table_angle_unit`, if `key` is a spatial angle
+        """
+        if (key not in spatial_angles) or (key in getattr(self, 'map_lims', {})):
+            return values
+
+        amax = angle_unit_maxs[getattr(self, 'table_angle_unit', None) or 'degrees']
+
+        if key in z_angles:
+            # polar angles are folded onto half a turn
+            amax *= 0.5
+
+        return np.asarray(values) * amax
 
     def validate_mapping(self):
         """ Validate the mapping choices, warn and/or except on issues.
@@ -184,7 +409,7 @@ class Source:
             if (ang in params) and not (ang in self.map_lims) and not (self.angle_unit):
                 warn_text += f" - no angle unit or map_lims entry for {ang}, assuming values (0,1] for fractions of a circle (cycles)  \n"
             if (ang in self.map_lims) and (self.angle_unit):
-                warn_text += f" - map_lims entry for '{ang}' ('{ang}':{self.map_lims['ang']}) provided alongside "
+                warn_text += f" - map_lims entry for '{ang}' ('{ang}':{self.map_lims[ang]}) provided alongside "
                 warn_text += f"angle_unit={self.angle_unit}. Ignoring angle_unit for '{ang}'.\n"
                 
         # Finally, warn or except about any issues after full audit of mapping
@@ -315,8 +540,13 @@ class Source:
             else:
                 scaledvals = rescale_values(np.array(mapvals), lims, plims)
                 self.mapping[key] =  list(scaledvals)
-            
-        # finally, iterate through sources and interpolate evo functions 
+
+        # keep the mapped values themselves before evolving parameters are
+        # replaced by interpolation functions below. Deep copy as the angle
+        # unwrapping further down modifies the mapped arrays in place.
+        self.mapped_samples = copy.deepcopy(self.mapping)
+
+        # finally, iterate through sources and interpolate evo functions
         for key in self.mapping:
             if key == "time_evo":
                 continue

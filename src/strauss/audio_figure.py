@@ -22,7 +22,8 @@ from .score import Score
 from .sources import Events, Objects, set_limits
 from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
-from .utilities import nested_dict_reassign, merge_events, rescale_values
+from .utilities import (nested_dict_reassign, merge_events, rescale_values,
+                        db_to_amplitude)
 
 import numpy as np
 from . import channels
@@ -58,6 +59,14 @@ INTMAX32 = (pow(2, 31)-1)
 _kw_defaults = {
     'duration': 10,
     'is_mapped': ['pitch', 'time_evo'],
+    # units assumed for spatial angles (polar, azimuth, theta, phi), where
+    # a cycle is a full turn, as the mapped parameters themselves are
+    'angle_unit': 'cycles',
+    # names to identify each source by, when looking up its table
+    'source_names': None,
+    # how events merged by max_notes_per_sec take their values, overriding
+    # the style's own merge_mode where given
+    'merge_mode': None,
     # Style File
     'style' : None,
     'caption': None,
@@ -169,6 +178,12 @@ class AudioFigure:
         if not sonpars['style']:
             sonpars['style'] = 'default'
         style = styles.Style(**load_style(sonpars['style']))
+
+        # an entry is a data mapping or a fixed value by what it holds, not by
+        # where it sits in the map. Data mappings take the input data in the
+        # order they are given
+        data_maps = [m for m in style.map if m.fixed is None]
+        fixed_maps = [m for m in style.map if m.fixed is not None]
         
         # Check if data is in CSV or Pandas DataFrame format
         if len(args) == 1:
@@ -183,7 +198,7 @@ class AudioFigure:
             # If using CSV or DF, check for specified 'input' columns in style and resolve these
             if df is not None:
                 resolved = []
-                for i, mapping in enumerate(style.map):
+                for i, mapping in enumerate(data_maps):
                     col = getattr(mapping, 'input', None)
                     if col is None:
                         # If no input, default to auto-mapping based on position in style file
@@ -254,28 +269,78 @@ class AudioFigure:
             args = [np.arange(len(args[0])), args[0]]
             tlims = (0,args[0][-1])
                 
-        nmap = min(len(args), len(style.map))
-        
+        if len(data_maps) > len(args):
+            # a style may map more than the data given, drop these quietly for now.
+            data_maps = data_maps[:len(args)]
+        elif len(args) > len(data_maps):
+            # data given that no mapping asks for is more likely a mistake
+            warnings.warn(f"{len(args)} data arrays were given but the style "
+                          f"maps only {len(data_maps)} parameters, so the last "
+                          f"{len(args) - len(data_maps)} will not be used.")
+
+        source_names = sonpars['source_names']
+
+        # a merge_mode keyword overrides the style
+        merge_mode = sonpars['merge_mode'] or style.merge_mode
+        if merge_mode not in ('average', 'central'):
+            raise ValueError(f"merge_mode '{merge_mode}' is not recognised, "
+                             "choose from 'average' or 'central'.")
+
         if (style.sources.lower() == 'events') and style.max_notes_per_sec:
-            for i in range(nmap):
-                if style.map[i].output == 'time':
-                    tlims = style.map[i].input_range
+            tdx = None
+            for i, mapping in enumerate(data_maps):
+                if mapping.output == 'time':
+                    tdx = i
+                    tlims = mapping.input_range
                     tlims = set_limits(tlims, args[i], warn=False)
                     time = rescale_values(args[i], tlims, (0,1))
                     break
-            
+
+            # names are given per input event, so must be thinned alongside
+            # the data they name
+            if (source_names is not None) and (len(source_names) != len(args[0])):
+                raise ValueError(f"Got {len(source_names)} source names for "
+                                 f"{len(args[0])} input events.")
+
+            # azimuthal angles wrap around the circle, so must be merged as
+            # directions. Any angle given an input_range is mapped linearly
+            # rather than wrapped, so is merged that way too
+            amax = sources.angle_unit_maxs[sonpars['angle_unit']]
+            cyclic = {i: amax for i, m in enumerate(data_maps)
+                      if (m.output in sources.azimuthal_angles)
+                      and ('input_range' not in m.model_fields_set)}
+
             # lets now thin the data according to max events per second if using events
-            args = merge_events(sonpars['duration'], style.max_notes_per_sec, time, args)
+            args, clusters = merge_events(sonpars['duration'], style.max_notes_per_sec,
+                                          time, args, mode=merge_mode,
+                                          time_index=tdx, cyclic=cyclic,
+                                          return_index=True)
+
+            if source_names is not None:
+                if merge_mode == 'central':
+                    # the merged event is the event representing it, so is named
+                    # by it
+                    source_names = [source_names[i] for i in clusters['central']]
+                else:
+                    # the merged event is an average of several, so name it for
+                    # the span it covers, from the earliest event to the latest
+                    source_names = [source_names[a] if a == b else
+                                    f'{source_names[a]}->{source_names[b]}'
+                                    for a, b in zip(clusters['first'],
+                                                    clusters['last'])]
         
         to_map = []
         in_lims = {}
         out_lims = {}
         mapping_functions = {}
+
+        # track where each mapping came from, so that tables and summaries
+        # can tell user-specified mappings from those we add here
+        origin = {}
         
         # Iterate through the mappings and add lims and funcs to their own dicts
-        for i in range(nmap):
-            mapping = style.map[i]
-            
+        for mapping in data_maps:
+
             if mapping.output == 'time' and style.sources == 'objects':
                 # Automatically swap time for time_evo if using Objects
                 mapping.output = 'time_evo'
@@ -286,18 +351,22 @@ class AudioFigure:
                 style.generator.mods["filter"] = "on" 
                 
             to_map.append(mapping.output)
-            if mapping.input_range:
+            origin[to_map[-1]] = 'mapped'
+
+            # only limits explicitly  asked for given angle_unit handling
+            if 'input_range' in mapping.model_fields_set:
                 in_lims[to_map[-1]] = mapping.input_range
             if mapping.output_range:
                 out_lims[to_map[-1]] = mapping.output_range
             if mapping.function:
                 funcs = [mapping.function] if isinstance(mapping.function, str) else mapping.function
                 mapping_functions[to_map[-1]] = [styles.MAPPING_FUNCTIONS[f] for f in funcs]
-        map_data = dict(zip(to_map, args[:nmap]))
+        map_data = dict(zip(to_map, args[:len(data_maps)]))
         
         if 'pitch' not in to_map:
             to_map.append('pitch')
-            
+            origin['pitch'] = 'auto'
+
             if style.sources == 'objects':
                 nnote = len(style.notes)
                 for k in map_data.keys():
@@ -309,39 +378,58 @@ class AudioFigure:
                 map_data["pitch"] = np.zeros(len(map_data[to_map[0]]))
         
         # we now iterate through style fixed values
-        for i in range(nmap, len(style.map)):
-            mapping = style.map[i]
-            if mapping.fixed:
-                if mapping.input_range:
-                    in_lims[to_map[-1]] = mapping.input_range
-                if mapping.output_range:
-                    out_lims[to_map[-1]] = mapping.output_range
-
-                fix_array =  len(map_data[to_map[0]])*[mapping.fixed]
+        for mapping in fixed_maps:
+            if mapping.output in to_map:
+                warnings.warn(f"'{mapping.output}' is mapped by the style, but "
+                              f"is also being fixed at {mapping.fixed}.")
+            else:
                 to_map.append(mapping.output)
-                map_data[mapping.output] = fix_array
-                    
+            origin[mapping.output] = 'fixed'
+
+            if mapping.output not in sources.spatial_angles:
+                lims = sources.param_lim_dict[mapping.output]
+                in_lims[mapping.output] = lims
+                out_lims[mapping.output] = lims
+            # spatial angles are left to apply_mapping_functions, which
+            # scales them by angle_unit and wraps them around the circle
+
+            map_data[mapping.output] = len(map_data[to_map[0]])*[mapping.fixed]
+
         # and finally overwrite with any kwarg fixed values:
         for k in sonpars.keys():
             ksplit = k.split('fix_')
             if len(ksplit) > 1:
                 prop = ksplit[1]
                 if prop in to_map:
-                    print(f'Overwriting {prop} with fixed value...')
-                map_data[prop] = [sonpars[k]]*len(map_data[to_map[0]])
-                if prop in ['azimuth', 'polar']:
-                    if prop == 'polar':
-                        in_lims[prop] = (0,180)
-                    if prop == 'azimuth':
-                        in_lims[prop] = (0,360)
+                    # already mapped, so overwrite it in place rather than
+                    # mapping the same parameter twice
+                    warnings.warn(f"'{prop}' is mapped by the style, but is being "
+                                  f"overwritten with the fixed value {sonpars[k]}.")
                 else:
-                    in_lims[prop] = (0,1)
-                to_map.append(prop)
+                    to_map.append(prop)
+                map_data[prop] = [sonpars[k]]*len(map_data[to_map[0]])
+                # as above: angles are scaled and wrapped later
+                
+                if prop not in sources.spatial_angles:
+                    in_lims[prop] = sources.param_lim_dict[prop]
+                    out_lims[prop] = sources.param_lim_dict[prop]
+                origin[prop] = 'fixed'
 
        
         _sources = getattr(sources, style.sources.capitalize())(to_map)
+        _sources.origin = origin
+
+        # report angles in whatever units they were given in, or in degrees
+        # where the user expressed no preference
+        if not is_default['angle_unit']:
+            _sources.table_angle_unit = sonpars['angle_unit']
         _sources.fromdict(map_data)
-        _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims, param_lims=out_lims)
+
+        # name the sources, now that we know how many there are
+        if source_names is not None:
+            _sources.names = source_names
+        _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims,
+                                         param_lims=out_lims, angle_unit=sonpars['angle_unit'])
 
         # Set up Generator
         gentype = style.generator.type
@@ -388,6 +476,153 @@ class AudioFigure:
     def list_sonifications(self):
         for i, k in enumerate(self.sonifications.keys()):
             print(f"\t{i+1}.\t {k}")
+
+    def _get_sonification(self, name=None):
+        """Look up one of the figure's sonifications by name.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+
+        Returns:
+          soni (:class:`~strauss.sonification.Sonification`): the named
+          sonification
+
+        Raises:
+          KeyError: if no such sonification exists, or if no name is
+            given for a figure holding more than one.
+        """
+        if not self.sonifications:
+            raise KeyError("AudioFigure has no sonifications yet.")
+
+        if name is None:
+            if len(self.sonifications) > 1:
+                raise KeyError("AudioFigure has more than one sonification, so "
+                               "a 'name' is needed. Choose from: "
+                               f"{list(self.sonifications)}")
+            return next(iter(self.sonifications.values()))
+
+        if name not in self.sonifications:
+            raise KeyError(f"No sonification named '{name}' in this AudioFigure. "
+                           f"Choose from: {list(self.sonifications)}")
+
+        return self.sonifications[name]
+
+    def get_event_table(self, name=None, include_input=False):
+        """Get the table of events for a sonification.
+
+        Wrapper for
+        :meth:`~strauss.sonification.Sonification.event_table`, giving a
+        row per event with the time it sounds, the note played and the
+        value of each user-specified mapped parameter.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+          include_input (`optional`, :obj:`bool`): if True, also give
+            the input data value of each parameter, before mapping.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per event
+        """
+        return self._get_sonification(name).event_table(include_input=include_input)
+
+    def get_object_table(self, name=None, source=None, include_input=False):
+        """Get the table of one object's evolution in a sonification.
+
+        Wrapper for
+        :meth:`~strauss.sonification.Sonification.object_table`, giving
+        a row per point in the object's evolution.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of the source. Can be omitted where the sonification has
+            only one.
+          include_input (`optional`, :obj:`bool`): if True, also give
+            the input data value of each parameter, before mapping.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per point in the
+          object's evolution
+        """
+        soni = self._get_sonification(name)
+        return soni.object_table(source, include_input=include_input)
+
+    def get_fixed_table(self, name=None, source=None):
+        """Get the table of unmapped parameters for a sonification.
+
+        Wrapper for
+        :meth:`~strauss.sonification.Sonification.fixed_table`, giving a
+        row per parameter that the user did not map, and the value it
+        takes.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of a source to report values for. If omitted, values are
+            reported for the sonification as a whole.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per unmapped parameter
+        """
+        return self._get_sonification(name).fixed_table(source)
+
+    def get_table(self, name=None, source=None, include_input=False):
+        """Get the timing table for a sonification.
+
+        Returns the table appropriate to the sonification's source type
+        - :meth:`get_event_table` for `Events`, where the sonification
+        has a single table of events, and :meth:`get_object_table` for
+        `Objects`, where each source has a table of its own evolution.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of the source, for `Objects` sonifications. Can be omitted
+            where the sonification has only one.
+          include_input (`optional`, :obj:`bool`): if True, also give
+            the input data value of each parameter, before mapping.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): the sonification's table of
+          events, or the named source's table of evolution
+
+        Raises:
+          TypeError: if a `source` is given for an `Events`
+            sonification, where events are not divided by source.
+        """
+        soni = self._get_sonification(name)
+
+        if isinstance(soni.sources, sources.Events):
+            if source is not None:
+                raise TypeError("Events sonifications have a single table of "
+                                f"all events, so cannot take source '{source}'.")
+            return soni.event_table(include_input=include_input)
+
+        return soni.object_table(source, include_input=include_input)
+
+    def list_tables(self):
+        """Print the tables available from this figure.
+
+        Lists each sonification with the tables it offers - a single
+        table of events for `Events` sonifications, or one per named
+        source, with the note it plays, for `Objects`.
+        """
+        for i, (name, soni) in enumerate(self.sonifications.items()):
+            stype = type(soni.sources).__name__
+            print(f"\t{i+1}.\t {name} ({stype})")
+
+            if isinstance(soni.sources, sources.Events):
+                print(f"\t\t - {soni.sources.n_sources} events")
+                continue
+
+            notes, _ = soni._assign_notes()
+            for sname, note in zip(soni.sources.names, notes):
+                print(f"\t\t - {sname} ({note})")
 
     def rename(self, old, new):
         dicts = [self.sonifications, self.levels, self.styles, self.figure_hashes]
@@ -499,8 +734,7 @@ class AudioFigure:
             elif level_clean.endswith('db'):
                 try:
                     db_val = float(level_clean.replace('db', '').strip())
-                    # Convert dB to amplitude: 10^(dB/20)
-                    return 10 ** (db_val / 20.0)
+                    return float(db_to_amplitude(db_val))
                 except ValueError:
                     raise ValueError(f"Invalid dB format: {level}")
             else:

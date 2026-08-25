@@ -15,9 +15,13 @@ Todo:
 
 from .stream import Stream
 from .channels import audio_channels
+from .sources import (Events, Objects, spatial_angles, display_name,
+                      param_converters, param_lim_dict)
+from .utilities import decimals_for_range
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import sys
 import os
@@ -129,6 +133,57 @@ class Sonification:
             elif isinstance(self.out_channels[chan], np.ndarray):
                 self.out_channels[chan][:] = 0.
             
+    def _assign_notes(self):
+        """Determine the note played by each source, and when.
+
+        Combines the :obj:`Sources` `time` and `pitch` mappings with the
+        :obj:`Score` chord sequence to decide which note each source
+        sounds, and at what point in the sonification. Used by
+        :meth:`render`, and by the table methods so that a table can be
+        produced without rendering any audio.
+
+        Note:
+          As in :meth:`render`, sources with no `time` mapping are all
+          assumed to start at zero and last the full sonification.
+
+        Returns:
+          notes (:obj:`list(str)`): note played by each source, in
+            scientific pitch notation (e.g. :obj:`'A4'`)
+          times (:obj:`ndarray`): start time of each source in seconds
+        """
+        # determine if time is provided, if not assume all start at zero
+        # and last the duration of sonification
+        if "time" not in self.sources.mapping:
+            self.sources.mapping['time'] = [0.] * self.sources.n_sources
+            self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources
+
+        # index each chord
+        cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
+        cbin = np.clip(cbin-1, 0, self.score.nchords-1)
+
+        # pitch rank of each source divided by the number of sources
+        pitch = np.asarray(self.sources.mapping['pitch'])
+        pitchfrac = np.empty_like(pitch)
+        if self.score.pitch_binning == 'adaptive' and np.unique(pitch).size > 1:
+            idxs = np.argsort(pitch)
+            pitchfrac[idxs] = np.arange(self.sources.n_sources)/self.sources.n_sources
+        else:
+            # a single pitch value has no ranking to adapt to - ranking it
+            # would spread sources over the chord in whatever order they
+            # arrived in, so bin it as a fixed pitch, as uniform binning does
+            pitchfrac = np.clip(pitch, 0, 9.999999e-1)
+
+        notes = []
+        for source in range(self.sources.n_sources):
+            chord = self.score.note_sequence[cbin[source]]
+            nints = self.score.nintervals[cbin[source]]
+            notes.append(chord[int(pitchfrac[source] * nints)])
+
+        # mapped time is a fraction of the sonification length
+        times = np.array(self.sources.mapping['time']) * self.score.length
+
+        return notes, times
+
     def render(self, downsamp=1, progress=True):
         """Render the sonification.
         
@@ -148,24 +203,10 @@ class Sonification:
         # first, clear the audio channels
         self.clear()
         
-        # determine if time is provided, if not assume all start at zero
-        # and last the duration of sonification
+        # determine the note played by each source and when it starts
+        # (this also defaults the time mapping, if none was provided)
+        notes, _ = self._assign_notes()
 
-        if "time" not in self.sources.mapping:
-            self.sources.mapping['time'] = [0.] * self.sources.n_sources
-            self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources
-            
-        # index each chord
-        cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
-        cbin = np.clip(cbin-1, 0, self.score.nchords-1)
-
-        # pitch rank of each source divided by the number of sources
-        pitchfrac = np.empty_like(self.sources.mapping['pitch'])
-        if self.score.pitch_binning == 'adaptive':
-            pitchfrac[np.argsort(self.sources.mapping['pitch'])] = np.arange(self.sources.n_sources)/self.sources.n_sources
-        elif self.score.pitch_binning == 'uniform':
-            pitchfrac = np.clip(self.sources.mapping['pitch'], 0, 9.999999e-1)
-            
         # get some relevant numbers before iterating through sources
         Nsamp = self.out_channels['0'].values.size
         lastsamp = Nsamp - 1
@@ -179,10 +220,7 @@ class Sonification:
             # index note properties
             t = self.sources.mapping['time'][source]
             tsamp = int((Nsamp-1) * t)
-            chord = self.score.note_sequence[cbin[source]]
-            nints = self.score.nintervals[cbin[source]]
-            pitch = pitchfrac[source]
-            note = chord[int(pitch * nints)]
+            note = notes[source]
 
             # make dictionary for feeding to play function with each notes properties
             sourcemap = {}
@@ -250,6 +288,396 @@ class Sonification:
             for c in range(Nchan):
                 self.caption_channels[str(c)] = Stream(0, self.samprate) 
 
+
+    def _check_can_tabulate(self):
+        """Check the sources carry the mapped values a table needs."""
+        if not getattr(self.sources, 'mapped_samples', {}):
+            raise Exception("Sources have no mapped values to tabulate - run "
+                            "'apply_mapping_functions' on the sources first.")
+
+    def _param_unit(self, key):
+        """The unit a mapped parameter is reported in.
+
+        Units come from three places, in order: the table columns that
+        replace a mapped parameter with what is heard (`time` in
+        seconds, `note` in place of `pitch`), the units spatial angles
+        are reported in, and otherwise the `<parameter>_unit` entries of
+        the :obj:`Generator` ranges. Anything else, and anything the
+        ranges call `unitless`, has no unit to report.
+
+        Args:
+          key (:obj:`str`): name of the mapped parameter, or of a table
+            column
+
+        Returns:
+          unit (:obj:`str`): the unit, or an empty string where the
+          quantity has none
+        """
+        if key in param_converters:
+            # the value is converted for reporting, so takes the unit of
+            # whatever it is converted into
+            return param_converters[key][1]
+
+        if key in spatial_angles:
+            return self.sources.table_angle_unit or 'degrees'
+
+        # otherwise ask the generator what it calls this parameter's units
+        node = self.generator.preset.get('ranges', {})
+        parts = key.split('/')
+        for part in parts[:-1]:
+            node = node.get(part, {})
+            if not isinstance(node, dict):
+                return ''
+        unit = node.get(f'{parts[-1]}_unit', '')
+
+        return '' if unit == 'unitless' else unit
+
+    def _display_values(self, key, values):
+        """Put mapped values into the terms they are reported in.
+
+        A mapped value is not always the quantity worth reporting - a
+        spatial angle is a fraction of a turn rather than an angle, and
+        `pan` a fraction rather than a share of the output. Parameters
+        with an entry in `param_converters` are converted by it, and
+        spatial angles by the units angles are reported in. Anything
+        else is already in the terms it is reported in.
+
+        Args:
+          key (:obj:`str`): name of the mapped parameter
+          values (:obj:`array-like` or :obj:`float`): mapped values
+
+        Returns:
+          values (:obj:`array-like` or :obj:`float`): the values as they
+          are reported
+        """
+        if key in param_converters:
+            convert, _ = param_converters[key]
+            return convert(values)
+
+        return self.sources.in_angle_unit(key, values)
+
+    def _display_range(self, key):
+        """The range a parameter covers, as it is reported.
+
+        Args:
+          key (:obj:`str`): name of the mapped parameter
+
+        Returns:
+          span (:obj:`float`): the range it covers, or `None` where the
+          parameter has no known limits
+        """
+        if key in ('time', 'time_evo'):
+            return float(self.score.length)
+
+        lims = self.sources.plims.get(key, param_lim_dict.get(key))
+        if lims is None:
+            return None
+
+        lims = np.asarray(self._display_values(key, np.asarray(lims)),
+                          dtype=float)
+
+        return float(abs(np.diff(lims)[0]))
+
+    def _round_numbers(self, table):
+        """Round a table's numbers to what is worth reading.
+
+        Each column is rounded to the decimal places that resolve its
+        range into a thousand steps, so that a column of angles in
+        degrees is given to a tenth of a degree and the same angles in
+        cycles to a thousandth. Columns whose range is unknown, input
+        data among them, are resolved by the values they hold. Times are
+        never coarser than 10 ms, however long the sonification.
+
+        Args:
+          table (:obj:`pandas.DataFrame`): table to round
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): the same table, rounded
+        """
+        for name in table.columns:
+            if not pd.api.types.is_numeric_dtype(table[name]):
+                continue
+
+            values = table[name].to_numpy(dtype=float)
+
+            span = self._display_range(name)
+            if span is None:
+                # no declared range, as for input data in the user's own
+                # units, so resolve what the column holds
+                finite = values[np.isfinite(values)]
+                span = float(finite.max() - finite.min()) if finite.size else 0.
+
+            decimals = decimals_for_range(span)
+            if name in ('time', 'time_evo'):
+                # times keep to the nearest 10 ms however long the
+                # sonification, rather than coarsening with its length
+                decimals = max(decimals, 2)
+
+            table[name] = np.round(values, decimals)
+
+        return table
+
+    def _with_units(self, table):
+        """Label a table's columns with the units of their contents.
+
+        Columns become a two-level :obj:`pandas.MultiIndex` of name and
+        unit, so that units travel with the table rather than living in
+        its formatting - they survive `to_csv`, and are read back with
+        `header=[0,1]`.
+
+        Note:
+          Columns holding no numerical quantity (e.g. `source`, `note`)
+          and input data columns, whose units are the user's own, are
+          labelled with an empty unit.
+
+        Args:
+          table (:obj:`pandas.DataFrame`): table with plain columns
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): the same table, with name and
+          unit columns
+        """
+        names, units = [], []
+        for column in table.columns:
+            if column.endswith('_input'):
+                # input values are the data as given, in the user's own units
+                key = column[:-len('_input')]
+                names.append(f'{display_name(key)} (input)')
+                units.append('')
+            else:
+                names.append(display_name(column))
+                unit = self._param_unit(column)
+                # bracket it, to read as a unit rather than as a second name
+                units.append(f'[{unit}]' if unit else '')
+
+        table.columns = pd.MultiIndex.from_arrays([names, units])
+
+        return table
+
+    def event_table(self, include_input=False):
+        """Tabulate the events of the sonification.
+
+        Produces a table with a row per event, giving the name of the
+        source it represents, the time at which it sounds, the note
+        played, and the value of each user-specified mapped parameter.
+        Parameters added automatically or held at fixed values are
+        excluded, and are instead listed by :meth:`fixed_table`.
+
+        Note:
+          Rows are ordered in time, whatever order the data was given in.
+          The `time` and `note` columns replace any mapped `time` and
+          `pitch` parameters, which are internal fractions rather than
+          what is heard - `time` is the time of the event in the
+          sonification in seconds, and `note` the note it ultimately
+          sounds. Spatial angles are given in degrees, or in the
+          sonification's `angle_unit` where one was asked for, rather
+          than as mapped fractions.
+
+        Args:
+          include_input (`optional`, :obj:`bool`): if True, also give the
+            input data value of each parameter, before mapping, in a
+            column suffixed `'_input'`.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per event
+        """
+        self._check_can_tabulate()
+        if not isinstance(self.sources, Events):
+            raise TypeError(f"'event_table' is for Events sources, but these "
+                            f"sources are {type(self.sources).__name__}.")
+
+        notes, times = self._assign_notes()
+
+        # each event is a source, so is named by it
+        table = {'source': self.sources.names,
+                 'time': self._display_values('time', times),
+                 'note': notes}
+
+        for key in self.sources.mapped_quantities:
+            if self.sources.origin.get(key, 'mapped') != 'mapped':
+                continue
+            if key not in ('time', 'time_evo', 'pitch'):
+                # time and pitch are already given by the time and note
+                # of each row, in the terms actually heard
+                table[key] = self._display_values(
+                    key, np.asarray(self.sources.mapped_samples[key]))
+            if include_input:
+                table[f'{key}_input'] = np.asarray(self.sources.raw_mapping[key])
+
+
+        table = pd.DataFrame(table).sort_values('time', kind='stable',
+                                                ignore_index=True)
+
+        return self._with_units(self._round_numbers(table))
+
+    def _resolve_source(self, source=None):
+        """Resolve a source name or index, defaulting to a lone source.
+
+        Args:
+          source (`optional`, :obj:`str` or :obj:`int`): name or index of
+            the source. Can be omitted where there is only one.
+
+        Returns:
+          index (:obj:`int`): index of the source
+
+        Raises:
+          KeyError: if omitted where there is more than one source.
+        """
+        if source is None:
+            if self.sources.n_sources > 1:
+                raise KeyError("Sonification has more than one source, so a "
+                               "'source' is needed. Choose from: "
+                               f"{self.sources.names}")
+            return 0
+
+        return self.sources.source_index(source)
+
+    def object_table(self, source=None, include_input=False):
+        """Tabulate the evolution of one object of the sonification.
+
+        Produces a table for a single source, with a row per point in
+        its continuous evolution, giving the time and the value of each
+        user-specified mapped parameter at that point. Parameters that
+        do not evolve hold the same value down their column. Those the
+        user did not map are excluded, and are instead listed by
+        :meth:`fixed_table`.
+
+        Note:
+          Rows are ordered in time, whatever order the data was given in.
+          As for :meth:`event_table`, `time` is given in seconds, and
+          replaces the mapped `time_evo` parameter, and spatial angles
+          are given in degrees, or in the sonification's `angle_unit`
+          where one was asked for. The note the
+          object plays, and its name, are given by the `note` and
+          `source` entries of the table's `attrs`.
+
+        Args:
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of the source, as in :attr:`Source.names`. Can be omitted
+            where the sonification has only one source.
+          include_input (`optional`, :obj:`bool`): if True, also give the
+            input data value of each parameter, before mapping, in a
+            column suffixed `'_input'`.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per point in the
+          object's evolution
+        """
+        self._check_can_tabulate()
+        if not isinstance(self.sources, Objects):
+            raise TypeError(f"'object_table' is for Objects sources, but these "
+                            f"sources are {type(self.sources).__name__}.")
+
+        index = self._resolve_source(source)
+
+        # objects with nothing evolving have no time base, and so are a
+        # single unchanging state
+        if 'time_evo' in self.sources.mapped_samples:
+            times = np.asarray(self.sources.mapped_samples['time_evo'][index])
+            times = self._display_values('time', times * self.score.length)
+        else:
+            times = np.zeros(1)
+
+        def _down_column(values):
+            """Broadcast an unevolving value down the time column."""
+            values = np.asarray(values)
+            if values.ndim == 0:
+                return np.broadcast_to(values, times.shape)
+            return values
+
+        table = {'time': times}
+
+        for key in self.sources.mapped_quantities:
+            if self.sources.origin.get(key, 'mapped') != 'mapped':
+                continue
+            if key not in ('time', 'time_evo', 'pitch'):
+                # time and pitch are already given by the time column and
+                # the note of the object, in the terms actually heard
+                table[key] = self._display_values(
+                    key, _down_column(self.sources.mapped_samples[key][index]))
+            if include_input:
+                table[f'{key}_input'] = _down_column(self.sources.raw_mapping[key][index])
+
+
+        table = pd.DataFrame(table).sort_values('time', kind='stable',
+                                                ignore_index=True)
+        table = self._with_units(self._round_numbers(table))
+
+        notes, _ = self._assign_notes()
+        table.attrs['source'] = self.sources.names[index]
+        table.attrs['note'] = notes[index]
+
+        return table
+
+    def fixed_table(self, source=None):
+        """Tabulate parameters the user did not map.
+
+        Companion to :meth:`event_table`, listing the parameters the
+        user did not map - those held at a fixed value, and those
+        STRAUSS assigned itself where no mapping was given (`'fixed'`
+        and `'auto'` in the `origin` column, respectively) - alongside
+        the value each takes.
+
+        Note:
+          Across the whole sonification, parameters varying from source
+          to source (e.g. the `pitch` assigned to each Object of a
+          chord) have no one value to report, and are left out. Given a
+          `source`, they take their value for that source, so are
+          listed. Spatial angles are given in degrees, or in the
+          sonification's `angle_unit` where one was asked for. A `pitch`
+          is reported as the `note` it resolves to, being what is
+          ultimately heard.
+
+        Args:
+          source (`optional`, :obj:`str` or :obj:`int`): name or index
+            of a source, as in :attr:`Source.names`, to report values
+            for. If omitted, values are reported for the sonification as
+            a whole.
+
+        Returns:
+          table (:obj:`pandas.DataFrame`): one row per unmapped parameter
+        """
+        self._check_can_tabulate()
+
+        index = None if source is None else self._resolve_source(source)
+
+        rows = []
+        for key in self.sources.mapped_quantities:
+            origin = self.sources.origin.get(key, 'mapped')
+            if origin == 'mapped':
+                continue
+
+            if key == 'pitch':
+                # a mapped pitch is an internal fraction, of no use to the
+                # reader - what is heard is the note it resolves to
+                notes, _ = self._assign_notes()
+                values = np.unique(notes if index is None else [notes[index]])
+                values = values.astype(str).tolist()
+                name = 'note'
+            else:
+                values = self.sources.mapped_samples[key]
+                values = np.unique(np.asarray(values if index is None
+                                              else values[index]))
+                name = key
+
+            if len(values) != 1:
+                # not held at one value, so don't claim it is
+                continue
+
+            value = self._display_values(key, values[0])
+
+            rows.append({'parameter': display_name(name),
+                         'value': value if isinstance(value, str) else
+                                  round(float(value),
+                                        decimals_for_range(
+                                            self._display_range(key) or 0.)),
+                         # a row per parameter, so the unit is a column of its
+                         # own rather than a second level of the column names
+                         'unit': self._param_unit(name),
+                         'origin': origin})
+
+        return pd.DataFrame(rows, columns=['parameter', 'value', 'unit',
+                                           'origin'])
 
     def add_ticks(self, increment, duration=0.04, tick_vol=0.25):
         # TODO this should probably use a dedicated generator...

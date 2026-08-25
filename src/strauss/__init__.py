@@ -48,3 +48,15 @@ def set_level(name, level):
 def save(fname):
     fig = _get_current_figure()
     fig.save(fname)
+    
+def get_fixed_table(name=None, source=None):
+    fig = _get_current_figure()
+    return fig.get_fixed_table(name, source)
+    
+def get_table(name=None, source=None, include_input=False):
+    fig = _get_current_figure()
+    return fig.get_table(name, source, include_input)
+    
+def list_tables():
+    fig = _get_current_figure()
+    fig.list_tables()
