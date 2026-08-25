@@ -38,6 +38,14 @@ from strauss.sonification import Sonification
 from strauss.sources import Events
 
 
+# Where the repository's own assets live. Worked out from this file rather
+# than from the working directory, so that the module can be imported, or run
+# as a script, from anywhere - including from `examples/multimedia/` itself.
+REPO = Path(__file__).resolve().parent.parent.parent
+SAMPLES = REPO / "data" / "samples"
+PANORAMAS = REPO / "data" / "panoramas"
+
+
 # <u> __Settings:__ </u>
 #
 # Everything you would want to change lives in one place. The defaults describe
@@ -89,9 +97,12 @@ class Config:
     # since the stretch diverges at the zenith itself.
     max_stretch: float = 40.0
 
-    # optional panorama to lay the stars over: a 360x180 degree image with
-    # `facing` at its centre. None gives a black sky.
-    background: Path | None = None
+    # panorama to lay the stars over: a 360x180 degree image with `facing` at
+    # its centre. `None` gives a black sky. The packaged default is a generic
+    # starfield rather than a photograph of any particular site, so its stars
+    # are not the ones being sonified over it - swap in a panorama of your own
+    # if you want the two to agree.
+    background: Path | None = PANORAMAS / "sherwood_sky.png"
 
     # -- outputs ---------------------------------------------------------
     outdir: Path = Path("stars_appearing_out")
@@ -154,13 +165,13 @@ _PLUCK_PRESET = {
 INSTRUMENTS = {
     "glockenspiel": {
         "chords": [["Db3", "Gb3", "Ab3", "Eb4", "F4"]],
-        "sampler": lambda cfg: Sampler(Path("..", "data", "samples", "glockenspiels")),
+        "sampler": lambda cfg: Sampler(SAMPLES / "glockenspiels"),
         "preset": _CHIME_PRESET,
     },
     "mallets": {
         # a fast-rendering stand-in while you are still choosing settings
         "chords": [["Db3", "Gb3", "Ab3", "Eb4", "F4"]],
-        "sampler": lambda cfg: Sampler(Path("..", "data", "samples", "mallets")),
+        "sampler": lambda cfg: Sampler(SAMPLES / "mallets"),
         "preset": _CHIME_PRESET,
     },
     "qanun": {

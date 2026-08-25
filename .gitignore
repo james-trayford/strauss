@@ -81,6 +81,8 @@ cython_debug/
 
 docs/_build/
 
+.DS_Store
+
 # Ignore WAV files, with explicit exceptions ('unignore') for packaged samples...
 *.wav
 !data/samples/glockenspiels/*.wav
@@ -93,3 +95,15 @@ docs/_build/
 
 # Also don't want ipynb checkpoints commited to the repo
 */.ipynb_checkpoints/
+
+# Rendered sonifications and animations - these get big, and are reproducible
+# from the examples that made them
+*.mp4
+*.mp3
+stars_appearing_out/
+stars_appearing_preview/
+stars_appearing_full/
+
+# Fisheye panoramas are reprojected from the equirectangular ones on demand,
+# so only the equirectangular originals are kept
+data/panoramas/*_fisheye.png
