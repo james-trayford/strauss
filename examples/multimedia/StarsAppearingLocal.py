@@ -13,17 +13,19 @@
 #
 # The single most important idea here is that the animation does **not** re-derive
 # when each star appears. It reads the timings straight out of the rendered
-# sonification via `Sonification.event_table()`, so sound and picture cannot drift
-# apart.
+# sonification via `strauss.get_table()`, so sound and picture cannot drift apart.
+#
+# This module is deliberately *not* where the sonification happens. It supplies the
+# two things that are not `strauss` - the sky, from `skyfield`, and the animation,
+# from `numpy` and `ffmpeg` - and the notebook beside it drives `strauss` itself,
+# in the open, with the `stars_appearing` style carrying the recipe.
 #
 # Extra requirements beyond `strauss`:  `pip install skyfield`
 # (and a working `ffmpeg` on your `PATH`).
 
-import subprocess
 import shutil
-import sys
-import urllib.request
-from dataclasses import dataclass, field
+import subprocess
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -32,17 +34,12 @@ import numpy as np
 import pandas as pd
 import tqdm
 
-from strauss.generator import Sampler
-from strauss.score import Score
-from strauss.sonification import Sonification
-from strauss.sources import Events
 
 
 # Where the repository's own assets live. Worked out from this file rather
 # than from the working directory, so that the module can be imported, or run
 # as a script, from anywhere - including from `examples/multimedia/` itself.
 REPO = Path(__file__).resolve().parent.parent.parent
-SAMPLES = REPO / "data" / "samples"
 PANORAMAS = REPO / "data" / "panoramas"
 
 
@@ -71,9 +68,11 @@ class Config:
     mag_limit: float = 5.0
 
     # -- the sound -------------------------------------------------------
+    # passed to `strauss.sonify`, and used here to work out how many frames
+    # the animation needs. The *sound itself* is chosen by the strauss style,
+    # not from here.
     duration: float = 60.0                      # seconds
     system: str = "5.1"                         # 'mono', 'stereo', '5.1', 'ambix2', ...
-    instrument: str = "glockenspiel"            # a key of INSTRUMENTS, below
 
     # -- the picture -----------------------------------------------------
     width: int = 4096
@@ -98,10 +97,10 @@ class Config:
     max_stretch: float = 40.0
 
     # panorama to lay the stars over: a 360x180 degree image with `facing` at
-    # its centre. `None` gives a black sky. The packaged default is a generic
-    # starfield rather than a photograph of any particular site, so its stars
-    # are not the ones being sonified over it - swap in a panorama of your own
-    # if you want the two to agree.
+    # its centre. `None` gives a black sky. The packaged default is the sky
+    # over Sherwood for the date, time and facing defaulted to above, so the
+    # pulses land on the stars already drawn there. Change any of those and
+    # the two no longer agree - render a panorama to match, or drop it.
     background: Path | None = PANORAMAS / "sherwood_sky.png"
 
     # -- outputs ---------------------------------------------------------
@@ -125,64 +124,6 @@ class Config:
             self.background = Path(self.background)
         if self.dome_size is None:
             self.dome_size = self.height
-
-
-# <u> __Instruments:__ </u>
-#
-# Each entry gives the chord the stars are drawn from, how to build the
-# `Sampler`, and any preset changes. Adding an instrument means adding a key
-# here and nothing else.
-
-def _download(url, path):
-    """Fetch `url` to `path` once, returning the local path."""
-    path = Path(path)
-    if not path.is_file():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        print(f"downloading {path.name} ...")
-        with urllib.request.urlopen(url) as response:
-            path.write_bytes(response.read())
-    return path
-
-
-# the long decay is what makes the piece shimmer: notes pile up rather than
-# sounding one at a time
-_CHIME_PRESET = {
-    "note_length": 5,
-    "volume_envelope": {
-        "use": "on",
-        "A": 0.02,    # fade in to full volume (s)
-        "D": 4.5,     # fall from full volume to the sustain level (s)
-        "S": 0.0,     # sustain level, as a fraction of full volume
-        "R": 0.07,    # release once the note is let go (s)
-    },
-}
-
-_PLUCK_PRESET = {
-    "note_length": 5,
-    "volume_envelope": {"use": "on", "A": 0.02, "D": 0.0, "S": 1.0, "R": 0.07},
-}
-
-INSTRUMENTS = {
-    "glockenspiel": {
-        "chords": [["Db3", "Gb3", "Ab3", "Eb4", "F4"]],
-        "sampler": lambda cfg: Sampler(SAMPLES / "glockenspiels"),
-        "preset": _CHIME_PRESET,
-    },
-    "mallets": {
-        # a fast-rendering stand-in while you are still choosing settings
-        "chords": [["Db3", "Gb3", "Ab3", "Eb4", "F4"]],
-        "sampler": lambda cfg: Sampler(SAMPLES / "mallets"),
-        "preset": _CHIME_PRESET,
-    },
-    "qanun": {
-        "chords": [["A2", "E3", "A3", "B3", "C4", "D4", "E4", "A4", "B4", "C5",
-                    "D5", "E5"]],
-        "sampler": lambda cfg: Sampler(str(_download(
-            "http://www.ozanyarman.com/files/QanunDrOz.sf2",
-            cfg.cache / "qanun.sf2"))),
-        "preset": _PLUCK_PRESET,
-    },
-}
 
 
 # <u> __The sky:__ </u>
@@ -279,96 +220,6 @@ def observed_sky(cfg):
     return sky.sort_values("magnitude")
 
 
-# <u> __The sonification:__ </u>
-#
-# Brightest stars sound first, so magnitude drives `time`. Colour drives
-# `pitch`, picking a note from the chord: blue stars take high notes and red
-# stars low ones, carrying the short-to-long wavelength of the light onto the
-# short-to-long wavelength of the sound. Position drives the spatial angles.
-#
-# Note on angles: `strauss` measures azimuth **anticlockwise from straight
-# ahead** (`stereo` puts L at 90 degrees and R at 270), while astronomical
-# azimuth runs **clockwise from north**. That is why `facing - az` below is the
-# right way round, and it is the same reason the panorama later uses
-# `180 - azimuth` to get its horizontal pixel.
-#
-# We pass `angle_unit='degrees'` rather than giving `map_lims` for the angles.
-# Both map the sound identically, but only `angle_unit` makes `event_table()`
-# report real degrees - with `map_lims` the angles come back as raw 0-1
-# fractions still labelled `[degrees]`, and the animation would be nonsense.
-
-def build_sonification(sky, cfg):
-    """Sonify the visible sky, returning the rendered `Sonification`."""
-    if cfg.instrument not in INSTRUMENTS:
-        raise ValueError(f"Unknown instrument '{cfg.instrument}'. "
-                         f"Choose from: {list(INSTRUMENTS)}")
-    voice = INSTRUMENTS[cfg.instrument]
-
-    rng = np.random.default_rng(cfg.seed + 1)
-    mag = sky["magnitude"].to_numpy(float)
-
-    # normalised magnitude, 0 brightest to 1 faintest
-    smag = unit_scale(mag)
-
-    data = {
-        "azimuth": (facing_degrees(cfg.facing) - sky["az"].to_numpy(float)) % 360,
-        "polar": 90.0 - sky["alt"].to_numpy(float),   # 0 at the zenith
-        "time": mag,
-        "pitch": -sky["bv"].to_numpy(float),
-        # dimmer stars are far more numerous, so quieten them to keep the
-        # overall level roughly even through the piece
-        "volume": (1 - smag) ** 0.5,
-        "pitch_shift": 5e-3 * rng.random(len(sky)),
-    }
-
-    map_lims = {
-        # '104%' leaves a tail of silence for the last notes to ring out in
-        "time": ("0%", "104%"),
-        "pitch": ("0%", "100%"),
-        "volume": ("0%", "100%"),
-        "pitch_shift": (0, 1),
-    }
-
-    events = Events(list(data))
-    events.fromdict(data)
-    # name each event for its star, so the animation can join back to the
-    # catalogue from the event table
-    events.names = [f"HIP{h}" for h in sky.index]
-    events.apply_mapping_functions(map_lims=map_lims, angle_unit="degrees")
-
-    sampler = voice["sampler"](cfg)
-    sampler.modify_preset(voice["preset"])
-
-    soni = Sonification(Score(voice["chords"], cfg.duration), events,
-                        sampler, cfg.system)
-    soni.render()
-
-    return soni
-
-
-def timings(soni, sky):
-    """Join the sonification's event table to its stars.
-
-    The event table is the single source of truth for *when* and *where*:
-    the animation takes its timings and angles from here rather than
-    recomputing them, so picture and sound cannot disagree.
-    """
-    table = soni.event_table()
-    # the table carries units in a second column level, which is for reading
-    # rather than for arithmetic
-    table.columns = table.columns.get_level_values(0)
-
-    events = pd.DataFrame({
-        "time": table["Time"].to_numpy(float),
-        "azimuth": table["Azimuthal Angle"].to_numpy(float),
-        "polar": table["Polar Angle"].to_numpy(float),
-    }, index=table["Source"].to_numpy())
-
-    stars = sky[["magnitude", "bv"]].set_axis([f"HIP{h}" for h in sky.index])
-
-    return events.join(stars).sort_values("time")
-
-
 # <u> __The animation:__ </u>
 #
 # Each star is a pulse that swells and fades as its note sounds. Frames are
@@ -387,7 +238,15 @@ def star_rgb(bv01):
 
 
 def render_frames(events, cfg):
-    """Yield one raw `RGBA` frame per frame of the animation."""
+    """Yield one raw `RGBA` frame per frame of the animation.
+
+    Args:
+      events (:obj:`pandas.DataFrame`): a row per star, with the columns
+        `time`, `azimuth` and `polar` taken from the sonification's own
+        table - so that the picture cannot disagree with the sound - plus
+        the `magnitude` and `colour` that were sonified, which set how big
+        and what colour each pulse is.
+    """
     W, H = cfg.width, cfg.height
     n_frames = int(round(cfg.duration * cfg.fps))
 
@@ -404,7 +263,7 @@ def render_frames(events, cfg):
 
     # colour, clipped to the bulk of the B-V range so a few outliers do not
     # flatten everything else
-    bv = events["bv"].to_numpy(float)
+    bv = events["colour"].to_numpy(float)
     bv01 = unit_scale(np.clip(bv, *np.percentile(bv, [1, 99])))
     rgb = star_rgb(bv01[:, None])
 
@@ -552,6 +411,9 @@ def write_videos(cfg, events, audio, targets):
     Returns:
       paths (:obj:`list`): the paths written, in the order given.
     """
+    if shutil.which("ffmpeg") is None:
+        raise RuntimeError("ffmpeg was not found on your PATH.")
+
     n_frames = int(round(cfg.duration * cfg.fps))
     procs = [subprocess.Popen(encode(cfg, audio, path, dome=dome),
                               stdin=subprocess.PIPE)
@@ -579,47 +441,3 @@ def write_videos(cfg, events, audio, targets):
 def write_video(cfg, events, audio, out_path, dome=False):
     """Render every frame into a single ffmpeg process."""
     return write_videos(cfg, events, audio, [(out_path, dome)])[0]
-
-
-# <u> __Running it:__ </u>
-
-def make_sequence(cfg=None):
-    """Build the whole sequence, returning the paths written."""
-    cfg = cfg or Config()
-
-    if shutil.which("ffmpeg") is None:
-        raise RuntimeError("ffmpeg was not found on your PATH.")
-
-    cfg.outdir.mkdir(parents=True, exist_ok=True)
-
-    print(f"Finding stars over {cfg.latitude:.3f}, {cfg.longitude:.3f} "
-          f"at {cfg.date_time} {cfg.time_zone} ...")
-    sky = observed_sky(cfg)
-    print(f"  {len(sky)} stars brighter than magnitude {cfg.mag_limit} "
-          f"above the horizon")
-
-    print(f"Rendering the '{cfg.instrument}' sonification in {cfg.system} ...")
-    soni = build_sonification(sky, cfg)
-
-    audio = cfg.outdir / f"stars_appearing_{cfg.instrument}.wav"
-    # a caption is *prepended* to the audio, which would slide the whole track
-    # against the picture, so the copy we mux into video goes without one
-    soni.save(str(audio), embed_caption=False)
-
-    events = timings(soni, sky)
-
-    targets = [(cfg.outdir / "stars_appearing_panorama.mp4", False)]
-    if cfg.dome:
-        targets.append((cfg.outdir / "stars_appearing_dome.mp4", True))
-
-    print("Rendering the animation ...")
-    written = [audio] + write_videos(cfg, events, audio, targets)
-
-    for path in written:
-        print(f"  wrote {path}")
-
-    return written
-
-
-if __name__ == "__main__":
-    make_sequence(Config())
