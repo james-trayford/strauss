@@ -455,6 +455,20 @@ class Style(MonitoredBaseModel):
         examples=['average', 'central']
         )
 
+    angle_unit: Optional[Literal['degrees', 'radians', 'cycles']] = Field(
+        default=None,
+        title='Spatial Angle Unit',
+        description='The units the style\'s input data gives spatial angles in '
+                    '("polar", "azimuth", "theta" or "phi"), where a cycle is a '
+                    'full turn. A style knows the data it was written for, so is '
+                    'the natural place to say this, but an "angle_unit" argument '
+                    'overrides it where given. If neither says, angles are taken '
+                    'to be in cycles and the user is warned that this is being '
+                    'assumed. Angles given an "input_range" are mapped linearly '
+                    'over that range rather than wrapped, so are unaffected.',
+        examples=['degrees', 'radians', 'cycles']
+        )
+
     # The map is the list of Mapping objects which set up the sonification parameters and limits.
     map: List[Mapping] = Field(
         ...,

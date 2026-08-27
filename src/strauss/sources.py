@@ -452,8 +452,8 @@ class Source:
 
         Note:
           Angles given `map_lims` are mapped linearly rather than
-          wrapped, so are not angular quantities to convert, and are
-          left alone too.
+          wrapped, but the value that comes out is the same fraction of
+          a turn either way, so it converts the same way too.
 
         Args:
           key (:obj:`str`): name of the mapped parameter
@@ -463,7 +463,7 @@ class Source:
           values (:obj:`array-like` or :obj:`float`): the values in
           units of `table_angle_unit`, if `key` is a spatial angle
         """
-        if (key not in spatial_angles) or (key in getattr(self, 'map_lims', {})):
+        if key not in spatial_angles:
             return values
 
         amax = angle_unit_maxs[getattr(self, 'table_angle_unit', None) or 'degrees']
