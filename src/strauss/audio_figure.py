@@ -59,9 +59,11 @@ INTMAX32 = (pow(2, 31)-1)
 _kw_defaults = {
     'duration': 10,
     'is_mapped': ['pitch', 'time_evo'],
-    # units assumed for spatial angles (polar, azimuth, theta, phi), where
-    # a cycle is a full turn, as the mapped parameters themselves are
-    'angle_unit': 'cycles',
+    # units the input data gives spatial angles in (polar, azimuth, theta,
+    # phi), overriding the style's own angle_unit where given. Where neither
+    # says, cycles are assumed, a full turn being 1 as it is for the mapped
+    # parameters themselves
+    'angle_unit': None,
     # names to identify each source by, when looking up its table
     'source_names': None,
     # how events merged by max_notes_per_sec take their values, overriding
@@ -295,6 +297,14 @@ class AudioFigure:
             raise ValueError(f"handle_nans '{handle_nans}' is not recognised, "
                              f"choose from {list(sources.nan_modes)}.")
 
+        # an angle_unit keyword overrides the style. Left as None where neither
+        # says, so that sources can tell the user it is assuming cycles rather
+        # than obeying a unit that was asked for
+        angle_unit = sonpars['angle_unit'] or style.angle_unit
+        if (angle_unit is not None) and (angle_unit not in sources.angle_unit_maxs):
+            raise ValueError(f"angle_unit '{angle_unit}' is not recognised, "
+                             f"choose from {list(sources.angle_unit_maxs)}.")
+
         if (style.sources.lower() == 'events') and style.max_notes_per_sec:
             # names are given per input event, so must be downsampled too
             if (source_names is not None) and (len(source_names) != len(args[0])):
@@ -326,7 +336,7 @@ class AudioFigure:
             # azimuthal angles wrap around the circle, so must be merged as
             # directions. Any angle given an input_range is mapped linearly
             # rather than wrapped, so is merged that way too
-            amax = sources.angle_unit_maxs[sonpars['angle_unit']]
+            amax = sources.angle_unit_maxs[angle_unit or 'cycles']
             cyclic = {i: amax for i, m in enumerate(data_maps)
                       if (m.output in sources.azimuthal_angles)
                       and ('input_range' not in m.model_fields_set)}
@@ -441,16 +451,16 @@ class AudioFigure:
         _sources.origin = origin
 
         # report angles in whatever units they were given in, or in degrees
-        # where the user expressed no preference
-        if not is_default['angle_unit']:
-            _sources.table_angle_unit = sonpars['angle_unit']
+        # where neither the user nor the style expressed a preference
+        if angle_unit:
+            _sources.table_angle_unit = angle_unit
         _sources.fromdict(map_data)
 
         # name the sources, now that we know how many there are
         if source_names is not None:
             _sources.names = source_names
         _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims,
-                                         param_lims=out_lims, angle_unit=sonpars['angle_unit'])
+                                         param_lims=out_lims, angle_unit=angle_unit)
 
         # Set up Generator
         gentype = style.generator.type
