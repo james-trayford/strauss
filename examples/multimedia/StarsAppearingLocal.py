@@ -73,7 +73,7 @@ class Config:
     # of Greenwich is -1.22
     latitude: float = 53.1143737
     longitude: float = -1.2219389
-    date_time: str = "2026-03-25 18:45:00"      # local wall-clock, YYYY-MM-DD HH:mm:ss
+    date_time: str = "2026-09-19 19:00:00"      # local wall-clock, YYYY-MM-DD HH:mm:ss
     time_zone: str = "Europe/London"            # TZ identifier, e.g. 'Europe/London'
 
     # which way is the listener/viewer facing? a cardinal point, and the
@@ -138,12 +138,13 @@ class Config:
     # linear gain applied to that map before it is encoded for the screen.
     # Raise it to bring the Milky Way up, lower it to keep the sky dark and
     # let the star pulses carry the picture.
-    sky_exposure: float = 0.35
+    sky_exposure: float = 0.75
 
-    # leave everything below the horizon black, as the ground would. Worth
-    # keeping on for the dome master, where the sky under your feet would
-    # otherwise fill the corners and there would be no horizon to see.
-    horizon: bool = True
+    # leave everything below the horizon black, as the ground would. Nothing
+    # is lost by it, since no star is sounded from down there - and it is
+    # worth turning on for the dome master, where the sky beneath your feet
+    # otherwise fills the corners and leaves no horizon to see.
+    horizon: bool = False
 
     # -- outputs ---------------------------------------------------------
     outdir: Path = Path("stars_appearing_out")
