@@ -290,7 +290,7 @@ class audio_channels:
                                 ptypes(custom_setup['types']),
                                 custom_setup['labels'])
             if 'forder' in custom_setup:
-                self.forder = self.custom_setup['forder']
+                self.forder = custom_setup['forder']
             else:
                 self.forder = 'unknown'
         else:
