@@ -30,6 +30,7 @@ from . import channels
 from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
+from .utilities import write_audio, ffmpeg_layout
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 from scipy.io import wavfile
 import IPython.display as ipd
@@ -846,42 +847,23 @@ class AudioFigure:
         ipd.display(ipd.Audio(outfmt.T,rate=self.samprate, autoplay=False))
 
     def save(self, fname):
-        # combine and write out file. first check extension
+        """ Save the mixed audio figure to a file
+
+        Renders first if the figure has not been rendered already. As
+        with `Sonification.save`, a non-WAV extension is converted to
+        via ffmpeg, and surround setups are passed through ffmpeg where
+        available so that their channel layout is recorded in the
+        output.
+
+        Args:
+          fname (:obj:`str`) Filename or filepath
+        """
+        # combine and write out file
         if not self.is_rendered:
             self.render()
 
-        fsplit = str(fname).split('.')
-        if len(fsplit) < 2:
-            warnings.warn('No file extension in provided fname. Assuming WAV...')
-        ext = fsplit[-1].lower()
-        if ext != 'wav':
-            # check we can use ffmpeg binary 
-            try:
-                sp.run(['ffmpeg','-h'],capture_output=1, check=1)
-            except FileNotFoundError as e: 
-                raise FileNotFoundError(f"""
-                'ffmpeg' doesn't appear to be available in the local environment.
-                This may need to be installed manually. To install ffmpeg visit
-                https://www.ffmpeg.org/download.html.
-                {str(e)}
-                """)
-            with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
-                # now first write the wav to a temporary file
-                wavfile.write(tmp.name, self.samprate, self.master_audio)
-                try:
-                    # try (naive) convert with ffmpeg
-                    sp.run(['ffmpeg', '-i', f'{tmp.name}', f'{fname}'],
-                           capture_output=1, check=1)
-                except sp.CalledProcessError as e:
-                    # if ffmpeg can't do it for whatever reason, raise
-                    raise Exception(f"""
-                    'ffmpeg' failed to convert '.wav' to '.{ext}' succesfully:
-                    {str(e)}
-                    {e.stderr}""")
-        else:
-            wavfile.write(fname, self.samprate, self.master_audio)
-        
-        print(f"Saved {fname}")
+        write_audio(fname, self.samprate, self.master_audio,
+                    layout=ffmpeg_layout(self.channels.setup))
 
         
     def _align_audio(self, audio, expected_channels, expected_samples):

@@ -13,7 +13,11 @@ from os import devnull
 from io import StringIO 
 import sys
 from scipy.stats import binned_statistic as bs1d
+from scipy.io import wavfile
 from pathlib import Path
+import subprocess as sp
+import tempfile
+import warnings
 
 
 # Some utility classes (these may graduate to somewhere else eventually)
@@ -598,3 +602,99 @@ def is_notebook() -> bool:
         return False      # Probably standard Python interpreter
     except ImportError:
         return False      # IPython not installed
+
+
+def ffmpeg_layout(setup):
+    """Get the `ffmpeg` channel layout name for an audio setup, if it has one
+
+    Args:
+      setup (:obj:`str`): the `audio_channels` setup, e.g. `"5.1"`
+
+    Returns:
+      layout (:obj:`str`): the `ffmpeg` layout name, or :obj:`None`
+    """
+    return setup if setup in ('5.1', '7.1') else None
+
+
+def write_audio(fname, samprate, samples, layout=None):
+    """Write rendered audio samples out to a file
+
+    Writes the samples as a WAV, converting to any other format asked
+    for via `ffmpeg`. Where a channel `layout` is given, `ffmpeg` is
+    optional to record metadata in the output, as `scipy` only writes a
+    plain PCM header which can be ambiguous or incompatible with players.
+    The surround pass also drops the samples to 24-bit for wider
+    compatibility.
+
+    Args:
+      fname (:obj:`str`): filename or filepath. Any extension other
+    	than `wav` is converted to by `ffmpeg`, which is then required
+      samprate (:obj:`int`): sampling rate of the samples
+      samples (:obj:`numpy.ndarray`): `int32` samples to write, with
+    	shape (number of samples, number of channels)
+      layout (:obj:`str`): optional `ffmpeg` channel layout name to
+    	record in the output, e.g. `"5.1"`. Layouts are only named for
+    	setups whose channel order already matches `ffmpeg`'s own
+
+    Raises:
+      FileNotFoundError: if a non-WAV format is asked for but `ffmpeg`
+        is unavailable to convert to it
+      Exception: if `ffmpeg` fails to convert to a non-WAV format
+    """
+    fsplit = str(fname).split('.')
+    if len(fsplit) < 2:
+        warnings.warn('No file extension in provided fname. Assuming WAV...')
+    ext = fsplit[-1].lower()
+
+    # declared ahead of the input, describing the channels ffmpeg is reading
+    layout_args = ['-channel_layout', layout] if layout else []
+
+    if (ext == 'wav') and not layout_args:
+        # nothing for ffmpeg to add, so write it directly
+        wavfile.write(fname, samprate, samples)
+        print(f"Saved {fname}")
+        return
+
+    # check we can use ffmpeg binary
+    try:
+        sp.run(['ffmpeg','-h'],capture_output=1, check=1)
+    except FileNotFoundError as e:
+        if ext != 'wav':
+            raise FileNotFoundError(f"""
+            'ffmpeg' not available in the local environment for {ext}
+            conversion. This may need to be installed manually. To
+            install ffmpeg visit https://www.ffmpeg.org/download.html.
+            {str(e)}
+            """)
+        # a WAV we can always write ourselves, just without the layout
+        warnings.warn(f"'ffmpeg' not available in the local environment, "
+                      f"so '{layout}' channel layout not explicitly "
+                      "recorded in the output metadata, which can cause "
+                      "compatability issues. To install ffmpeg visit "
+                      "https://www.ffmpeg.org/download.html.")
+        wavfile.write(fname, samprate, samples)
+        print(f"Saved {fname}")
+        return
+
+    with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
+        # now first write the wav to a temporary file
+        wavfile.write(tmp.name, samprate, samples)
+        # a bit depth only means anything for the uncompressed case
+        depth_args = ['-c:a', 'pcm_s24le'] if ext == 'wav' else []
+        try:
+            # try (naive) convert with ffmpeg
+            sp.run(['ffmpeg'] + layout_args + ['-i', f'{tmp.name}']
+                   + depth_args + ['-y', f'{fname}'],
+                   capture_output=1, check=1)
+        except sp.CalledProcessError as e:
+            if ext != 'wav':                # if ffmpeg can't do it for whatever reason, raise
+                raise Exception(f"""
+                'ffmpeg' failed to convert '.wav' to '.{ext}' succesfully:
+                {str(e)}
+                {e.stderr}""")
+            # don't lose a long render over the layout, write it plainly
+            warnings.warn(f"'ffmpeg' failed to record the '{layout}' channel "
+                          f"layout in the output, writing it without:\n{e.stderr}")
+            wavfile.write(fname, samprate, samples)
+
+    print(f"Saved {fname}")
