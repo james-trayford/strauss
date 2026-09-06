@@ -345,6 +345,11 @@ class Source:
     	    so that a gap in the data is heard as a gap in the sound.
         """
 
+        # take a list of whatever iterable is given, as the examples pass
+        # dict keys, and both the checks below and the indexing done when
+        # reading in data need to consume it more than once
+        mapped_quantities = list(mapped_quantities)
+
         # check these are all mappable parameters
 
         for q in mapped_quantities:
