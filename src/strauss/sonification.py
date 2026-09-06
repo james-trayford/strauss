@@ -19,6 +19,7 @@ from .sources import (Events, Objects, spatial_angles, display_name,
                       param_converters, param_lim_dict)
 from .utilities import decimals_for_range
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
+from .utilities import write_audio, ffmpeg_layout
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import pandas as pd
@@ -869,7 +870,10 @@ class Sonification:
         Can use this function to save sonification of any audio_setup
         to a file. This first creates a 32-bit depth WAV using
         `scipy.io.wavfile`. If fname has a non-WAV extension, it then attempts
-        conversion via ffmpeg, provided ffmpeg is available.
+        conversion via ffmpeg, provided ffmpeg is available. Surround setups
+        are additionally passed through ffmpeg where it is available, to
+        record their channel layout in the output - which `scipy` cannot -
+        and are 24-bit as a result.
         
         formats
 
@@ -917,39 +921,9 @@ class Sonification:
                 signal += self.tick_channels[str(c)].values*norm*self.tick_vol
             chans[:,c] = (signal).astype("int32")
             
-        # finally combine and write out file. first check extension
-        fsplit = str(fname).split('.')
-        if len(fsplit) < 2:
-            warnings.warn('No file extension in provided fname. Assuming WAV...')
-        ext = fsplit[-1].lower()
-        if ext != 'wav':
-            # check we can use ffmpeg binary 
-            try:
-                sp.run(['ffmpeg','-h'],capture_output=1, check=1)
-            except FileNotFoundError as e: 
-                raise FileNotFoundError(f"""
-                'ffmpeg' doesn't appear to be available in the local environment.
-                This may need to be installed manually. To install ffmpeg visit
-                https://www.ffmpeg.org/download.html.
-                {str(e)}
-                """)
-            with tempfile.NamedTemporaryFile(suffix='.wav') as tmp:
-                # now first write the wav to a temporary file
-                wavfile.write(tmp.name, self.samprate, chans)
-                try:
-                    # try (naive) convert with ffmpeg
-                    sp.run(['ffmpeg', '-i', f'{tmp.name}', f'{fname}'],
-                           capture_output=1, check=1)
-                except sp.CalledProcessError as e:
-                    # if ffmpeg can't do it for whatever reason, raise
-                    raise Exception(f"""
-                    'ffmpeg' failed to convert '.wav' to '.{ext}' succesfully:
-                    {str(e)}
-                    {e.stderr}""")
-        else:
-            wavfile.write(fname, self.samprate, chans)
-        
-        print(f"Saved {fname}")
+        # finally combine and write out file
+        write_audio(fname, self.samprate, chans,
+                    layout=ffmpeg_layout(self.channels.setup))
 
         
     def notebook_display(self, show_waveform=True):
