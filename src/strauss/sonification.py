@@ -20,10 +20,10 @@ from .score import is_alias
 from .sources import (Events, Objects, spatial_angles, display_name,
                       param_converters, param_lim_dict)
 from .utilities import decimals_for_range
-from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
+from .utilities import const_or_evo, const_or_evo_func, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .utilities import write_audio, ffmpeg_layout, parse_level
 from . import plotting
-from .tts_caption import render_caption
+from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -35,6 +35,7 @@ import IPython.display as ipd
 from IPython.display import display
 from scipy.io import wavfile
 from scipy.interpolate import interp1d
+from scipy.signal import fftconvolve
 import warnings
 import tempfile
 from pathlib import Path
@@ -67,7 +68,7 @@ class Sonification:
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
                  caption=None, samprate=48000, declick_time=0.03,
-                 ttsmodel=None, handle_nans=None):
+                 ttsmodel=None, handle_nans=None, hrtf=None):
         """
         Args:
          score (:class:`~strauss.score.Score`): Sonification :obj:`Score`
@@ -97,6 +98,10 @@ class Sonification:
           given, which is where the data itself is handled - see the
           `handle_nans` argument of
           :meth:`~strauss.sources.Source.__init__`.
+         hrtf (:obj:`str` or :obj:`~strauss.hrtf.HRTFProvider`) head-related
+          transfer functions used by the :obj:`'binaural'` audio setup,
+          either the name of a provider or one already constructed.
+          Ignored by every other setup.
         """
 
         # sampling rate in Hz
@@ -179,16 +184,20 @@ class Sonification:
                           "which has already been applied to the data. Pass " 
                           "to the Sources too for correct behaviour.")
 
-        # set up the audio channel routing for the sonification
-        self.channels = audio_channels(setup=audio_setup)
-
         # check Generator and Sonification sampling rates match...
         if self.samprate != self.generator.samprate:
             # if not, revert to Generator sampling rate.
             warnings.warn("warning: global and generator sampling rates disagree, " \
             f"reverting to generator value of {self.generator.samprate} Hz")
             self.samprate = self.generator.samprate
-        
+
+        # set up the audio channel routing for the sonification. Note this
+        # follows the sampling rate check, as any head-related transfer
+        # functions must be generated for the rate actually used
+        self.channels = audio_channels(setup=audio_setup, hrtf=hrtf,
+                                       samprate=self.samprate)
+
+
         # ...and the corresponding Stream objects 
         self.out_channels = {}
         for c in range(self.channels.Nmics):
@@ -273,6 +282,83 @@ class Sonification:
 
         return notes, times
 
+    def _source_angle_funcs(self, sourcemap):
+        """The direction of a source as functions of its playback position.
+
+        Resolves the :obj:`'pan'`, :obj:`'phi'`/:obj:`'azimuth'` and
+        :obj:`'theta'`/:obj:`'polar'` aliases in the order they take
+        precedence. Functions are returned rather than values, so that
+        the caller may read the direction either at every sample, as
+        volume panning needs, or once per buffer, as filtering does.
+
+        Args:
+          sourcemap (:obj:`dict`): mapped parameters of a single source
+
+        Returns:
+          azifunc (function): azimuth in radians at a fractional
+            position through the note
+          polfunc (function): polar angle in radians at a fractional
+            position through the note
+        """
+        # place source on listener plane (quarter rotation) by default
+        polfunc = lambda x: x*0. + 0.5*np.pi
+
+        if 'pan' in sourcemap:
+            # in pan mode, put everything on the listener plane
+            panfunc = const_or_evo_func(sourcemap['pan'])
+            azifunc = lambda x: (panfunc(x) + 0.5) * np.pi
+        else:
+            # TODO: generic handling of alias parameters (beyond 3D angles)
+            if 'phi' in sourcemap:
+                afunc = const_or_evo_func(sourcemap['phi'])
+            elif 'azimuth' in sourcemap:
+                afunc = const_or_evo_func(sourcemap['azimuth'])
+            else:
+                afunc = const_or_evo_func(self.generator.preset['azimuth'])
+            azifunc = lambda x: afunc(x) * 2 * np.pi
+
+            if 'theta' in sourcemap:
+                pfunc = const_or_evo_func(sourcemap['theta'])
+            elif 'polar' in sourcemap:
+                pfunc = const_or_evo_func(sourcemap['polar'])
+            else:
+                pfunc = None
+            if pfunc is not None:
+                polfunc = lambda x: pfunc(x) * np.pi
+
+        return azifunc, polfunc
+
+    def _binaural_render(self, sstream, azifunc, polfunc):
+        """Filter a mono source with head-related transfer functions.
+
+        The impulse response pair tracks the source direction through
+        the note, so that a moving source is heard to move around the
+        listener. Notes too short to fill more than a couple of buffers
+        are filtered in one go with the response from the middle of the
+        note, as the buffered sweep needs several buffers to cross-fade
+        between.
+
+        Args:
+          sstream (:obj:`~strauss.stream.Stream`): mono source audio
+          azifunc (function): azimuth in radians at a fractional
+            position through the note
+          polfunc (function): polar angle in radians at a fractional
+            position through the note
+
+        Returns:
+          ears (:obj:`ndarray`): (2, `nsamples`) left and right ear audio
+        """
+        hrtf = self.channels.hrtf
+        irfunc = hrtf.ir_pair_func(azifunc, polfunc)
+
+        nsamp_buff = 2*(int(self.samprate*hrtf.bufflength)//2)
+        if sstream.values.size < 2*nsamp_buff:
+            return fftconvolve(sstream.values[None,:], irfunc(0.5),
+                               mode='full', axes=-1)[:, :sstream.values.size]
+
+        sstream.bufferize(hrtf.bufflength)
+        return sstream.convolve_sweep(irfunc)
+
     def render(self, downsamp=1, progress=True):
         """Render the sonification.
         
@@ -353,32 +439,26 @@ class Sonification:
                                       fill_value=(y[0], y[-1]))
                     sstream.values = sstream.values * mutenv(sstream.sampfracs)
 
-            # place source on listener plane (quarter rotation) by default
-            polar = 0.5 * np.pi
-            if 'pan' in sourcemap:
-                # in pan mode, put everything on the 
-                azi     = (const_or_evo(sourcemap['pan'], sstream.sampfracs) + 0.5) * np.pi
-            else:
-                # TODO: generic handling of alias parameters (beyond 3D angles)
-                if 'phi' in sourcemap:
-                    azi     = const_or_evo(sourcemap['phi'], sstream.sampfracs) * 2 * np.pi
-                elif 'azimuth' in sourcemap:
-                    azi     = const_or_evo(sourcemap['azimuth'], sstream.sampfracs) * 2 * np.pi
-                else:
-                    azi     = const_or_evo(self.generator.preset['azimuth'], sstream.sampfracs) * 2 * np.pi
-                if 'theta' in sourcemap:
-                    polar   = const_or_evo(sourcemap['theta'], sstream.sampfracs) * np.pi
-                elif 'polar' in sourcemap:
-                    polar   = const_or_evo(sourcemap['polar'], sstream.sampfracs) * np.pi                
+            # where the source is, as functions of position through the note
+            azifunc, polfunc = self._source_angle_funcs(sourcemap)
 
             # compute sample indices for truncating notes overshooting sonification length
             trunc_note = min(playlen, lastsamp-tsamp)
             trunc_soni   = trunc_note + tsamp
 
-            # spatialise audio by computing relative volume in each speaker
-            for i in range(Nchan):
-                panenv = self.channels.mics[i].antenna(azi,polar)
-                self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
+            if self.channels.binaural:
+                # spatialise audio by filtering with the head-related
+                # transfer functions for the source direction
+                ears = self._binaural_render(sstream, azifunc, polfunc)
+                for i in range(min(Nchan, 2)):
+                    self.out_channels[str(i)].values[tsamp:trunc_soni] += ears[i][:trunc_note]
+            else:
+                # spatialise audio by computing relative volume in each speaker
+                azi   = azifunc(sstream.sampfracs)
+                polar = polfunc(sstream.sampfracs)
+                for i in range(Nchan):
+                    panenv = self.channels.mics[i].antenna(azi,polar)
+                    self.out_channels[str(i)].values[tsamp:trunc_soni] += (sstream.values*panenv)[:trunc_note]
 
         # produce mono audio of caption, if one is provided
         if str(self.caption or '').strip():
@@ -1094,7 +1174,7 @@ class Sonification:
             
         print("Joining temporary .wav files...")
         (
-            ff.filter(inputs, 'join', inputs=len(inputs), channel_layout=self.channels.setup)
+            ff.filter(inputs, 'join', inputs=len(inputs), channel_layout=self.channels.ffmpeg_layout)
             .output(fname)
             .overwrite_output()
             .run(quiet=~ffmpeg_output)
