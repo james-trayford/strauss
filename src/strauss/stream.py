@@ -10,7 +10,9 @@ Todo:
 """
 import numpy as np
 import wavio
+import warnings
 import matplotlib.pyplot as plt
+from scipy.signal import fftconvolve
 from scipy.signal.windows import hann
 
 # frequency limits a filter cutoff sweeps between, in Hz, from the bottom
@@ -135,6 +137,89 @@ class Stream:
         # finally, consolidate buffers to apply effect to stream
         self.consolidate_buffers()
 
+    def convolve_sweep(self, irfunc, apply=True):
+        """Apply a time varying impulse response to the buffered stream
+
+        The convolution analogue of :func:`~stream.Stream.filt_sweep`.
+        Each buffer is convolved with the impulse response evaluated at
+        that buffer's position through the stream, and the buffers are
+        cross-faded back together in the same way. Every buffer is
+        given the input samples preceding it, so that it carries the
+        same tail it would have had were the whole stream convolved at
+        once.
+
+        An impulse response function may return several responses at
+        once, in which case the stream is convolved with each of them
+        and one output returned per response. This is how a binaural
+        pair is produced, sharing the cost of transforming the input
+        between the two ears.
+
+        Args:
+          irfunc (function): function returning the impulse response at
+            a fractional position through the stream, of shape
+            (`ntaps`,) or (`nout`, `ntaps`). All responses returned
+            must be the same length.
+          apply (optional, :obj:`bool`): where a single response is
+            returned, also assign the result to the stream values, as
+            :func:`~stream.Stream.filt_sweep` does
+
+        Returns:
+          out (:obj:`ndarray`): (`nout`, `nsamples`) array of the
+            convolved stream, one row per impulse response
+        """
+        if not hasattr(self, "buffers"):
+            raise Exception("needs bufferized stream, please run 'bufferize' method first.")
+        buffers = self.buffers
+        if buffers._consumed:
+            raise Exception("buffers already consolidated, please run 'bufferize' method again.")
+
+        # array to regularly sample the impulse response at each buffer,
+        # matching the convention filt_sweep uses for its mapping functions
+        x = np.linspace(0, 1, buffers._nbuffs_tot)
+
+        h = np.atleast_2d(np.asarray(irfunc(x[0]), dtype=float))
+        nout, ntaps = h.shape
+        nsamp_buff = buffers._nsamp_buff
+
+        if nsamp_buff < 4*ntaps:
+            warnings.warn(f"buffer of {nsamp_buff} samples is short for a {ntaps} "
+                          "tap impulse response, consider a longer 'bufflength'.")
+
+        # samples of input history each buffer needs to reproduce the tail
+        # it would have had within a convolution of the entire stream
+        nsamp_pre = ntaps - 1
+
+        tile = np.zeros((nout, buffers._nbuffs,   nsamp_buff))
+        olap = np.zeros((nout, buffers._nbuffs-1, nsamp_buff))
+
+        # loop over buffers, convolving each with its impulse response
+        for j in range(buffers._nbuffs_tot):
+            if j:
+                h = np.atleast_2d(np.asarray(irfunc(x[j]), dtype=float))
+            start = buffers._buff_start(j)
+            seg = np.concatenate([buffers.lookbehind(j, nsamp_pre),
+                                  buffers._src_padded[start:start+nsamp_buff]])
+
+            # trim to the steady state part of the convolution, that is
+            # exactly the samples belonging to this buffer's span
+            y = fftconvolve(seg[None,:], h, mode='full',
+                            axes=-1)[:, nsamp_pre:nsamp_pre+nsamp_buff]
+
+            i, is_olap = divmod(j, 2)
+            if is_olap:
+                olap[:,i] = y
+            else:
+                tile[:,i] = y
+
+        # finally, consolidate each set of buffers into an output stream
+        out = np.array([buffers._consolidate(tile[k], olap[k]) for k in range(nout)])
+        buffers._consumed = True
+
+        if apply and (nout == 1):
+            self.values = out[0]
+
+        return out
+
     def get_sampfracs(self):
         """ Get fractional position of the sample in total stream duration
         """
@@ -153,7 +238,8 @@ class Stream:
         self.values *= 0.
         if hasattr(self, "buffers"):
             self.buffers.buffs_tile *= 0.
-            self.buffers.buffs_olap *= 0.        
+            self.buffers.buffs_olap *= 0.
+            self.buffers._src_padded *= 0.
         
 class Buffers:
     """Audio buffers split into uniform discrete chunks or 'buffers'.
@@ -174,8 +260,12 @@ class Buffers:
       buffs_tile (:obj:`ndarray`): 2d array of buffers completely
         enclosing the stream (number of buffers x samples per buffer)
       buffs_olap (:obj:`ndarray`) 2d array of overlap buffers,
-        allowing for cross fading 
+        allowing for cross fading
     """
+    # Note: buffers are indexed across the brickwork by a single index
+    # `j` running from 0 to `_nbuffs_tot - 1`, where even `j` are tiled
+    # buffers and odd `j` are the overlaps between them.
+
     def __init__(self, stream, bufflength=0.1):
         """
         Args:
@@ -210,12 +300,101 @@ class Buffers:
         self._olap_pad = self.nsamp_pad-self._nsamp_halfbuff
         self._olap_lim = min(stream._nsamp_stream, stream._nsamp_stream+self._olap_pad)
         
-        # construct tile and overlap buffer arrays
-        self.buffs_tile = np.pad(stream.values, (0,self.nsamp_pad)
+        # an un-windowed copy of the padded source, so that effects needing
+        # the input preceding a buffer (e.g. convolution) can look behind it
+        self._src_padded = np.pad(stream.values, (0,self.nsamp_pad))
+
+        # flag set once the buffers have been consolidated, after which
+        # they have been windowed in place and cannot be reused
+        self._consumed = False
+
+        # construct tile and overlap buffer arrays. Note the tiles must be a
+        # copy rather than a reshaped view, as they are written to in place
+        # by the effects that operate on them
+        self.buffs_tile = self._src_padded.copy(
                                  ).reshape((self._nbuffs, self._nsamp_buff))
         self.buffs_olap = np.pad(stream.values[self._nsamp_halfbuff:self._olap_lim],
                                  (0,max(0, self._olap_pad))
                                  ).reshape((self._nbuffs-1), self._nsamp_buff)
+
+    def _buff_start(self, j):
+        """Index into the padded source at which a buffer begins
+
+        Buffers are indexed across the brickwork as
+        :func:`~stream.Stream.filt_sweep` maps them, with even `j`
+        being ``buffs_tile[j//2]`` and odd `j` being
+        ``buffs_olap[j//2]``. Both series advance by half a buffer, so
+        the start index is simply half a buffer per step.
+
+        Args:
+          j (:obj:`int`): index of the buffer across the brickwork,
+            from 0 to ``self._nbuffs_tot - 1``
+
+        Returns:
+          start (:obj:`int`): first sample of the buffer in the padded
+            source stream
+        """
+        return j * self._nsamp_halfbuff
+
+    def lookbehind(self, j, nsamp):
+        """The un-windowed input samples preceding a buffer
+
+        Used by effects that need the signal history to produce the
+        same output a buffer would have had within a whole-stream
+        operation. Zero-padded at the head for the first buffers of the
+        stream, where no history exists.
+
+        Args:
+          j (:obj:`int`): index of the buffer across the brickwork
+          nsamp (:obj:`int`): number of preceding samples wanted
+
+        Returns:
+          pre (:obj:`ndarray`): `nsamp` samples preceding buffer `j`
+        """
+        if nsamp <= 0:
+            return np.zeros(0)
+        start = self._buff_start(j)
+        pre = self._src_padded[max(0, start-nsamp):start]
+        if pre.size < nsamp:
+            pre = np.pad(pre, (nsamp-pre.size, 0))
+        return pre
+
+    def _consolidate(self, buffs_tile, buffs_olap):
+        """Cross-fade a tile and overlap buffer pair into a single stream
+
+        Operates on the buffer arrays it is passed rather than those
+        held by this object, so that one set of buffer geometry can
+        consolidate several signals, such as the left and right ear of
+        a binaural pair.
+
+        Args:
+          buffs_tile (:obj:`ndarray`): 2d array of tiled buffers
+          buffs_olap (:obj:`ndarray`): 2d array of overlap buffers
+
+        Returns:
+          out (:obj:`ndarray`): 1d array of sample values representing
+            the new audio signal
+        """
+        # work on copies, as the fades are applied in place
+        bt = buffs_tile.copy()
+        bo = buffs_olap.copy()
+
+        # apply fades to buffers, first special edge cases...
+        bt[0,self._nsamp_halfbuff:] *= self.fade[self._nsamp_halfbuff:]
+        bt[-1,:self._nsamp_halfbuff] *= self.fade[:self._nsamp_halfbuff]
+
+        # ...then to remaining buffers
+        bt[1:-1,:] *= self.fade.T
+        bo *= self.fade.T
+
+        # reconstruct stream
+        padded_stream = np.zeros(self.nsamp_padstream)
+        padded_stream += bt.flatten()
+        flat_olaps    = bo.flatten()
+        padded_stream[self._nsamp_halfbuff:-self._nsamp_halfbuff] += flat_olaps
+
+        # remove padding on returning reconstructed stream
+        return padded_stream[:-self.nsamp_pad]
 
     def to_stream(self):
         """Reconstruct stream by cross-fading buffers
@@ -226,21 +405,8 @@ class Buffers:
 
         Returns:
           out (:obj:`ndarray`): 1d array of sample values representing the
-            new audio signal for the parent `Stream`. 
+            new audio signal for the parent `Stream`.
         """
-        # apply fades to buffers, first special edge cases...
-        self.buffs_tile[0,self._nsamp_halfbuff:] *= self.fade[self._nsamp_halfbuff:]
-        self.buffs_tile[-1,:self._nsamp_halfbuff] *= self.fade[:self._nsamp_halfbuff]
-
-        # ...then to remaining buffers
-        self.buffs_tile[1:-1,:] *= self.fade.T
-        self.buffs_olap *= self.fade.T
-
-        # reconstruct stream
-        padded_stream = np.zeros(self.nsamp_padstream)
-        padded_stream += self.buffs_tile.flatten()
-        flat_olaps    = self.buffs_olap.flatten()
-        padded_stream[self._nsamp_halfbuff:-self._nsamp_halfbuff] += flat_olaps
-
-        # remove padding on returning reconstructed stream
-        return padded_stream[:-self.nsamp_pad]
+        out = self._consolidate(self.buffs_tile, self.buffs_olap)
+        self._consumed = True
+        return out
