@@ -30,8 +30,9 @@ class mic:
     	:obj:`"vbap"` (collects only from the arc spanned by its two
     	neighbours on the speaker ring, using pairwise Vector Base
     	Amplitude Panning), :obj:`"omni"` (collects sound from all
-    	directions equally) and :obj:`"mute"` (collects no sound, useful
-    	for e.g. muting auxillary channels)
+    	directions equally), :obj:`"mute"` (collects no sound, useful
+    	for e.g. muting auxillary channels) and :obj:`"hrtf"` (an ear,
+    	spatialised by filtering rather than by volume, see below)
       label (:obj:`str`): A label for the mic
       channel (:obj:`int`) The index of the channel, corresponding to
     	channel ordering in the output (starting from 0 e.g. stereo
@@ -43,12 +44,17 @@ class mic:
       nring (:obj:`int`): for :obj:`"vbap"` mics only, the number of mics
     	on the speaker ring, used to spread sources evenly as they
     	approach the poles.
+      hrtf (:obj:`~strauss.hrtf.HRTFProvider`): Head-related transfer
+        functions for an :obj:`"hrtf"` mic, shared with the other ear
+      ear (:obj:`int`): Which ear an :obj:`"hrtf"` mic represents,
+        0 being the left and 1 the right
 
     Raises:
-      Exception: if mic_type not in allowed options
+      Exception: if mic_type not in allowed options, or an
+        :obj:`"hrtf"` mic is given no HRTFs
     """
     def __init__(self, azimuth, mic_type="directional", label="C", channel=1,  order=None, degree=None,
-                 neighbours=None, nring=1):
+                 neighbours=None, nring=1, hrtf=None, ear=None):
         self.azimuth = azimuth
         self.mic_type = mic_type
         self.label = label
@@ -64,6 +70,18 @@ class mic:
             self.antenna = lambda a, b=0.5*np.pi: a*0.
         elif mic_type == "ambisonic":
             self.antenna = self._ambisonic_antenna(acn=azimuth)
+        elif mic_type == "hrtf":
+            # an ear is spatialised by filtering rather than by volume, so
+            # its directional response lives in the HRTFs and is applied by
+            # the renderer. The antenna is the fallback used wherever that
+            # filtering is not, for captions, ticks and antenna plots, and
+            # is the cardioid this ear would have in a stereo setup
+            if hrtf is None:
+                raise Exception("Mic type \"hrtf\" needs head-related transfer "
+                                "functions, please provide an 'hrtf'.")
+            self.hrtf = hrtf
+            self.ear = ear
+            self.antenna = lambda a, b=0.5*np.pi: 0.5*(1+np.cos(a-azimuth)*np.sin(b))
         else:
             raise Exception(f"Mic type \"{mic_type}\" unknown.")
 
@@ -171,8 +189,18 @@ class audio_channels:
     
     Args:
       setup (:obj:`str`): Type of audio setup. Supported options are
-        :obj:`"mono"`, :obj:`"stereo"`, :obj:`"5.1"` and
-        :obj:`"7.1"`, or :obj:`"custom"`. 
+        :obj:`"mono"`, :obj:`"stereo"`, :obj:`"binaural"`, :obj:`"5.1"`
+        and :obj:`"7.1"`, or :obj:`"custom"`. Note :obj:`"binaural"` is
+        a two channel setup intended for headphones, spatialising each
+        source by filtering it with head-related transfer functions
+        rather than by panning its volume between speakers; over
+        speakers it will not sound as intended.
+      hrtf (:obj:`str` or :obj:`~strauss.hrtf.HRTFProvider`): Head-related
+    	transfer functions for the :obj:`"binaural"` setup, either the
+    	name of a provider or one already constructed. Defaults to the
+    	modelled spherical head, which needs no data.
+      samprate (:obj:`int`): Sample rate in Hz the head-related transfer
+    	functions should be generated for. Ignored by every other setup.
       custom_setup (:obj:`dict`): Dictionary defining a customised
     	audio setup, containing keys for :obj:`"azimuths"`, :obj:`"types"`
     	and :obj:`"labels"`, containing lists parameterising the first
@@ -196,7 +224,8 @@ class audio_channels:
 
     """
 
-    def __init__(self, setup="stereo", custom_setup={}, panning=None):
+    def __init__(self, setup="stereo", custom_setup={}, panning=None,
+                 hrtf=None, samprate=48000):
 
         ##############################################
         # Channel properties for preset audio setups
@@ -204,7 +233,14 @@ class audio_channels:
 
         # store the setup
         self.setup = setup
-        
+
+        # whether sources are spatialised by filtering rather than panning
+        self.binaural = (setup == "binaural")
+
+        # the channel layout ffmpeg should be told about, which is not
+        # always what strauss calls the setup
+        self.ffmpeg_layout = setup
+
         # mic angles in radians
         mono_azimuths = [0.]
         stereo_azimuths = [0.5*np.pi, 1.5*np.pi]
@@ -213,13 +249,18 @@ class audio_channels:
                             2./3*np.pi, 4./3*np.pi]
         sevenpoint_azimuths = fivepoint_azimuths + stereo_azimuths
 
-        # mic type, either omni(-directional), directional, vbap
+        # an ear sits where a stereo speaker does, but hears through
+        # head-related transfer functions rather than a volume pan
+        binaural_azimuths = stereo_azimuths
+
+        # mic type, either omni(-directional), directional, vbap, hrtf
         # or muted (mute channels not used for spatialisation).
         # surround setups pan pairwise (vbap) rather than with the
         # broad cardioid of the directional mics, which would otherwise
         # spread every source over all of the speakers at once
         mono_types = ["omni"]
         stereo_types = ["directional"] * 2
+        binaural_types = ["hrtf"] * 2
         fivepoint_types = ["vbap"] * 2  + \
                           ["mute"] * 2 + \
                           ["vbap"] * 2
@@ -230,6 +271,7 @@ class audio_channels:
         # mic labels corresponding to each speaker
         mono_labels = ['C']
         stereo_labels = ['L', 'R']
+        binaural_labels = ['L', 'R']
         fivepoint_labels = ['FL', 'FR', 
                             'FC', 'LF',
                             'SL', 'SR']
@@ -241,6 +283,7 @@ class audio_channels:
         #ffmpeg channel orders to correctly save combined files
         mono_forder = [0]
         stereo_forder = [0,1]
+        binaural_forder = [0,1]
         fivepoint_forder = [1,2,0,3,4,5]
         sevenpoint_forder = [1,2,0,3,4,5,6,7]
         
@@ -272,6 +315,15 @@ class audio_channels:
         elif setup == "stereo":
             self.setup_channels(stereo_azimuths, ptypes(stereo_types), stereo_labels)
             self.forder = stereo_forder
+        elif setup == "binaural":
+            # imported here so the HRTF machinery is only loaded when asked for
+            from .hrtf import get_hrtf
+            self.hrtf = get_hrtf(hrtf or 'spherical', samprate=samprate)
+            self.setup_channels(binaural_azimuths, binaural_types,
+                                binaural_labels, hrtf=self.hrtf)
+            self.forder = binaural_forder
+            # binaural is not a layout ffmpeg knows, but it is two channels
+            self.ffmpeg_layout = 'stereo'
         elif setup == "5.1":
             self.setup_channels(fivepoint_azimuths, ptypes(fivepoint_types), fivepoint_labels)
             self.forder = fivepoint_forder
@@ -297,7 +349,7 @@ class audio_channels:
             raise Exception(f"setup \"{setup}\" not understood")
             
 
-    def setup_channels(self, azimuths, types, labels, orders=None, degrees=None):
+    def setup_channels(self, azimuths, types, labels, orders=None, degrees=None, hrtf=None):
         """initialise audio channel setup for lists of properties
 
         Subroutine for setting up the audio_channels as arrays of
@@ -311,6 +363,8 @@ class audio_channels:
           	for :obj:`mic` object.
           labels (:obj:`list(float)`): list of :obj:`label` values for
           	:obj:`mic` object
+          hrtf (optional, :obj:`~strauss.hrtf.HRTFProvider`): head-related
+          	transfer functions, shared by any :obj:`"hrtf"` mics
 
         """
         self.azimuths = azimuths
@@ -328,8 +382,11 @@ class audio_channels:
         self.mics = []
 
         for i in range(self.Nmics):
+            # the ear index is only meaningful to an "hrtf" mic, which
+            # takes it as the row of the response pair belonging to it
             microphone = mic(azimuths[i], types[i], labels[i], self.channels[i], orders, degrees,
-                             neighbours=ring.get(i), nring=len(ring))
+                             neighbours=ring.get(i), nring=len(ring),
+                             hrtf=hrtf, ear=i)
             self.mics.append(microphone)
 
     def _vbap_ring(self, azimuths, types):
