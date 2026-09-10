@@ -20,13 +20,17 @@ radians with 0 straight ahead and 0.5 pi to the listener's left, and a
 polar angle in radians measured from directly overhead, so that 0.5 pi
 is the horizontal plane.
 
-Todo:
-  * Support measured HRTF sets alongside the modelled one
+Two providers are available: :class:`SphericalHeadHRTF`, modelled on a
+rigid sphere and needing no data, and :class:`MeasuredHRTF`, which
+interpolates a set of real measurements and so carries the outer ear
+filtering that tells front from back.
 """
 
 import numpy as np
 import warnings
-from scipy.signal import bilinear, lfilter
+from pathlib import Path
+from scipy.signal import bilinear, lfilter, fftconvolve, resample_poly
+from scipy.spatial import ConvexHull
 
 # speed of sound in air, m/s
 sound_speed = 343.
@@ -94,6 +98,32 @@ class HRTFProvider:
         self._cache = {}
         self._nlookup = 0
         self._nbuild = 0
+
+    # half width in samples of the fractional delay kernel
+    _half = 16
+
+    def _frac_delay(self, delay):
+        """Windowed sinc kernel delaying a signal by a fractional sample count.
+
+        Normalised to unit sum, which makes the gain at DC exactly one
+        and the group delay exactly `delay`, and leaves the kernel
+        varying smoothly as the delay does so that a moving source is
+        free of zipper artefacts.
+
+        Args:
+          delay (:obj:`float`): delay in samples
+
+        Returns:
+          h (:obj:`ndarray`): `ntaps` length kernel
+        """
+        x = np.arange(self.ntaps) - delay
+        half = self._half
+        # Blackman window, zeroed outside its half width
+        w = np.where(abs(x) <= half,
+                     0.42 + 0.5*np.cos(np.pi*x/half)
+                     + 0.08*np.cos(2*np.pi*x/half), 0.)
+        h = np.sinc(x)*w
+        return h/h.sum()
 
     def _default_ntaps(self):
         """Response length in samples, where the caller gives none."""
@@ -209,9 +239,6 @@ class SphericalHeadHRTF(HRTFProvider):
         # the scale of every delay in the model
         self._tau = radius/sound_speed
 
-        # half width in samples of the fractional delay kernel
-        self._half = 16
-
         super().__init__(**kwargs)
 
         self._notch_lims = np.clip(notch_lims, 20., 0.45*self.samprate)
@@ -241,29 +268,6 @@ class SphericalHeadHRTF(HRTFProvider):
         need = self._half + 2*self._tau*self.samprate \
             + 0.5*self.samprate/1000. + 4*self._tau*self.samprate + 8
         return int(2**np.ceil(np.log2(need)))
-
-    def _frac_delay(self, delay):
-        """Windowed sinc kernel delaying a signal by a fractional sample count.
-
-        Normalised to unit sum, which makes the gain at DC exactly one
-        and the group delay exactly `delay`, and leaves the kernel
-        varying smoothly as the delay does so that a moving source is
-        free of zipper artefacts.
-
-        Args:
-          delay (:obj:`float`): delay in samples
-
-        Returns:
-          h (:obj:`ndarray`): `ntaps` length kernel
-        """
-        x = np.arange(self.ntaps) - delay
-        half = self._half
-        # Blackman window, zeroed outside its half width
-        w = np.where(abs(x) <= half,
-                     0.42 + 0.5*np.cos(np.pi*x/half)
-                     + 0.08*np.cos(2*np.pi*x/half), 0.)
-        h = np.sinc(x)*w
-        return h/h.sum()
 
     def _shadow(self, h, gamma):
         """Apply the head shadow for an angle from the ear axis.
@@ -329,7 +333,287 @@ class SphericalHeadHRTF(HRTFProvider):
         return np.array(ears)/self._norm
 
 
-hrtf_providers = {'spherical': SphericalHeadHRTF}
+def _minimum_phase(h, nfft=None):
+    """Minimum phase counterpart of an impulse response.
+
+    Built from the real cepstrum, folding the non-causal half onto the
+    causal one. The magnitude spectrum is preserved exactly; what is
+    discarded is the excess phase, which for a head-related response is
+    very nearly a pure delay and is handled separately.
+
+    Args:
+      h (:obj:`ndarray`): impulse response
+      nfft (optional, :obj:`int`): transform length, defaulting to
+        eight times the response length to keep wraparound negligible
+
+    Returns:
+      hmin (:obj:`ndarray`): minimum phase response, same length as `h`
+    """
+    n = h.size
+    nfft = nfft or 8*n
+    mag = np.abs(np.fft.rfft(h, nfft))
+    # floor the magnitude so that its logarithm stays finite
+    mag = np.maximum(mag, mag.max()*1e-8)
+    cep = np.fft.irfft(np.log(mag), nfft)
+    fold = np.zeros(nfft)
+    fold[0] = 1.
+    fold[1:nfft//2] = 2.
+    fold[nfft//2] = 1.
+    return np.fft.irfft(np.exp(np.fft.rfft(cep*fold, nfft)), nfft)[:n]
+
+
+def _excess_delay(h, hmin, samprate, flo=200., fhi=1500., nfft=None):
+    """Delay in samples between a response and its minimum phase form.
+
+    Measured from the phase slope of the all-pass component the two
+    differ by, over a band low enough that the response is smooth and
+    strong. Cross-correlating the two instead is tempting but much less
+    reliable: for a shadowed ear the response is diffuse, its
+    correlation peak ambiguous, and the resulting delays vary sharply
+    between neighbouring measurements, which then shows up as a
+    stepping interaural time difference once they are interpolated.
+
+    Args:
+      h (:obj:`ndarray`): impulse response
+      hmin (:obj:`ndarray`): its minimum phase counterpart
+      samprate (:obj:`int`): sample rate of the response in Hz
+      flo (optional, :obj:`float`): bottom of the fitting band in Hz
+      fhi (optional, :obj:`float`): top of the fitting band in Hz
+      nfft (optional, :obj:`int`): transform length
+
+    Returns:
+      delay (:obj:`float`): delay in samples
+    """
+    nfft = nfft or 8*h.size
+    spec = np.fft.rfft(hmin, nfft)
+    # the minimum phase form shares the magnitude, so their ratio is an
+    # all-pass whose phase carries the delay and nothing else
+    allpass = np.fft.rfft(h, nfft)/np.where(np.abs(spec) < 1e-12, 1e-12, spec)
+
+    freq = np.fft.rfftfreq(nfft, 1./samprate)
+    band = (freq >= flo) & (freq <= fhi)
+    bins = np.arange(nfft//2 + 1)[band]
+    phase = np.unwrap(np.angle(allpass))[band]
+
+    slope = np.polyfit(bins, phase, 1)[0]
+    return -slope*nfft/(2*np.pi)
+
+
+def kemar_to_npz(kemar_dir, outfile):
+    """Convert the MIT KEMAR compact measurements to a STRAUSS HRTF file.
+
+    The compact set gives one stereo response per direction over half
+    the sphere, the other half following by symmetry. Each response is
+    split into its minimum phase part and a pure delay, so that
+    responses for neighbouring directions can be blended without the
+    comb filtering that averaging differently delayed copies would
+    cause.
+
+    Note the MIT set measures azimuth towards the listener's right,
+    where STRAUSS measures it towards the left, so the azimuths are
+    negated on the way in. This was established from the data rather
+    than the documentation: at MIT azimuth 90 the second channel leads
+    by 32 samples and is 14 dB the louder.
+
+    Args:
+      kemar_dir (:obj:`str` or :obj:`Path`): directory holding the
+        `elev<N>` folders of the unpacked compact archive
+      outfile (:obj:`str` or :obj:`Path`): `.npz` file to write
+
+    Returns:
+      outfile (:obj:`Path`): the file written
+    """
+    import glob
+    import os
+    import re
+    from scipy.io import wavfile
+
+    rows = []
+    rate = None
+
+    # the asset fetcher hands back the folder of the first file it
+    # unpacked, which for this archive is one of the elevation folders
+    root = Path(kemar_dir)
+    if root.name.startswith('elev'):
+        root = root.parent
+    files = sorted(glob.glob(str(Path(root, '**', 'H*e*a.wav')), recursive=True))
+    if not files:
+        raise Exception(f"no KEMAR measurements found under \"{root}\".")
+
+    for f in files:
+        m = re.match(r'H(-?\d+)e(\d+)a\.wav', os.path.basename(f))
+        elev, mit_azi = int(m.group(1)), int(m.group(2))
+        rate, wav = wavfile.read(f)
+        # (2, nsamples), as left and right ear
+        ears = wav.astype(np.float64).T/32768.
+
+        # elevation above the horizon becomes polar angle from overhead
+        polar = np.radians(90. - elev)
+
+        # the measured half of the sphere lies to the right in the
+        # STRAUSS convention, and mirrors onto the left with the ears
+        # exchanged
+        entries = [((360 - mit_azi) % 360, ears)]
+        if mit_azi not in (0, 180):
+            entries.append((mit_azi, ears[::-1]))
+
+        for azi, pair in entries:
+            hmin = np.array([_minimum_phase(pair[e]) for e in (0, 1)])
+            delay = np.array([_excess_delay(pair[e], hmin[e], rate) for e in (0, 1)])
+            rows.append((np.radians(azi), polar, hmin, delay))
+
+    azi = np.array([r[0] for r in rows])
+    polar = np.array([r[1] for r in rows])
+    hrir = np.array([r[2] for r in rows], dtype=np.float32)
+    itd = np.array([r[3] for r in rows])
+
+    # delays are only meaningful relative to one another, so referencing
+    # them to the earliest keeps the responses as short as possible
+    itd -= itd.min()
+
+    outfile = Path(outfile)
+    np.savez_compressed(outfile, azi=azi, polar=polar, hrir=hrir, itd=itd,
+                        samprate=rate, convention='strauss-v1',
+                        source='MIT KEMAR compact, Gardner & Martin, '
+                               'Copyright 1994 MIT Media Laboratory')
+    return outfile
+
+
+class MeasuredHRTF(HRTFProvider):
+    """HRTFs interpolated from a set of measured responses.
+
+    Measured responses carry the filtering of a real outer ear, which
+    the modelled :class:`SphericalHeadHRTF` cannot: a sphere is
+    symmetric front to back, so it places a source ahead and the same
+    source behind identically. The folds of a real pinna break that
+    symmetry, giving front from back and a usable sense of elevation.
+
+    Responses are stored as a minimum phase part and a pure delay.
+    Blending the two separately is what makes interpolation safe:
+    averaging responses that carry different delays would comb filter
+    the result. The delay is put back with the same fractional delay
+    kernel the modelled HRTFs use.
+
+    A direction is looked up by finding the triangle of measured
+    directions containing it and weighting its three responses
+    barycentrically. The triangulation is the convex hull of the
+    measured directions, which for points on a sphere is their
+    Delaunay triangulation, and so copes with the irregular rings and
+    the poles of a real measurement grid.
+
+    Args:
+      path (optional, :obj:`str`): `.npz` file of measurements to load.
+        Defaults to the MIT KEMAR set, downloaded and converted the
+        first time it is asked for
+      samprate (optional, :obj:`int`): sample rate to provide responses
+        at, resampling the measurements if they were made at another
+
+    Raises:
+      Exception: if the file does not carry a convention this
+        understands, which would leave its directions ambiguous
+    """
+    def __init__(self, path=None, samprate=48000, **kwargs):
+        if path is None:
+            path = kemar_path()
+        data = np.load(path, allow_pickle=False)
+
+        convention = str(data['convention'])
+        if convention != 'strauss-v1':
+            raise Exception(f"HRTF file \"{path}\" uses convention "
+                            f"\"{convention}\", which this version does not "
+                            "know how to orient. Directions would be ambiguous.")
+
+        self.path = path
+        self.source = str(data['source']) if 'source' in data else 'unknown'
+        self._hrir = data['hrir'].astype(np.float64)
+        self._itd = data['itd'].astype(np.float64)
+        file_rate = int(data['samprate'])
+
+        samprate = int(samprate)
+        if samprate != file_rate:
+            # measurements are rarely made at the rate we render at
+            gcd = np.gcd(samprate, file_rate)
+            self._hrir = resample_poly(self._hrir, samprate//gcd,
+                                       file_rate//gcd, axis=-1)
+            self._itd *= samprate/file_rate
+
+        # offset making every delay causal, leaving room for the kernel
+        self._n0 = self._half + 2
+
+        super().__init__(samprate=samprate, **kwargs)
+
+        # unit vectors towards each measured direction, and the triangles
+        # of the sphere they span
+        self._xyz = np.asarray(direction(data['azi'], data['polar'])).T
+        simplices = ConvexHull(self._xyz).simplices
+        mats = self._xyz[simplices].transpose(0, 2, 1)
+
+        # a triangle whose vertices lie on a great circle is edge on to
+        # the origin and cannot be solved for, so drop any that appear
+        keep = np.abs(np.linalg.det(mats)) > 1e-9
+        self._simplices = simplices[keep]
+        self._Tinv = np.linalg.inv(mats[keep])
+
+        # match the gain the modelled HRTFs and the stereo setup give a
+        # source straight ahead, so switching between them is level
+        self._norm = 1.
+        self._norm = np.mean(self._ir(0., 0.5*np.pi).sum(axis=1))/0.5
+
+    def _default_ntaps(self):
+        # the measurements, the delay put back, and the kernel doing it
+        return int(self._hrir.shape[-1] + self._n0 + self._itd.max()
+                   + self._half + 4)
+
+    def _ir(self, azi, polar):
+        """Interpolated impulse response pair, see :func:`HRTFProvider._ir`."""
+        s = direction(azi % (2*np.pi), np.clip(polar, 0., np.pi))
+
+        # barycentric weights of the ray through s in every triangle, of
+        # which the containing one is that with no negative weight
+        weights = self._Tinv @ s
+        inside = np.all(weights >= -1e-9, axis=1)
+
+        if inside.any():
+            k = int(np.argmax(inside))
+            idx = self._simplices[k]
+            wts = weights[k]/weights[k].sum()
+        else:
+            # no triangle claims it, so fall back on the nearest
+            # measurement rather than failing
+            idx = np.array([int(np.argmax(self._xyz @ s))])
+            wts = np.array([1.])
+
+        hmin = (self._hrir[idx] * wts[:, None, None]).sum(axis=0)
+        delay = (self._itd[idx] * wts[:, None]).sum(axis=0)
+
+        ir = np.array([fftconvolve(hmin[e],
+                                   self._frac_delay(self._n0 + delay[e]))[:self.ntaps]
+                       for e in (0, 1)])
+        return ir/self._norm
+
+
+def kemar_path():
+    """Path to the converted MIT KEMAR measurements, preparing them if needed.
+
+    The archive is fetched from the MIT Media Laboratory and converted
+    on first use, then cached alongside the other STRAUSS assets.
+
+    Returns:
+      path (:obj:`Path`): the `.npz` file of converted measurements
+    """
+    from .assets import assets, get_asset_path
+
+    cached = Path(assets.path, 'kemar_strauss.npz')
+    if not cached.exists():
+        warnings.warn("preparing the MIT KEMAR measurements for first use, "
+                      "this takes a few seconds...")
+        kemar_to_npz(get_asset_path('kemar'), cached)
+    return cached
+
+
+hrtf_providers = {'spherical': SphericalHeadHRTF,
+                  'measured': MeasuredHRTF,
+                  'kemar': MeasuredHRTF}
 
 
 def get_hrtf(name='spherical', **kwargs):
