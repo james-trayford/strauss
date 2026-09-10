@@ -237,10 +237,6 @@ class audio_channels:
         # whether sources are spatialised by filtering rather than panning
         self.binaural = (setup == "binaural")
 
-        # the channel layout ffmpeg should be told about, which is not
-        # always what strauss calls the setup
-        self.ffmpeg_layout = setup
-
         # mic angles in radians
         mono_azimuths = [0.]
         stereo_azimuths = [0.5*np.pi, 1.5*np.pi]
@@ -322,8 +318,6 @@ class audio_channels:
             self.setup_channels(binaural_azimuths, binaural_types,
                                 binaural_labels, hrtf=self.hrtf)
             self.forder = binaural_forder
-            # binaural is not a layout ffmpeg knows, but it is two channels
-            self.ffmpeg_layout = 'stereo'
         elif setup == "5.1":
             self.setup_channels(fivepoint_azimuths, ptypes(fivepoint_types), fivepoint_labels)
             self.forder = fivepoint_forder

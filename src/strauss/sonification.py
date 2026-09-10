@@ -1174,7 +1174,7 @@ class Sonification:
             
         print("Joining temporary .wav files...")
         (
-            ff.filter(inputs, 'join', inputs=len(inputs), channel_layout=self.channels.ffmpeg_layout)
+            ff.filter(inputs, 'join', inputs=len(inputs), channel_layout=ffmpeg_layout(self.channels.setup))
             .output(fname)
             .overwrite_output()
             .run(quiet=~ffmpeg_output)
