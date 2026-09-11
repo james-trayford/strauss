@@ -838,9 +838,10 @@ class AudioFigure:
 
         Args:
           fname (:obj:`str`) Filename or filepath
-          master_volume (:obj:`str` or :obj:`float`) Amplitude of the
-            largest volume peak, from 0-1, or a level in decibels below
-            full scale as a string, e.g. :obj:`'-6 dB'`
+          master_volume (:obj:`float` or :obj:`str`) Amplitude of the
+            largest volume peak, from 0-1, or an attenuation below the
+            maximum volume, specified as a string in decibels, e.g. 
+            :obj:`'-6 dB'`
         """
         # combine and write out file
         if not self.is_rendered:
