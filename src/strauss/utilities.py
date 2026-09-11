@@ -261,6 +261,44 @@ def db_to_amplitude(db):
     """
     return pow(10., np.asarray(db, dtype=float)/20.)
 
+def parse_level(level):
+    """Express a level as a linear amplitude.
+
+    Accepts a level as an amplitude fraction, or as a string in
+    decibels relative to full scale, e.g. :obj:`'-6 dB'`. :obj:`'-inf dB'`
+    is silence.
+
+    Args:
+      level (:obj:`str` or :obj:`float`): the level, either a linear
+        amplitude (typically 0-1) or a string ending in :obj:`'dB'`
+
+    Returns:
+      amplitude (:obj:`float`): the corresponding linear amplitude
+
+    Raises:
+      ValueError: if a string is neither a number nor a decibel value
+      TypeError: if the level is not a string or a number
+    """
+    if isinstance(level, str):
+        level_clean = level.strip().lower()
+        if level_clean.endswith('db'):
+            db_str = level_clean[:-2].strip()
+            if db_str == '-inf':
+                return 0.0
+            try:
+                return float(db_to_amplitude(float(db_str)))
+            except ValueError:
+                raise ValueError(f"Invalid dB format: {level}")
+        # specific case for just a number in string format
+        try:
+            return float(level)
+        except ValueError:
+            raise ValueError(f"Unknown level format: {level}")
+    elif isinstance(level, (int, float, np.number)):
+        return float(level)
+    else:
+        raise TypeError(f"Level must be str or float, got {type(level)}")
+
 def rescale_values(x, oldlims, newlims):
     """
     Rescale x values defined by limits oldlims to new limits newlims
@@ -616,7 +654,7 @@ def ffmpeg_layout(setup):
     return setup if setup in ('5.1', '7.1') else None
 
 
-def write_audio(fname, samprate, samples, layout=None):
+def write_audio(fname, samprate, samples, layout=None, master_volume=1.):
     """Write rendered audio samples out to a file
 
     Writes the samples as a WAV, converting to any other format asked
@@ -635,12 +673,26 @@ def write_audio(fname, samprate, samples, layout=None):
       layout (:obj:`str`): optional `ffmpeg` channel layout name to
     	record in the output, e.g. `"5.1"`. Layouts are only named for
     	setups whose channel order already matches `ffmpeg`'s own
+      master_volume (:obj:`str` or :obj:`float`): amplitude of the
+    	largest volume peak as a fraction of full scale, from 0-1, or a
+    	level in decibels below full scale as a string, e.g.
+    	:obj:`'-6 dB'`. Samples are assumed peak-normalised to full
+    	scale on input, so anything above 1 (or 0 dB) would clip
 
     Raises:
+      ValueError: if `master_volume` is above full scale, or negative
       FileNotFoundError: if a non-WAV format is asked for but `ffmpeg`
         is unavailable to convert to it
       Exception: if `ffmpeg` fails to convert to a non-WAV format
     """
+    amp = parse_level(master_volume)
+    if not (0. <= amp <= 1.):
+        raise ValueError(f"master_volume of {master_volume!r} is outside the "
+                         "range 0-1 (-inf to 0 dB).")
+    if amp != 1.:
+        # scale in float, so that the int32 samples aren't truncated
+        samples = (samples.astype(float) * amp).astype(np.int32)
+
     fsplit = str(fname).split('.')
     if len(fsplit) < 2:
         warnings.warn('No file extension in provided fname. Assuming WAV...')

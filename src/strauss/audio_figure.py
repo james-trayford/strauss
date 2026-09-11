@@ -23,7 +23,7 @@ from .sources import Events, Objects, set_limits
 from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
 from .utilities import (nested_dict_reassign, merge_events, rescale_values,
-                        db_to_amplitude)
+                        parse_level)
 
 import numpy as np
 from . import channels
@@ -760,26 +760,7 @@ class AudioFigure:
         - Strings ending in 'dB' (e.g., '-6 dB', '-inf dB')
         - Floats/linear fractions (0.0 to 1.0)
         """
-        if isinstance(level, str):
-            level_clean = level.strip().lower()
-            if level_clean == '-inf db':
-                return 0.0
-            elif level_clean.endswith('db'):
-                try:
-                    db_val = float(level_clean.replace('db', '').strip())
-                    return float(db_to_amplitude(db_val))
-                except ValueError:
-                    raise ValueError(f"Invalid dB format: {level}")
-            else:
-                # specific case for just a number in string format
-                try:
-                    return float(level)
-                except ValueError:
-                    raise ValueError(f"Unknown level format: {level}")
-        elif isinstance(level, (int, float)):
-            return float(level)
-        else:
-            raise TypeError(f"Level must be str or float, got {type(level)}")
+        return parse_level(level)
 
     def render(self, progress=True, normalize='peak'):
         """
@@ -846,7 +827,7 @@ class AudioFigure:
                 outfmt[c] += self.tick_channels['0'].values*self.tick_vol / self.vmax
         ipd.display(ipd.Audio(outfmt.T,rate=self.samprate, autoplay=False))
 
-    def save(self, fname):
+    def save(self, fname, master_volume=1.):
         """ Save the mixed audio figure to a file
 
         Renders first if the figure has not been rendered already. As
@@ -857,13 +838,17 @@ class AudioFigure:
 
         Args:
           fname (:obj:`str`) Filename or filepath
+          master_volume (:obj:`str` or :obj:`float`) Amplitude of the
+            largest volume peak, from 0-1, or a level in decibels below
+            full scale as a string, e.g. :obj:`'-6 dB'`
         """
         # combine and write out file
         if not self.is_rendered:
             self.render()
 
         write_audio(fname, self.samprate, self.master_audio,
-                    layout=ffmpeg_layout(self.channels.setup))
+                    layout=ffmpeg_layout(self.channels.setup),
+                    master_volume=master_volume)
 
         
     def _align_audio(self, audio, expected_channels, expected_samples):

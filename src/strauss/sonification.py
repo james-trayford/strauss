@@ -19,7 +19,7 @@ from .sources import (Events, Objects, spatial_angles, display_name,
                       param_converters, param_lim_dict)
 from .utilities import decimals_for_range
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
-from .utilities import write_audio, ffmpeg_layout
+from .utilities import write_audio, ffmpeg_layout, parse_level
 from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import pandas as pd
@@ -774,12 +774,11 @@ class Sonification:
 
         Args:
           fname (:obj:`str`) Filename or filepath
-          master_volume (:obj:`float`) Amplitude of the largest volume
-            peak, from 0-1
-
-        Todo:
-          * Support :obj:`master_volume` in decibels
+          master_volume (:obj:`str` or :obj:`float`) Amplitude of the
+            largest volume peak, from 0-1, or a level in decibels as a
+            string, e.g. :obj:`'-6 dB'`
         """
+        master_volume = parse_level(master_volume)
 
         if len(self.out_channels) > 2:
             print("Warning: sonification has > 2 channels, only first 2 will be used. See 'save_combined' method.")
@@ -822,9 +821,12 @@ class Sonification:
           fname (:obj:`str`) Filename or filepath
           ffmpeg_output (:obj:`bool`) If True, print :obj:`ffmpeg`
             output to screen 
-          master_volume (:obj:`float`) Amplitude of the largest volume
-            peak, from 0-1
+          master_volume (:obj:`str` or :obj:`float`) Amplitude of the
+            largest volume peak, from 0-1, or a level in decibels as a
+            string, e.g. :obj:`'-6 dB'`
         """
+        master_volume = parse_level(master_volume)
+
         # setup list to house wav stream data 
         inputs = [None]*len(self.out_channels)
 
@@ -879,8 +881,9 @@ class Sonification:
 
         Args:
           fname (:obj:`str`) Filename or filepath
-          master_volume (:obj:`float`) Amplitude of the largest volume
-            peak, from 0-1
+          master_volume (:obj:`str` or :obj:`float`) Amplitude of the
+            largest volume peak, from 0-1, or a level in decibels below
+            full scale as a string, e.g. :obj:`'-6 dB'`
           embed_caption (:obj:`bool`) Whether or not to embed caption
             at the start of the output audio
 
@@ -907,8 +910,9 @@ class Sonification:
                 vmax
             ) * 1.05
 
-        # normalisation for conversion to int32 bitdepth wav
-        norm = master_volume * (pow(2, 31)-1) / vmax
+        # normalisation for conversion to int32 bitdepth wav, the
+        # master_volume is applied on writing
+        norm = (pow(2, 31)-1) / vmax
 
         # setup array to house wav stream data 
         chans = np.zeros((channels[0].size, len(channels)), dtype="int32")
@@ -923,7 +927,8 @@ class Sonification:
             
         # finally combine and write out file
         write_audio(fname, self.samprate, chans,
-                    layout=ffmpeg_layout(self.channels.setup))
+                    layout=ffmpeg_layout(self.channels.setup),
+                    master_volume=master_volume)
 
         
     def notebook_display(self, show_waveform=True):
