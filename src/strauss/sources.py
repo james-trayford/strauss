@@ -563,9 +563,29 @@ class Source:
           vallims (:obj:`tuple`): limits to descale the data by, as
             absolute values or percentile strings
         """
-        rawvals = self.raw_mapping[key]
+        mapvals = self._apply_map_funcs(key, self.raw_mapping[key])
 
-        # apply mapping functions if specified
+        # set mapping limits if specified
+        if key in self.map_lims:
+            vallims = self.map_lims[key]
+        elif key in spatial_angles:
+            mapvals = self._fold_angle(key, mapvals)
+            vallims = (0, 1)
+        else:
+            vallims = ('0%','100%')
+
+        return mapvals, vallims
+
+    def _apply_map_funcs(self, key, rawvals):
+        """Apply the mapping function(s) for a key, if any were given.
+
+        Args:
+          key (:obj:`str`): the mapped quantity
+          rawvals: input data values
+
+        Returns:
+          mapvals: the converted values, the input itself if none
+        """
         if key in self.map_funcs:
             func = self.map_funcs[key]
             func_list = [func] if callable(func) else func
@@ -575,27 +595,72 @@ class Source:
         else:
             mapvals = rawvals
 
-        # set mapping limits if specified
-        if key in self.map_lims:
-            vallims = self.map_lims[key]
-        elif key in spatial_angles:
-            # special case for spatial angles - use absolute values
-            # set domain based on units unit (by default in cycles)
-            amax = 1
-            if self.angle_unit:
-                amax = angle_unit_maxs[self.angle_unit]
-            # for angles make sure conforms to units
-            if key in z_angles:
-                # triangle wave behaviour to map polar angle domain
-                mapvals = (sig.sawtooth(2*np.pi*(np.array(mapvals)/amax),0.5) + 1)/2
-            else:
-                # sawtooth wave behaviour to map azimuthal angle domain
-                mapvals = (np.array(mapvals)%amax)/amax
-            vallims = (0, 1)
-        else:
-            vallims = ('0%','100%')
+        return mapvals
 
-        return mapvals, vallims
+    def _fold_angle(self, key, mapvals):
+        """Wrap a spatial angle onto the fraction of a turn it maps to.
+
+        Angles are taken as absolute rather than descaled by limits,
+        in `angle_unit` (cycles by default), and folded so that any
+        number of turns lands on the fraction the sonification uses.
+
+        Args:
+          key (:obj:`str`): the spatial angle
+          mapvals: angles, in `angle_unit`
+
+        Returns:
+          mapvals: the same angles as fractions in (0, 1)
+        """
+        # set domain based on units unit (by default in cycles)
+        amax = 1
+        if self.angle_unit:
+            amax = angle_unit_maxs[self.angle_unit]
+        # for angles make sure conforms to units
+        if key in z_angles:
+            # triangle wave behaviour to map polar angle domain
+            return (sig.sawtooth(2*np.pi*(np.array(mapvals)/amax),0.5) + 1)/2
+        # sawtooth wave behaviour to map azimuthal angle domain
+        return (np.array(mapvals)%amax)/amax
+
+    def input_to_param(self, key):
+        """The function taking input data to the parameter it is mapped to.
+
+        Composes the mapping already applied to `key` - its mapping
+        functions, the fold for a spatial angle, clipping to its input
+        limits and rescaling to its parameter limits - as a function of
+        the input value alone, for showing the mapping or converting
+        further values by it. Only meaningful once
+        :meth:`apply_mapping_functions` has fixed those limits.
+
+        Args:
+          key (:obj:`str`): the mapped quantity
+
+        Returns:
+          convert (:obj:`callable`): takes input values to mapped
+          parameter values
+        """
+        if key not in getattr(self, 'lims', {}):
+            raise Exception(f"'{key}' has no mapping limits to convert by - "
+                            "run 'apply_mapping_functions' on the sources first.")
+
+        lo, hi = self.lims[key]
+        plo, phi = self.plims[key]
+
+        def convert(values):
+            mapvals = self._apply_map_funcs(key, np.asarray(values, dtype=float))
+            if key in spatial_angles and key not in self.map_lims:
+                mapvals = self._fold_angle(key, mapvals)
+            mapvals = np.asarray(mapvals, dtype=float)
+            # descale by the input limits and rescale to the parameter's, as
+            # `rescale_values` does for the data - but by these limits
+            # whatever the number of values, where that takes a single value
+            # as a fraction already
+            if hi == lo:
+                return np.full(mapvals.shape, float(plo))
+            descale = np.clip((mapvals - lo) / (hi - lo), 0, 1)
+            return (phi - plo)*descale + plo
+
+        return convert
 
     def _drop_nonfinite_times(self):
         """Discard input data with no finite time to place it at.
