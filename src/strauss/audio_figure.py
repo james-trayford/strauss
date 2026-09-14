@@ -31,7 +31,7 @@ from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .utilities import write_audio, ffmpeg_layout
-from .tts_caption import render_caption, get_ttsMode, default_tts_voice
+from .tts_caption import render_caption
 from scipy.io import wavfile
 import IPython.display as ipd
 import subprocess as sp

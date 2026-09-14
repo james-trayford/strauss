@@ -20,7 +20,7 @@ from .sources import (Events, Objects, spatial_angles, display_name,
 from .utilities import decimals_for_range
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .utilities import write_audio, ffmpeg_layout, parse_level
-from .tts_caption import render_caption, get_ttsMode, default_tts_voice
+from .tts_caption import render_caption
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -62,7 +62,7 @@ class Sonification:
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
                  caption=None, samprate=48000, declick_time=0.03,
-                 ttsmodel=default_tts_voice, handle_nans=None):
+                 ttsmodel=None, handle_nans=None):
         """
         Args:
          score (:class:`~strauss.score.Score`): Sonification :obj:`Score`
@@ -82,8 +82,10 @@ class Sonification:
          declick_time (:obj:`float`) duration of start and end fades applied
           on save and dispolay to remove audible clicks from sample
           discontinuity
-         ttsmodel (:obj:`str` or :obj:`PosixPath`) file path to the
-          text-to-speech model used for captions.
+         ttsmodel (:obj:`str`, :obj:`PosixPath` or :obj:`dict`) the
+          text-to-speech voice used for captions, in the form the current
+          engine expects (see :obj:`tts_caption.getVoices`). Defaults to
+          the engine's default voice at render time.
          handle_nans (:obj:`str`) how to treat the audio any source's
           non-finite data corresponds to, either :obj:`'silent'` or
           :obj:`'interpolate'`. Taken from the :obj:`Sources` where not
@@ -307,8 +309,6 @@ class Sonification:
 
         # produce mono audio of caption, if one is provided
         if str(self.caption or '').strip():
-            ttsMode = get_ttsMode() # determine if using coqui-ai or pyttsx3
-
             # use a temporary directory to ensure caption file cleanup
             with tempfile.TemporaryDirectory() as cdir:
                 cpath = Path(cdir, 'caption.wav')

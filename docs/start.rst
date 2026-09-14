@@ -51,15 +51,15 @@ throughout the documentation, I will refer to this as the **strauss repo** or **
 Text-to-speech
 **************
 
-Fot text-to-speech (TTS) functionality, there are a couple of options: _system_ and _AI_ text to speech.
+For text-to-speech (TTS) functionality, there are a couple of options: *system* and *AI* text to speech.
 
-If you would like to use system AI, you will need to install the (as of writing) cutting-edge `pyttsx3` dependency, with 
+If you would like to use system TTS, you will need to install the (as of writing) cutting-edge `pyttsx3` dependency, with 
 
 .. code-block:: bash
 
    pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple/ pyttsx3==2.99
 
-If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`AI-TTS` dependency:
+If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`AI-TTS` dependency, which installs the :code:`kokoro` and :code:`coqui` engines:
 
 .. code-block:: bash
 
@@ -72,7 +72,17 @@ or, for an install from a local repository copy:
    pip install -e ".[AI-TTS]"
 
 .. note::
-   The AI TTS is currently supported for python version :code:`<= 3.12`.
+   The :code:`coqui` engine is currently supported for python version :code:`<= 3.12`. To install
+   just one engine use the :code:`[kokoro]` or :code:`[coqui]` extra instead.
+
+Strauss uses the best engine it finds at import, preferring :code:`kokoro`, then :code:`coqui`, then
+:code:`pyttsx3`. To choose one explicitly, or list the voices it offers:
+
+.. code-block:: python
+
+   from strauss import tts_caption
+   tts_caption.set_engine('kokoro')
+   tts_caption.getVoices(info=True)
    
 Example jupyter notebooks/scripts
 *********************************

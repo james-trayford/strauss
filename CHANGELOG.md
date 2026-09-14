@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `kokoro` text-to-speech engine for captions, alongside `coqui-tts` and `pyttsx3`. The best
+  installed engine is used (in that order), or pick one with `tts_caption.set_engine()`.
+  Engines load on first caption render rather than at import. `pip install strauss[AI-TTS]`
+  now installs `kokoro` (and `coqui-tts` on python < 3.13); `[kokoro]` and `[coqui]` extras
+  install one or the other. `tts_caption.getVoices()` lists the current engine's voices.
+
+### Changed
+
+- `Sonification(ttsmodel=...)` defaults to `None`, resolved to the current engine's default
+  voice at render time, so `set_engine()` after import takes effect.
+
 ## v1.5
 
 ### Added
