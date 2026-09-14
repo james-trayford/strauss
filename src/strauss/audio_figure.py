@@ -638,6 +638,21 @@ class AudioFigure:
 
         return soni.object_table(source, include_input=include_input)
 
+    def plot_mapping(self, name=None, **kwargs):
+        """Plot a sonification's mapped parameters against its input data.
+
+        See :meth:`strauss.sonification.Sonification.plot_mapping`, which
+        this passes any keyword arguments to.
+
+        Args:
+          name (`optional`, :obj:`str`): name of the sonification. Can
+            be omitted where the figure holds only one.
+
+        Returns:
+          fig (:obj:`matplotlib.figure.Figure`): the figure
+        """
+        return self._get_sonification(name).plot_mapping(**kwargs)
+
     def list_tables(self):
         """Print the tables available from this figure.
 

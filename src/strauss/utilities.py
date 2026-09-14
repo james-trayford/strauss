@@ -18,6 +18,7 @@ from pathlib import Path
 import subprocess as sp
 import tempfile
 import warnings
+from matplotlib.ticker import Locator
 
 
 # Some utility classes (these may graduate to somewhere else eventually)
@@ -750,3 +751,58 @@ def write_audio(fname, samprate, samples, layout=None, master_volume=1.):
             wavfile.write(fname, samprate, samples)
 
     print(f"Saved {fname}")
+
+
+class MinPixelLocator(Locator):
+    """Tick locator that thins ticks to a minimum separation on screen.
+
+    A secondary axis converted from a primary one by a function has
+    ticks placed evenly in its own values, which can land arbitrarily
+    close together on the page where the function is steep, or run past
+    the data it describes. This wraps the axis's own locator, dropping
+    ticks closer than `min_pixels` to the last kept and any outside
+    `min_val` to `max_val`.
+
+    Args:
+      base_locator (:obj:`matplotlib.ticker.Locator`): locator to take
+        candidate ticks from
+      to_pixels (:obj:`callable`): takes tick values to their position
+        along the axis in pixels
+      min_pixels (:obj:`float`): minimum separation of kept ticks
+      min_val (:obj:`float`, optional): lowest tick value to keep
+      max_val (:obj:`float`, optional): highest tick value to keep
+    """
+    def __init__(self, base_locator, to_pixels, min_pixels=40,
+                 min_val=None, max_val=None):
+        self.base_locator = base_locator
+        self.to_pixels = to_pixels
+        self.min_pixels = min_pixels
+        self.min_val = min_val
+        self.max_val = max_val
+
+    def __call__(self):
+        vmin, vmax = self.axis.get_view_interval()
+        return self.tick_values(vmin, vmax)
+
+    def tick_values(self, vmin, vmax):
+        ticks = np.asarray(self.base_locator.tick_values(vmin, vmax), dtype=float)
+
+        # remove ticks outside the fixed data range
+        if self.min_val is not None:
+            ticks = ticks[ticks >= self.min_val]
+        if self.max_val is not None:
+            ticks = ticks[ticks <= self.max_val]
+
+        if ticks.size < 2:
+            return ticks
+
+        # prune ticks that are too close in screen space
+        pixels = np.asarray(self.to_pixels(ticks), dtype=float)
+        kept = [ticks[0]]
+        last = pixels[0]
+        for tick, pixel in zip(ticks[1:], pixels[1:]):
+            if abs(pixel - last) >= self.min_pixels:
+                kept.append(tick)
+                last = pixel
+
+        return np.array(kept)

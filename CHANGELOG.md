@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `Sonification.plot_mapping()`, also via `AudioFigure.plot_mapping(name)` and the top-level
+  `strauss.plot_mapping()`. One panel per mapped parameter, showing its input data against
+  the input time (or by source, where nothing is mapped to time), with what the same values
+  sound as along the far side of each axis - seconds along the top, and the parameter in
+  the terms the tables report it along the right (degrees, dB, Hz, the notes of the chord
+  for `pitch`). Where a mapping folds back on itself over the data, so cannot be shown as a
+  rescaling of the input axis, the parameter is drawn as a dashed line against its own axis.
+- `Sources.input_to_param(key)`, the function taking input data to the parameter it is
+  mapped to - mapping functions, angle folding, limits and rescaling composed, as applied
+  to the data.
+- `utilities.MinPixelLocator`, a tick locator thinning ticks of a converted axis to a
+  minimum separation on the page.
+
 ## v1.5
 
 ### Added
