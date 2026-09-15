@@ -18,7 +18,7 @@ from pathlib import Path
 import subprocess as sp
 import tempfile
 import warnings
-from matplotlib.ticker import Locator
+from matplotlib.ticker import Locator, MaxNLocator
 
 
 # Some utility classes (these may graduate to somewhere else eventually)
@@ -765,7 +765,10 @@ class MinPixelLocator(Locator):
 
     Args:
       base_locator (:obj:`matplotlib.ticker.Locator`): locator to take
-        candidate ticks from
+        candidate ticks from. If `None`, candidates are placed at round
+        values about twice as dense as `min_pixels` along the axis, so
+        that a stretch of the axis the function compresses keeps as
+        many ticks as will fit
       to_pixels (:obj:`callable`): takes tick values to their position
         along the axis in pixels
       min_pixels (:obj:`float`): minimum separation of kept ticks
@@ -784,15 +787,59 @@ class MinPixelLocator(Locator):
         vmin, vmax = self.axis.get_view_interval()
         return self.tick_values(vmin, vmax)
 
-    def tick_values(self, vmin, vmax):
-        ticks = np.asarray(self.base_locator.tick_values(vmin, vmax), dtype=float)
+    def _candidates(self, vmin, vmax):
+        if self.base_locator is not None:
+            return [self.base_locator.tick_values(vmin, vmax)]
+        # from the usual density up to as dense as could ever fit
+        length = abs(np.diff(self.to_pixels([vmin, vmax]))[0])
+        nbins = max(int(length / (1.5*self.min_pixels)), 4)
+        return [MaxNLocator(nbins=nbins*k, steps=[1, 2, 2.5, 5, 10]).tick_values(vmin, vmax)
+                for k in (1, 2, 4, 8)]
 
-        # remove ticks outside the fixed data range
+    def tick_values(self, vmin, vmax):
+        # start from the usual ticks, then fill any stretch of the axis
+        # left with room from progressively denser sets - so an evenly
+        # spread axis keeps its round steps, and a stretch the function
+        # stretches gains the finer round steps that fit
+        sets = self._candidates(vmin, vmax)
+        base = np.asarray(sets[0], dtype=float)
+        kept = self._prune(base)
+        # only fill to the spacing the usual ticks would have had, were
+        # the axis evenly spread, so that one that is stays as it was
+        length = abs(np.diff(self.to_pixels([vmin, vmax]))[0])
+        spacing = max(self.min_pixels, 0.6*length/max(base.size - 1, 1))
+        for candidates in sets[1:]:
+            kept = self._fill(kept, np.asarray(candidates, dtype=float), spacing)
+        return kept
+
+    def _in_range(self, ticks):
         if self.min_val is not None:
             ticks = ticks[ticks >= self.min_val]
         if self.max_val is not None:
             ticks = ticks[ticks <= self.max_val]
+        return ticks
 
+    def _fill(self, kept, candidates, spacing):
+        """Add candidates that sit `spacing` pixels clear of every kept tick.
+
+        Only between kept ticks - a finer step beyond the last of them
+        reads as a change of step rather than a gap filled.
+        """
+        candidates = self._in_range(candidates)
+        if kept.size > 1:
+            candidates = candidates[(candidates > kept.min()) & (candidates < kept.max())]
+        if candidates.size == 0:
+            return kept
+        pixels = list(np.asarray(self.to_pixels(kept), dtype=float)) if kept.size else []
+        kept = list(kept)
+        for tick, pixel in zip(candidates, np.asarray(self.to_pixels(candidates), dtype=float)):
+            if not pixels or np.min(np.abs(np.asarray(pixels) - pixel)) >= spacing:
+                kept.append(tick)
+                pixels.append(pixel)
+        return np.array(sorted(kept))
+
+    def _prune(self, ticks):
+        ticks = self._in_range(ticks)
         if ticks.size < 2:
             return ticks
 
