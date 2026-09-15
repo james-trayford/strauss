@@ -47,6 +47,33 @@ def parse_note(notename):
     octv  = int(nsplit[1])
     return tuneC0*pow(2.,semi+octv)
 
+def notes_to_freqs(notenames):
+    """
+    Take scientific pitch names to their frequencies in Hz, as
+    :func:`parse_note` does one at a time.
+
+    Args:
+      notenames (:obj:`list` of :obj:`str`): scientific pitch names
+
+    Returns:
+      out (:obj:`numpy.ndarray`): frequency of each note in Hertz
+    """
+    return np.array([parse_note(str(n)) for n in notenames], dtype=float)
+
+def rank_notes(notenames):
+    """
+    Order the distinct notes among some names from lowest to highest.
+
+    Args:
+      notenames (:obj:`list` of :obj:`str`): scientific pitch names
+
+    Returns:
+      out (:obj:`list` of :obj:`str`): each distinct note once, in
+        ascending order of frequency
+    """
+    unique = list(dict.fromkeys(str(n) for n in notenames))
+    return sorted(unique, key=parse_note)
+
 def valid_note(notename):
     nsplit = re.findall("(\\D+|\\d+)", notename)
     if len(nsplit) == 2:

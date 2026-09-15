@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the terms the tables report it along the right (degrees, dB, Hz, the notes of the chord
   for `pitch`). Where a mapping folds back on itself over the data, so cannot be shown as a
   rescaling of the input axis, the parameter is drawn as a dashed line against its own axis.
+  What is drawn comes from the timing tables, so the plot shows exactly the events they
+  list. Each event or object is coloured by the note it sounds, low to high, with a legend
+  where the chord changes over the sonification and the notes can't label the pitch axis.
+- Table `note` columns are ordered by pitch (a `pandas.Categorical`), so sorting or ranking
+  them puts `C3` below `A3`, and the frequency of each note in Hz travels with the table in
+  `attrs['note_frequency']` - a row per event for `event_table`, one value for
+  `object_table`. `notes.notes_to_freqs` and `notes.rank_notes` do the same for any notes.
 - `Sources.input_to_param(key)`, the function taking input data to the parameter it is
   mapped to - mapping functions, angle folding, limits and rescaling composed, as applied
   to the data.
