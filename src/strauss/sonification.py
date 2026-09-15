@@ -14,6 +14,7 @@ Todo:
 """
 
 from .stream import Stream
+from .notes import notes_to_freqs, rank_notes
 from .channels import audio_channels
 from .sources import (Events, Objects, spatial_angles, display_name,
                       param_converters, param_lim_dict, quiet_db)
@@ -24,7 +25,7 @@ from .tts_caption import render_caption, get_ttsMode, default_tts_voice
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, FixedLocator, FuncFormatter
 import sys
 import os
 import subprocess as sp
@@ -519,7 +520,10 @@ class Sonification:
           sonification in seconds, and `note` the note it ultimately
           sounds. Spatial angles are given in degrees, or in the
           sonification's `angle_unit` where one was asked for, rather
-          than as mapped fractions.
+          than as mapped fractions. The `note` column is ordered by
+          pitch, so sorting or ranking it puts low notes before high
+          ones whatever their names, and the frequency of each row's
+          note in Hz is kept in the table's `attrs['note_frequency']`.
 
         Args:
           include_input (`optional`, :obj:`bool`): if True, also give the
@@ -559,8 +563,15 @@ class Sonification:
 
         table = pd.DataFrame(table).sort_values('time', kind='stable',
                                                 ignore_index=True)
+        # notes order by pitch rather than by name, so that sorting or
+        # ranking the column puts C3 below A3 - and keep the frequency each
+        # sounds at alongside the table, for anything numerical
+        table['note'] = pd.Categorical(table['note'],
+                                       categories=rank_notes(notes), ordered=True)
+        table = self._with_units(self._round_numbers(table))
+        table.attrs['note_frequency'] = notes_to_freqs(table['Note'].to_numpy().ravel())
 
-        return self._with_units(self._round_numbers(table))
+        return table
 
     def _resolve_source(self, source=None):
         """Resolve a source name or index, defaulting to a lone source.
@@ -600,8 +611,9 @@ class Sonification:
           replaces the mapped `time_evo` parameter, and spatial angles
           are given in degrees, or in the sonification's `angle_unit`
           where one was asked for. The note the
-          object plays, and its name, are given by the `note` and
-          `source` entries of the table's `attrs`.
+          object plays, its frequency in Hz, and its name, are given by
+          the `note`, `note_frequency` and `source` entries of the
+          table's `attrs`.
 
         Args:
           source (`optional`, :obj:`str` or :obj:`int`): name or index
@@ -663,6 +675,7 @@ class Sonification:
         notes, _ = self._assign_notes()
         table.attrs['source'] = self.sources.names[index]
         table.attrs['note'] = notes[index]
+        table.attrs['note_frequency'] = float(notes_to_freqs([notes[index]])[0])
 
         return table
 
@@ -837,22 +850,22 @@ class Sonification:
 
         return sampled, inverse
 
-    def _secondary_axis(self, ax, key, which, data, min_pixels):
-        """Add an axis showing what input data along one side sounds as.
+    def _axis_functions(self, key, data, shown=None):
+        """The functions taking an input axis to what its values sound as.
 
         Args:
-          ax (:obj:`matplotlib.axes.Axes`): axes to add to
-          key (:obj:`str`): the mapped parameter shown on that side
-          which (:obj:`str`): `'x'` or `'y'`, the side
-          data (:obj:`ndarray`): input values plotted on that side
-          min_pixels (:obj:`float`): closest ticks may sit on the page
+          key (:obj:`str`): the mapped parameter
+          data (:obj:`ndarray`): input values plotted along the axis
+          shown (`optional`, :obj:`ndarray`): what the tables say each
+            of `data` sounds as, to check the functions against
 
         Returns:
-          secondary (:obj:`matplotlib.axes.Axes`): the added axis, or
-          `None` where the mapping is not monotone over the data so
-          cannot be shown as a rescaling of the input axis
+          functions (:obj:`tuple`): the forward and inverse functions,
+          or `None` where the mapping is not monotone over the data, or
+          not a function of each value alone, so the axis cannot be
+          shown as a rescaling of the input axis
         """
-        forward, unit = self._mapping_forward(key)
+        forward, _ = self._mapping_forward(key)
         finite = data[np.isfinite(data)]
         if finite.size == 0:
             return None
@@ -861,9 +874,79 @@ class Sonification:
         functions = self._monotone_functions(forward, finite.min(), finite.max())
         if functions is None:
             return None
-        forward, inverse = functions
+        if shown is not None:
+            # a mapping function may not act on each value alone - one
+            # ranking the data, say - in which case the axis, made by
+            # sampling it, would not show what the tables say sounded, so
+            # is instead made from what they say
+            expected = functions[0](data)
+            shown = np.asarray(shown, dtype=float)
+            ok = np.isfinite(shown) & np.isfinite(expected)
+            span = np.ptp(shown[ok]) if ok.any() else 0.
+            if ok.any() and not np.allclose(expected[ok], shown[ok],
+                                            atol=1e-2*span + 1e-6, rtol=0):
+                return self._paired_functions(data[ok], shown[ok])
 
+        return functions
+
+    @staticmethod
+    def _paired_functions(data, shown):
+        """Functions between an input axis and what sounded, from pairs.
+
+        Interpolates between the values the tables give, for a mapping
+        with no function of each value alone to sample.
+
+        Args:
+          data (:obj:`ndarray`): input values
+          shown (:obj:`ndarray`): what each sounded as
+
+        Returns:
+          functions (:obj:`tuple`): forward and inverse functions, or
+          `None` where the pairs don't run one way, so there is no
+          single value for the axis to show
+        """
+        # one value per input, in input order
+        inputs, first = np.unique(data, return_index=True)
+        values = shown[first]
+        if inputs.size < 2 or values[-1] == values[0]:
+            return None
+
+        steps = np.diff(values)
+        if np.all(steps >= 0):
+            sign = 1.
+        elif np.all(steps <= 0):
+            sign = -1.
+        else:
+            return None
+
+        forward = lambda x: np.interp(np.asarray(x, dtype=float), inputs, values)
+        signed, first = np.unique(sign*values, return_index=True)
+        inverse = lambda v: np.interp(sign*np.asarray(v, dtype=float),
+                                      signed, inputs[first])
+
+        return forward, inverse
+
+    def _secondary_axis(self, ax, key, which, functions, data, min_pixels):
+        """Add an axis showing what input data along one side sounds as.
+
+        Args:
+          ax (:obj:`matplotlib.axes.Axes`): axes to add to
+          key (:obj:`str`): the mapped parameter shown on that side
+          which (:obj:`str`): `'x'` or `'y'`, the side
+          functions (:obj:`tuple`): forward and inverse functions between
+            the input axis and the parameter, from :meth:`_axis_functions`
+          data (:obj:`ndarray`): input values plotted on that side
+          min_pixels (:obj:`float`): closest ticks may sit on the page
+
+        Returns:
+          secondary (:obj:`matplotlib.axes.Axes`): the added axis, or
+          `None` for a pitch where the chord changes over the
+          sonification, so no note names a value along the axis
+        """
+        forward, inverse = functions
+        _, unit = self._mapping_forward(key)
         label = display_name(key) + (f' [{unit}]' if unit else '')
+
         if which == 'x':
             secondary = ax.secondary_xaxis('top', functions=functions)
             secondary.set_xlabel(label)
@@ -876,31 +959,107 @@ class Sonification:
             axis = secondary.yaxis
             to_pixels = lambda ticks: ax.transData.transform(
                 np.column_stack([np.zeros(np.size(ticks)), inverse(ticks)]))[:, 1]
+        secondary.tick_params(axis=which, direction='in')
 
         if key == 'pitch':
             # a pitch selects a note from the chord, so mark the chord's
-            # notes at the fraction each is chosen for - by name where
-            # every chord is the same, else by where they fall
+            # notes at the fraction each is chosen for. With chords
+            # changing over time the note depends on when a source sounds
+            # too, so only an unchanging chord can be named along an axis
             chords = self.score.note_sequence
             nints = len(chords[0])
-            if nints < 2:
-                secondary.set_visible(False)
-                return secondary
+            if nints < 2 or not all(list(c) == list(chords[0]) for c in chords):
+                secondary.remove()
+                return None
             centres = (np.arange(nints) + 0.5) / nints
-            if all(list(c) == list(chords[0]) for c in chords):
-                labels = [str(n) for n in chords[0]]
-            else:
-                labels = ['low'] + ['']*(nints-2) + ['high']
-            axis.set_ticks(centres, labels)
+            names = dict(zip(np.round(centres, 6), [str(n) for n in chords[0]]))
+            # where the notes crowd the axis it can do without some names,
+            # keeping those a line of text apart
+            axis.set_major_locator(MinPixelLocator(FixedLocator(centres),
+                                                   to_pixels, 12))
+            axis.set_major_formatter(FuncFormatter(
+                lambda value, pos: names.get(round(value, 6), '')))
             return secondary
 
+        finite = data[np.isfinite(data)]
         shown = np.asarray(forward(finite), dtype=float)
-        axis.set_major_locator(MinPixelLocator(axis.get_major_locator(),
-                                               to_pixels, min_pixels,
+        # labels along an x axis are wider than they are tall
+        if which == 'x':
+            min_pixels *= 2.5
+        axis.set_major_locator(MinPixelLocator(None, to_pixels, min_pixels,
                                                shown.min(), shown.max()))
         return secondary
 
-    def plot_mapping(self, show=True, panel_size=(8., 2.5), min_tick_pixels=12):
+    def _pitch_limits(self, functions, pad=0.25):
+        """The input range worth showing for a pitch mapping.
+
+        A pitch chooses among the notes of the chord, so input values
+        far beyond those choosing the highest and lowest notes - the
+        outliers of adaptively binned data, say - say nothing more
+        about what sounds.
+
+        Args:
+          functions (:obj:`tuple`): forward and inverse functions between
+            the input and the fraction of the chord it selects
+          pad (:obj:`float`): fraction of the range between the lowest
+            and highest notes to show beyond them
+
+        Returns:
+          limits (:obj:`tuple`): input values to limit the axis to
+        """
+        nints = len(self.score.note_sequence[0])
+        centres = np.array([0.5, nints - 0.5]) / nints
+        lo, hi = functions[1](centres)
+        margin = pad*(hi - lo)
+        if lo > hi:
+            lo, hi = hi, lo
+            margin = -margin
+        return lo - margin, hi + margin
+
+    def _shade_pitch_bins(self, ax, functions):
+        """Shade alternate pitch bins behind the data, to show them.
+
+        Args:
+          ax (:obj:`matplotlib.axes.Axes`): the pitch panel
+          functions (:obj:`tuple`): forward and inverse functions between
+            the input and the fraction of the chord it selects
+        """
+        nints = len(self.score.note_sequence[0])
+        edges = functions[1](np.arange(nints + 1) / nints)
+        for i in range(0, nints, 2):
+            ax.axhspan(*sorted(edges[i:i+2]), color='0.95', lw=0, zorder=0)
+
+    @staticmethod
+    def _column(table, name):
+        """A table column by name, whatever unit it carries.
+
+        Args:
+          table (:obj:`pandas.DataFrame`): a table with (name, unit)
+            columns, as the table methods return
+          name (:obj:`str`): the column's name
+
+        Returns:
+          values (:obj:`ndarray`): the column, or `None` if there is none
+        """
+        if name not in table.columns.get_level_values(0):
+            return None
+        return table[name].to_numpy().ravel()
+
+    def _mapping_tables(self):
+        """The tables the mapping plot draws from, one per line.
+
+        Returns:
+          tables (:obj:`list` of :obj:`pandas.DataFrame`): the event
+          table alone for `Events`, or a table per source for `Objects`,
+          each with its input columns
+        """
+        if isinstance(self.sources, Events):
+            return [self.event_table(include_input=True)]
+        return [self.object_table(i, include_input=True)
+                for i in range(self.sources.n_sources)]
+
+    def plot_mapping(self, show=True, panel_size=(8., 2.5), colour_notes=False,
+                     min_tick_pixels=20):
         """Plot each mapped parameter against the input data it came from.
 
         One panel per parameter the user mapped, showing the input data
@@ -910,21 +1069,29 @@ class Sonification:
         sonification in seconds along the top, and the parameter along
         the right in the terms the tables report it in - degrees for
         angles, decibels for volume, the notes of the chord for pitch.
-        Where the mapping folds back on itself over the data (a polar
-        angle over more than half a turn, say) there is no one input
-        for each value it sounds as, so the parameter is instead drawn
-        as a dashed line against its own axis.
+
+        Where a mapping acts on the data as a whole rather than on each
+        value (ranking it, say) the far axis is read off the tables
+        instead. Where a parameter can't be shown that way at all - its
+        mapping folds back on itself over the data (a polar angle over
+        more than half a turn, say) - the panel instead shows what
+        sounded, from the tables, in place of the input.
 
         Note:
-          Mapping functions and limits given to the sources are
-          honoured, as are the notes of the score, so the plot shows
-          the mapping as it sounds - it is the picture the tables
-          describe.
+          What is drawn comes from the timing tables, so the plot shows
+          the events the tables list, at the times and values they
+          give - after any merging of events and handling of missing
+          data. A pitch panel is limited to the input choosing the
+          chord's lowest to highest notes, and a little beyond, since
+          nothing further from those sounds any different, and alternate
+          notes are shaded behind the data to show where each begins.
 
         Args:
           show (`optional`, :obj:`bool`): display the figure once made
           panel_size (`optional`, :obj:`tuple`): width and height of each
             panel in inches
+          colour_notes (`optional`, :obj:`bool`): colour each event or
+            object by the note it sounds, from low to high, with a legend
           min_tick_pixels (`optional`, :obj:`float`): closest two ticks
             of a converted axis may sit, on the page
 
@@ -935,6 +1102,7 @@ class Sonification:
         sources = self.sources
         is_events = isinstance(sources, Events)
         origin = getattr(sources, 'origin', {})
+        tables = self._mapping_tables()
 
         xkey = 'time' if is_events else 'time_evo'
         if xkey not in sources.mapped_quantities:
@@ -948,70 +1116,90 @@ class Sonification:
         if not keys:
             raise Exception("No mapped parameters to plot against the input.")
 
+        # each event, or each object, may be coloured by the note it sounds
+        if is_events:
+            notes = tables[0]['Note'].to_numpy().ravel().astype(str)
+        else:
+            notes = np.array([t.attrs['note'] for t in tables], dtype=str)
+        ranked = rank_notes(notes)
+        if colour_notes:
+            colours = {n: plt.get_cmap('viridis')(i/max(len(ranked)-1, 1))
+                       for i, n in enumerate(ranked)}
+        else:
+            colours = {n: f'C{i % 10}' for i, n in enumerate(ranked)}
+        def colour(i):
+            return colours[notes[i]] if (colour_notes or not is_events) else 'C0'
+        legend = colour_notes and len(ranked) > 1
+
         width, height = panel_size
         fig, axes = plt.subplots(len(keys), 1, squeeze=False,
                                  figsize=(width, height*len(keys)))
         axes = axes[:, 0]
 
-        # what the input for each source is plotted against
+        # what the input for each line is plotted against
         if xkey is not None:
-            xdata = [np.ravel(np.asarray(x, dtype=float))
-                     for x in sources.raw_mapping[xkey]]
+            xdata = [self._column(t, f'{display_name(xkey)} (input)') for t in tables]
         else:
-            xdata = [np.array([i], dtype=float) for i in range(sources.n_sources)]
+            xdata = [np.arange(len(t), dtype=float) for t in tables]
 
         labelled_time = False
         for ax, key in zip(axes, keys):
-            ydata = [np.ravel(np.asarray(y, dtype=float))
-                     for y in sources.raw_mapping[key]]
-            evolving = any(y.size > 1 for y in ydata)
-
+            name = display_name(key)
+            unit = self._param_unit(key)
+            ydata = [self._column(t, f'{name} (input)') for t in tables]
+            shown = [self._column(t, name) for t in tables]
+            # objects hold one value of a parameter that doesn't evolve,
+            # broadcast down their tables
+            evolving = is_events or any(np.ptp(y) > 0 for y in ydata if y.size)
             by_source = not is_events and not (evolving and xkey is not None)
-            if is_events:
-                # each event is a point, but still one input value per source
-                ax.scatter(np.concatenate(xdata), np.concatenate(ydata), s=6)
-                xshown = np.concatenate(xdata)
-            elif not by_source:
-                # objects evolve over time, so each is a line
-                for x, y in zip(xdata, ydata):
-                    ax.plot(x, y if y.size > 1 else np.full(x.size, y[0]))
-                xshown = np.concatenate(xdata)
-            else:
+
+            if by_source:
                 # objects holding one value each have nothing to draw against
                 # time, so go by source instead
-                xshown = np.arange(sources.n_sources, dtype=float)
-                ax.scatter(xshown, [y[0] for y in ydata], s=12)
+                xs = [np.arange(sources.n_sources, dtype=float)]
+                ys = [np.array([y[0] for y in ydata])]
+                heard = [np.array([v[0] for v in shown])] if key != 'pitch' else None
+            else:
+                xs, ys = xdata, ydata
+                heard = shown if key != 'pitch' else None
+            xall, yall = np.concatenate(xs), np.concatenate(ys)
+
+            # the parameter is shown as a rescaling of the input axis
+            # where it can be, and in place of the input where it can't
+            functions = self._axis_functions(
+                key, yall, None if heard is None else np.concatenate(heard))
+            if functions is None and key != 'pitch':
+                ys = heard
+                yall = np.concatenate(ys)
+                ax.set_ylabel(name + (f' [{unit}]' if unit else ''))
+            else:
+                ax.set_ylabel(f'{name} input')
+
+            if is_events:
+                ax.scatter(xs[0], ys[0], s=8, c=[colour(i) for i in range(len(notes))])
+            elif by_source:
+                ax.scatter(xs[0], ys[0], s=16, c=[colour(i) for i in range(len(notes))])
                 ax.set_xlabel('Source')
                 ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            else:
+                # objects evolve over time, so each is a line
+                for i, (x, y) in enumerate(zip(xs, ys)):
+                    ax.plot(x, y, c=colour(i))
 
-            yshown = np.concatenate(ydata)
-            ax.set_ylabel(f'{display_name(key)} input')
             ax.tick_params(axis='both', direction='in')
             ax.ticklabel_format(useOffset=False, style='plain')
 
-            secy = self._secondary_axis(ax, key, 'y', yshown, min_tick_pixels)
-            if secy is None:
-                # not a rescaling of the input, so draw the mapped values as
-                # a line of their own
-                forward, unit = self._mapping_forward(key)
-                twin = ax.twinx()
-                if is_events or by_source:
-                    twin.scatter(xshown, forward([y[0] for y in ydata] if by_source
-                                                 else yshown), marker='x', c='C3', s=12)
-                else:
-                    for x, y in zip(xdata, ydata):
-                        twin.plot(x, forward(y if y.size > 1 else np.full(x.size, y[0])),
-                                  ls='--', c='C3', lw=1)
-                twin.set_ylabel(display_name(key) + (f' [{unit}]' if unit else ''),
-                                color='C3')
-                twin.tick_params(axis='y', colors='C3', direction='in')
-            else:
-                secy.tick_params(axis='y', direction='in')
+            if functions is not None:
+                if key == 'pitch':
+                    ax.set_ylim(*self._pitch_limits(functions))
+                    self._shade_pitch_bins(ax, functions)
+                self._secondary_axis(ax, key, 'y', functions, yall, min_tick_pixels)
 
             if xkey is not None and not by_source:
-                secx = self._secondary_axis(ax, xkey, 'x', xshown, min_tick_pixels)
-                if secx is not None:
-                    secx.tick_params(axis='x', direction='in')
+                xfunctions = self._axis_functions(xkey, xall)
+                if xfunctions is not None:
+                    secx = self._secondary_axis(ax, xkey, 'x', xfunctions, xall,
+                                                min_tick_pixels)
                     # the time in the sonification reads the same on every
                     # panel, so label it once, at the top
                     if labelled_time:
@@ -1019,11 +1207,14 @@ class Sonification:
                         secx.set_xticklabels([])
                     labelled_time = True
 
-        if xkey is not None:
-            axes[-1].set_xlabel(f'{display_name(xkey)} input')
+        if legend:
+            handles = [plt.Line2D([], [], marker='o', ls='', color=colours[n], label=n)
+                       for n in ranked]
+            axes[0].legend(handles=handles, title='Note', loc='upper left',
+                           bbox_to_anchor=(1.12, 1.), fontsize='small')
 
-        if xkey is None:
-            axes[-1].set_xlabel('Source')
+        axes[-1].set_xlabel(f'{display_name(xkey)} input' if xkey is not None
+                            else 'Source')
 
         fig.tight_layout()
         self.mapping_figure = fig
