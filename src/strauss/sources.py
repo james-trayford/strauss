@@ -623,14 +623,11 @@ class Source:
         return (np.array(mapvals)%amax)/amax
 
     def input_to_param(self, key):
-        """The function taking input data to the parameter it is mapped to.
+        """The function converting input data to a sound parameter.
 
-        Composes the mapping already applied to `key` - its mapping
-        functions, the fold for a spatial angle, clipping to its input
-        limits and rescaling to its parameter limits - as a function of
-        the input value alone, for showing the mapping or converting
-        further values by it. Only meaningful once
-        :meth:`apply_mapping_functions` has fixed those limits.
+        Produces the functional form for mapping of`key` as a function 
+        of the input value alone, for showing the mapping or converting
+        values by it. 
 
         Args:
           key (:obj:`str`): the mapped quantity
@@ -651,10 +648,7 @@ class Source:
             if key in spatial_angles and key not in self.map_lims:
                 mapvals = self._fold_angle(key, mapvals)
             mapvals = np.asarray(mapvals, dtype=float)
-            # descale by the input limits and rescale to the parameter's, as
-            # `rescale_values` does for the data - but by these limits
-            # whatever the number of values, where that takes a single value
-            # as a fraction already
+            # Rescale to the parameter's `plim` limits
             if hi == lo:
                 return np.full(mapvals.shape, float(plo))
             descale = np.clip((mapvals - lo) / (hi - lo), 0, 1)

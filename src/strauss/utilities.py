@@ -759,9 +759,7 @@ class MinPixelLocator(Locator):
     A secondary axis converted from a primary one by a function has
     ticks placed evenly in its own values, which can land arbitrarily
     close together on the page where the function is steep, or run past
-    the data it describes. This wraps the axis's own locator, dropping
-    ticks closer than `min_pixels` to the last kept and any outside
-    `min_val` to `max_val`.
+    the data it describes. 
 
     Args:
       base_locator (:obj:`matplotlib.ticker.Locator`): locator to take
@@ -774,14 +772,17 @@ class MinPixelLocator(Locator):
       min_pixels (:obj:`float`): minimum separation of kept ticks
       min_val (:obj:`float`, optional): lowest tick value to keep
       max_val (:obj:`float`, optional): highest tick value to keep
+      log (:obj:`bool`, optional): place candidates by decade, as for
+        a frequency in Hz, rather than evenly
     """
     def __init__(self, base_locator, to_pixels, min_pixels=40,
-                 min_val=None, max_val=None):
+                 min_val=None, max_val=None, log=False):
         self.base_locator = base_locator
         self.to_pixels = to_pixels
         self.min_pixels = min_pixels
         self.min_val = min_val
         self.max_val = max_val
+        self.log = log
 
     def __call__(self):
         vmin, vmax = self.axis.get_view_interval()
@@ -790,6 +791,13 @@ class MinPixelLocator(Locator):
     def _candidates(self, vmin, vmax):
         if self.base_locator is not None:
             return [self.base_locator.tick_values(vmin, vmax)]
+        if self.log and vmax > 0:
+            # round numbers at each decade - then in 2s and 5s, then
+            # every step
+            from matplotlib.ticker import LogLocator
+            vmin = vmin if vmin > 0 else 1e-3*vmax
+            return [LogLocator(subs=subs, numticks=100).tick_values(vmin, vmax)
+                    for subs in ((1.,), (1., 2., 5.), tuple(range(1, 10)))]
         # from the usual density up to as dense as could ever fit
         length = abs(np.diff(self.to_pixels([vmin, vmax]))[0])
         nbins = max(int(length / (1.5*self.min_pixels)), 4)
@@ -799,17 +807,21 @@ class MinPixelLocator(Locator):
     def tick_values(self, vmin, vmax):
         # start from the usual ticks, then fill any stretch of the axis
         # left with room from progressively denser sets - so an evenly
-        # spread axis keeps its round steps, and a stretch the function
-        # stretches gains the finer round steps that fit
+        # spread axis keeps its round steps
+        if self.min_val is not None:
+            vmin = max(vmin, self.min_val)
+        if self.max_val is not None:
+            vmax = min(vmax, self.max_val)
         sets = self._candidates(vmin, vmax)
         base = np.asarray(sets[0], dtype=float)
         kept = self._prune(base)
         # only fill to the spacing the usual ticks would have had, were
         # the axis evenly spread, so that one that is stays as it was
         length = abs(np.diff(self.to_pixels([vmin, vmax]))[0])
-        spacing = max(self.min_pixels, 0.6*length/max(base.size - 1, 1))
+        nominal = length/max(base.size - 1, 1)
+        spacing = max(self.min_pixels, 0.6*nominal)
         for candidates in sets[1:]:
-            kept = self._fill(kept, np.asarray(candidates, dtype=float), spacing)
+            kept = self._fill(kept, np.asarray(candidates, dtype=float), spacing, nominal)
         return kept
 
     def _in_range(self, ticks):
@@ -819,21 +831,29 @@ class MinPixelLocator(Locator):
             ticks = ticks[ticks <= self.max_val]
         return ticks
 
-    def _fill(self, kept, candidates, spacing):
+    def _fill(self, kept, candidates, spacing, nominal):
         """Add candidates that sit `spacing` pixels clear of every kept tick.
 
         Only between kept ticks - a finer step beyond the last of them
-        reads as a change of step rather than a gap filled.
+        reads as a change of step rather than a gap filled - and only
+        into gaps well wider than the `nominal` step of the usual ticks.
         """
         candidates = self._in_range(candidates)
         if kept.size > 1:
             candidates = candidates[(candidates > kept.min()) & (candidates < kept.max())]
         if candidates.size == 0:
             return kept
-        pixels = list(np.asarray(self.to_pixels(kept), dtype=float)) if kept.size else []
-        kept = list(kept)
+        pixels = np.sort(np.asarray(self.to_pixels(kept), dtype=float))
+        # only gaps the function stretches well past the usual take
+        # finer ticks, so an evenly spread axis keeps its even steps
+        gaps = np.diff(pixels)
+        wide = gaps > 1.8*nominal
+        edges = [(pixels[i], pixels[i+1]) for i in np.flatnonzero(wide)]
+        pixels, kept = list(pixels), list(kept)
         for tick, pixel in zip(candidates, np.asarray(self.to_pixels(candidates), dtype=float)):
-            if not pixels or np.min(np.abs(np.asarray(pixels) - pixel)) >= spacing:
+            if not any(lo < pixel < hi for lo, hi in edges):
+                continue
+            if np.min(np.abs(np.asarray(pixels) - pixel)) >= spacing:
                 kept.append(tick)
                 pixels.append(pixel)
         return np.array(sorted(kept))
@@ -853,3 +873,38 @@ class MinPixelLocator(Locator):
                 last = pixel
 
         return np.array(kept)
+
+
+class EdgePrunedLocator(Locator):
+    """Tick locator dropping ticks within a margin of the view's ends.
+
+    Panels stacked end to end put the top tick label of one against
+    the bottom label of the next. This wraps a locator, dropping any
+    tick landing within a fraction of the axis of the end(s) asked for.
+
+    Args:
+      base_locator (:obj:`matplotlib.ticker.Locator`): locator to take
+        ticks from
+      upper (:obj:`float`): fraction of the view interval from its top
+        within which ticks are dropped, 0 to keep them all
+      lower (:obj:`float`): the same from its bottom
+    """
+    def __init__(self, base_locator, upper=0.1, lower=0.):
+        self.base_locator = base_locator
+        self.upper = upper
+        self.lower = lower
+
+    def set_axis(self, axis):
+        super().set_axis(axis)
+        self.base_locator.set_axis(axis)
+
+    def __call__(self):
+        vmin, vmax = self.axis.get_view_interval()
+        return self.tick_values(vmin, vmax)
+
+    def tick_values(self, vmin, vmax):
+        ticks = np.asarray(self.base_locator.tick_values(vmin, vmax), dtype=float)
+        lo, hi = min(vmin, vmax), max(vmin, vmax)
+        span = hi - lo
+        keep = (ticks <= hi - self.upper*span) & (ticks >= lo + self.lower*span)
+        return ticks[keep]
