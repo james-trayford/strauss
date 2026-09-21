@@ -22,6 +22,7 @@ from .score import Score
 from .sources import Events, Objects, set_limits
 from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
+from . import plotting
 from .utilities import (nested_dict_reassign, merge_events, rescale_values,
                         parse_level)
 
@@ -638,20 +639,89 @@ class AudioFigure:
 
         return soni.object_table(source, include_input=include_input)
 
-    def plot_mapping(self, name=None, **kwargs):
-        """Plot a sonification's mapped parameters against its input data.
+    def _mapping_columns(self, name):
+        """The sonifications a mapping plot shows, by name: one, a list
+        of them, or all where `name` is None."""
+        if name is None:
+            return dict(self.sonifications)
+        if isinstance(name, str):
+            name = [name]
+        return {n: self._get_sonification(n) for n in name}
 
-        See :meth:`strauss.sonification.Sonification.plot_mapping`, which
-        this passes any keyword arguments to.
+    def plot_mapping(self, name=None, show=True, panel_size=None,
+                     title=None, **kwargs):
+        """Plot constituent sonifications' mapped parameters against
+        their input data, with one column per sonification.
+
+        Each column is the plot of
+        :meth:`strauss.sonification.Sonification.plot_mapping` for one
+        sonification, titled by its name in this figure. Can pass
+        `plot_mapping` kwargs to modify the animation templates.
 
         Args:
-          name (`optional`, :obj:`str`): name of the sonification. Can
-            be omitted where the figure holds only one.
+          name (`optional`, :obj:`str` or :obj:`list`): name(s) of the
+            sonification(s) to plot. Otherwise, plot all.
+          show (`optional`, :obj:`bool`): display the figure once made
+          panel_size (`optional`, :obj:`tuple`): width and height of each
+            panel in inches - 4 by 2.5 for columns, otherwise the
+            sonification's default
+          title (`optional`, :obj:`str`): title across the whole figure
 
         Returns:
           fig (:obj:`matplotlib.figure.Figure`): the figure
         """
-        return self._get_sonification(name).plot_mapping(**kwargs)
+        columns = self._mapping_columns(name)
+        if len(columns) == 1:
+            (name, soni), = columns.items()
+            if panel_size is not None:
+                kwargs['panel_size'] = panel_size
+            fig = soni.plot_mapping(show=show, title=title or name, **kwargs)
+        else:
+            fig = plotting.plot_columns(columns, show, panel_size or (4.5, 2.5),
+                                        title, **kwargs)
+        self.mapping_figure = fig
+        return fig
+
+    def animate_mapping(self, name=None, fname=None, fps=30, dpi=100,
+                        highlight=0.5, preview_fps=10, max_panels=6,
+                        ffmpeg_output=False, waveform=True, **kwargs):
+        """Animate the figure's mapping plot along with its mixed audio.
+
+        Draws the figure of :meth:`plot_mapping`, and runs a playhead
+        across every column at the pace of the sonifications, as
+        :meth:`strauss.sonification.Sonification.animate_mapping` does
+        for one. The video's audio is the `AudioFigure`'s master mix. 
+        Renders the figure first if needed.
+
+        Args:
+          name (`optional`, :obj:`str` or :obj:`list`): name(s) of the
+            sonification(s). Otherwise, animate all.
+          fname (`optional`, :obj:`str`): the video filename to write. 
+            Else the animation data is returned.
+          fps, dpi, highlight, preview_fps, max_panels, ffmpeg_output,
+            waveform: as for
+            :meth:`strauss.sonification.Sonification.animate_mapping`.
+            `max_panels` applies to each column, and each column gets
+            its own sonification's waveform
+          **kwargs: passed on to :meth:`plot_mapping`
+
+        Returns:
+          anim (:obj:`matplotlib.animation.FuncAnimation`): the preview
+          animation, when no `fname` is given
+        """
+        columns = self._mapping_columns(name)
+        if len(columns) == 1:
+            (name, soni), = columns.items()
+            kwargs.setdefault('title', name)
+            return soni.animate_mapping(fname, fps, dpi, highlight, preview_fps,
+                                        max_panels, ffmpeg_output, waveform,
+                                        **kwargs)
+        if fname is not None and not self.is_rendered:
+            self.render()
+        return plotting.animate_columns(columns, self.length, self.save, fname,
+                                        fps, dpi, highlight, preview_fps,
+                                        max_panels, ffmpeg_output, waveform,
+                                        **kwargs)
 
     def list_tables(self):
         """Print the tables available from this figure.
