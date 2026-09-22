@@ -29,6 +29,19 @@ noteflats = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"]
 semitone_dict = {**dict(zip(notesharps, notecount)),
                  **dict(zip(noteflats, notecount))}
 
+def _split_note(notename):
+    """Split a scientific pitch name into its note and octave.
+
+    Args:
+      notename (:obj:`str`): e.g. 'Ab4', 'E3', 'F#2' or 'C-1'
+
+    Returns:
+      parts (:obj:`list` of :obj:`str`): the note name and octave, as
+      `['Ab', '4']`, or an empty list where the name does not parse
+    """
+    match = re.fullmatch(r"(\D+?)(-?\d+)", str(notename))
+    return list(match.groups()) if match else []
+
 def parse_note(notename):
     """ 
     Takes scientific pitch name and returns frequency in Hz.
@@ -42,7 +55,7 @@ def parse_note(notename):
     Returns:
       out (numerical): Frequency of note in Hertz
     """
-    nsplit = re.findall(r"(\D+|\d+)", notename)
+    nsplit = _split_note(notename)
     semi = semitone_dict[nsplit[0]]/12.
     octv  = int(nsplit[1])
     return tuneC0*pow(2.,semi+octv)
@@ -75,7 +88,7 @@ def rank_notes(notenames):
     return sorted(unique, key=parse_note)
 
 def valid_note(notename):
-    nsplit = re.findall("(\\D+|\\d+)", notename)
+    nsplit = _split_note(notename)
     if len(nsplit) == 2:
         if nsplit[0] in semitone_dict:
             try:
@@ -156,7 +169,7 @@ def note_to_mkey(notename):
       out (:obj:`str`): scientific pitch name, in format
         `<note><octave>`, e.g. `'E3'` or `'F#2'`
     """
-    nsplit = re.findall("(\\D+|\\d+)", notename)
+    nsplit = _split_note(notename)
     mkey = semitone_dict[nsplit[0]] + (int(nsplit[1])+1)*12
     return mkey
 
