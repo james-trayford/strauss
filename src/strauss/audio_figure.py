@@ -32,7 +32,7 @@ from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .utilities import write_audio, ffmpeg_layout
-from .tts_caption import render_caption, get_ttsMode, default_tts_voice
+from .tts_caption import render_caption
 from scipy.io import wavfile
 import IPython.display as ipd
 import subprocess as sp
@@ -465,6 +465,8 @@ class AudioFigure:
                                          param_lims=out_lims, angle_unit=angle_unit)
 
         # Set up Generator
+        # TODO: support the 'speech' generator here, which needs a way for a
+        # Style to carry the list of phrases to speak.
         gentype = style.generator.type
         
         if gentype == 'sampler':

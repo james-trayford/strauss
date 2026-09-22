@@ -7,7 +7,8 @@ from pathlib import Path
 
 generators = {'spec' : "`Spectraliser` Generator",
               'synth' : "`Synthesiser` Generator",
-              'sampler' : "`Sampler` Generator"}
+              'sampler' : "`Sampler` Generator",
+              'speech' : "`Speech` Generator"}
 
 p = Path("src", "strauss", "presets", "*", "default.yml")
 
