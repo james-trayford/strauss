@@ -51,7 +51,14 @@ class Score:
     	  notation, e.g. :obj:`[['C3','E3', 'G3'], ['C3', 'F3', 'A4']]`.
           If floats, take values as note frequency in Hz. NOTE: currently
     	  only supported in combination with the :obj:`Synthesiser`
-    	  generator class.
+    	  generator class. Strings that are not note names are read as
+          sample `aliases` (e.g. :obj:`[['kick', 'snare', 'hat']]`), naming
+          the samples of a :class:`~strauss.generator.Sampler` directly
+          (see :attr:`~strauss.generator.Sampler.aliases`). Notes are
+          ordered low to high, while aliases keep their position in the
+          chord, so `pitch` maps from the first entry to the last - e.g.
+          :obj:`['E3', 'snare', 'C3']` becomes :obj:`['C3', 'snare', 'E3']`
+          and a low `pitch` sounds C3, high E3 and in between the snare.
          length: (:obj:`str` or :obj:`float`): the length of the
           sonification. If a string, parse minutes and seconds from
     	  format 'Xm Y.Zs'. If a float, read as seconds.
@@ -76,15 +83,24 @@ class Score:
             self.note_sequence = parse_chord_sequence(chord_sequence)
 
             
-        # ensure note order is always low -> high
+        # ensure note order is always low -> high. Sample aliases have no
+        # pitch to order by, so keep their positions in the chord and
+        # order the notes across the non-aliased positions
         conforming_sequence = []
+        aliases = set()
         for chord in self.note_sequence:
-            freqs = []
-            for note in chord:
-                freqs.append(notes.parse_note(note))
-            newchord = [x for _,x in sorted(zip(freqs, chord))]
-            conforming_sequence.append(newchord)    
+            newchord = list(chord)
+            note_idxs = [i for i, n in enumerate(chord) if not is_alias(n)]
+            aliases.update(n for n in chord if is_alias(n))
+            ordered = sorted((chord[i] for i in note_idxs), key=notes.parse_note)
+            for i, note in zip(note_idxs, ordered):
+                newchord[i] = note
+            conforming_sequence.append(newchord)
         self.note_sequence = conforming_sequence
+
+        # sample aliases the score names, for the Sonification to check
+        # against its generator
+        self.aliases = sorted(aliases)
                 
         if pitch_binning in ['adaptive','uniform']:
             self.pitch_binning = pitch_binning
@@ -100,6 +116,18 @@ class Score:
         self.fracbins = np.linspace(0,1, self.nchords+1) 
         self.timebins = self.length * self.fracbins
         
+def is_alias(entry):
+    """Whether a chord entry names a sample by alias rather than a note.
+
+    Args:
+      entry (:obj:`str` or :obj:`float`): an entry of a chord
+
+    Returns:
+      alias (:obj:`bool`): True if `entry` is a string that is not in
+      scientific pitch notation
+    """
+    return isinstance(entry, str) and not notes.valid_note(entry)
+
 def parse_chord_sequence(chord_sequence):
     """ parse a chord sequence from a string
 

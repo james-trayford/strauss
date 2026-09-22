@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Sampler` samples can be named in a `Score` by *alias* rather than note, e.g.
+  `Score([['kick', 'snare', 'hat']], 10)`, with `pitch` then binning sources onto
+  the named samples as for notes. Notes and aliases can be mixed: notes are
+  ordered low to high while aliases keep their position in the chord (e.g.
+  `['E3', 'snare', 'C3']` becomes `['C3', 'snare', 'E3']`).
+  Untagged sample files (e.g. `kick.wav`) are given consecutive home notes from `C3`
+  in filename order (`assign_notes='sequential'`, or `'detect'` to place them by
+  their strongest frequency), are aliased by their filename stem, listed
+  by `Sampler.info()`, and renamed with `Sampler.set_aliases({'kick': 'C1'})`;
+  `Sampler.resolve_alias()` gives the root note an alias refer to. Scores using
+  aliases the sampler lacks, or used with a non-`Sampler` generator, raise on
+  `Sonification` construction. `Generator.supports_aliases` marks which generators
+  can play aliases, groundwork for a `Speech` generator.
+- `event_table()` gains a `sample` column, and `object_table()` an `attrs['sample']`,
+  naming the sample each source sounds when using a `Sampler`.
+- `examples/Percussion.py` demonstrating alias-based sampling with synthesised drum hits.
+
 - `plot_mapping()` methods introduced to plot mappped parameters for sonifications. This
   applies to `Sonification` and `AudioFigure` objects, with `strauss.plot_mapping()` to
   refer to the active `AudioFigure`. For a sonification, one panel is included per mapped

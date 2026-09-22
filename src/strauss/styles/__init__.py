@@ -627,6 +627,8 @@ class Style(MonitoredBaseModel):
             return value 
         
         # Could validate the chords/scales here? E.g. try to parse the chord name with pychord
+        # TODO: entries that aren't note names may be Sampler aliases (see
+        # Score) - validate against the sampler's aliases once it is loaded
 
         return value
 

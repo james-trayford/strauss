@@ -100,8 +100,14 @@ class Generator:
       audbuff (:obj:`int`): Samples per audio buffer
       preset (:obj:`dict`): Dictionary of parameters defining the
         generator.
+      supports_aliases (:obj:`bool`): whether the generator can play
+        sounds named by an alias in the :obj:`Score` (see
+        :meth:`Sampler.resolve_alias`) rather than a note.
 
     """
+    # generators whose sounds can be named by alias override this
+    supports_aliases = False
+
     def __init__(self, params={}, samprate=48000):
         """
         Args:
@@ -601,18 +607,22 @@ class Sampler(Generator):
     attribute :obj:`self.gtype = 'sampler'`.
 
     Attributes:
-      gtype (:obj:`str`): Generator type 
-    
+      gtype (:obj:`str`): Generator type
+      aliases (:obj:`dict`): name each loaded sample can be called by in
+        a :obj:`Score`, alongside the sample's home note. Defaults to the
+        filename stem (e.g. `'snare'` for `snare.wav`), and can be
+        changed with :meth:`set_aliases`.
+
     Todo:
     	* Add zone mapping for samples (e.g. allow a sample to define
           a range of notes played at different speeds).
-        * Support non-scientifically named notes? (e.g
-    	  :obj:`'cymbal'`, :obj:`'snare'`). 
         * Have sample loading defined via the preset rather than the
           :obj:`sampfiles` variable?
     """
+    supports_aliases = True
 
-    def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None):
+    def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None,
+                 assign_notes='sequential'):
         """
         Args:
           sampfiles (`required`, :obj:`str`): string pointing to samples
@@ -630,18 +640,31 @@ class Sampler(Generator):
             All `.sf2` files should contain at least one preset. When
             given default `None` value, will print available presets
             and select the first preset. Note presets are 1-indexed.
+          assign_notes (`optional`, :obj:`str`): how samples whose
+            filenames carry no note tag are given a home note. With
+            `'sequential'` (default) they take consecutive semitones from
+            `C3` in filename order, skipping any note a tagged sample has.
+            With `'detect'` the note is found from the sample's strongest
+            frequency, for tuned samples that are simply untagged.
         
         Note:
-          It is necessary to assign a note for each sample in order to
-          choose different sample based on the ``pitch`` parameter. This
-          is also the case for non-pitched sounds, following a similar
+          Each sample is assigned a home note in order to choose between
+          samples based on the ``pitch`` parameter, following a similar
           approach to a [keyboard sampler]
           (https://support.apple.com/en-lk/guide/logicpro/lgcp4eecaaff/mac)
           where each key can triggers a different chosen sample. If
           `drumset_C1.wav` is a kick drum and `drumset_D1.wav` is a snare
           drum for :obj:`Score` with `chord_sequence=[["C1", "D1"]]`, events
           mapped to a higher (lower) `pitch` will sound as snare (kick) drums.
-          
+
+          Samples whose filename carries no note tag (e.g. `kick.wav`) are
+          assigned a home note automatically (see `assign_notes`), and
+          can be named in the
+          :obj:`Score` by their `alias` instead - the filename stem by
+          default, so `chord_sequence=[["kick", "snare"]]`. See
+          :meth:`info` to list the assignments and :meth:`set_aliases`
+          to change them.
+
         """
         # default sampler preset
         self.gtype = 'sampler'
@@ -652,6 +675,10 @@ class Sampler(Generator):
         self.sf_preset = sf_preset
         self.sf_preset_name = None
         self.sf_note_range = []
+        if assign_notes not in ('sequential', 'detect'):
+            raise ValueError(f"assign_notes '{assign_notes}' not recognised, "
+                             "choose from 'sequential' or 'detect'")
+        self.assign_notes = assign_notes
         
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
@@ -886,8 +913,16 @@ class Sampler(Generator):
                 self.aliases[note] = note
             mkeys.append(mkey)
             root_notes.append(note)
+        # untagged samples are placed from C1 in the order given, unless
+        # asked to find their pitch, in which case they go at the note
+        # detected.
+        mkey = notes.note_to_mkey('C1')
         for wav in unassigned_wavs:
-            sintp, slen, mkey = process_sample(wav, self.samprate, find_pitch=True)
+            if self.assign_notes == 'detect':
+                sintp, slen, mkey = process_sample(wav, self.samprate, find_pitch=True)
+                mkey = int(np.clip(mkey, 0, 127))
+            else:
+                sintp, slen = process_sample(wav, self.samprate)
             note = notes.mkey_to_note(mkey)
             while note in self.samples:
                 mkey += 1
@@ -943,7 +978,54 @@ class Sampler(Generator):
                     self.samplens[flat_note] = self.samplens[this_note]                
         keylims[idx].append(notes.mkey_to_note(i))
         self.sampranges = dict(zip(keys, keylims))
-            
+
+    def set_aliases(self, aliases):
+        """Name loaded samples, to call them by alias in a :obj:`Score`.
+
+        Each sample may have one alias, so exiting aliases are overwritten. 
+
+        Args:
+          aliases (:obj:`dict`): keys are the new aliases, values the
+            home note of the sample each names (see :meth:`info`),
+            e.g. :obj:`{'kick': 'C1', 'snare': 'D1'}`.
+
+        Raises:
+          ValueError: if a note has no sample loaded at it, or an alias
+            already names a different sample.
+        """
+        for alias, note in aliases.items():
+            alias = str(alias)
+            if note not in self.sampdict:
+                raise ValueError(f"No sample is loaded at note '{note}' to alias as "
+                                 f"'{alias}', choose from: {[str(n) for n in self.samporder]}")
+            # a name must pick out one sample. Renaming the same sample is fine
+            taken = [n for n, a in self.aliases.items() if a == alias and n != note]
+            if taken:
+                raise ValueError(f"Alias '{alias}' already names the sample at "
+                                 f"note '{taken[0]}'")
+            if notes.valid_note(alias):
+                raise ValueError(f"Alias '{alias}' is a note name, so would be "
+                                 "read as a note in the Score")
+            self.aliases[note] = alias
+
+    def resolve_alias(self, alias):
+        """Find the root note of the sample an alias names.
+
+        Args:
+          alias (:obj:`str`): alias of a loaded sample
+
+        Returns:
+          note (:obj:`str`): the sample's root note
+
+        Raises:
+          ValueError: if no loaded sample has this alias.
+        """
+        for note, name in self.aliases.items():
+            if name == alias:
+                return note
+        raise ValueError(f"Sampler has no sample aliased '{alias}', choose "
+                         f"from: {sorted(self.aliases.values())}")
+
     def info(self, pretty=True):
         """
         Print info about the sampler set-up
