@@ -14,8 +14,9 @@ Todo:
 """
 
 from .stream import Stream
-from .notes import notes_to_freqs, rank_notes
+from .notes import notes_to_freqs, rank_notes, note_to_mkey
 from .channels import audio_channels
+from .score import is_alias
 from .sources import (Events, Objects, spatial_angles, display_name,
                       param_converters, param_lim_dict)
 from .utilities import decimals_for_range
@@ -117,6 +118,21 @@ class Sonification:
         # sonification owns an instance of the Generator
         self.generator = generator
 
+        # any sample aliases named in the score must be sounds the
+        # generator has, or every source would fail at render
+        aliases = getattr(self.score, 'aliases', [])
+        if aliases:
+            if not self.generator.supports_aliases:
+                raise ValueError(f"Score names samples by alias {aliases}, "
+                                 f"but the '{self.generator.gtype}' generator "
+                                 "does not support aliases.")
+            known = set(self.generator.aliases.values())
+            unknown = [a for a in aliases if a not in known]
+            if unknown:
+                raise ValueError(f"Score uses sample aliases {unknown} that "
+                                 "aren't loaded, choose from: "
+                                 f"{sorted(known)}")
+
         # the Sources handle the data, and so decide what is
         # interpolated and which events sound - from here these
         # instructions are taken to part-mute or drop sources.
@@ -168,6 +184,11 @@ class Sonification:
           As in :meth:`render`, sources with no `time` mapping are all
           assumed to start at zero and last the full sonification.
 
+        Note:
+          Where the score names a sample by alias, the note returned is
+          the root note of that sample (see
+          :meth:`~strauss.generator.Sampler.resolve_alias`).
+
         Returns:
           notes (:obj:`list(str)`): note played by each source, in
             scientific pitch notation (e.g. :obj:`'A4'`)
@@ -199,7 +220,11 @@ class Sonification:
         for source in range(self.sources.n_sources):
             chord = self.score.note_sequence[cbin[source]]
             nints = self.score.nintervals[cbin[source]]
-            notes.append(chord[int(pitchfrac[source] * nints)])
+            entry = chord[int(pitchfrac[source] * nints)]
+            if is_alias(entry):
+                # a sample named by alias plays at its home note
+                entry = self.generator.resolve_alias(entry)
+            notes.append(entry)
 
         # mapped time is a fraction of the sonification length
         times = np.array(self.sources.mapping['time']) * self.score.length
@@ -526,6 +551,8 @@ class Sonification:
           pitch, so sorting or ranking it puts low notes before high
           ones whatever their names, and the frequency of each row's
           note in Hz is kept in the table's `attrs['note_frequency']`.
+          For a :class:`~strauss.generator.Sampler`, a `sample` column
+          names the sample each row sounds, by its alias.
 
         Args:
           include_input (`optional`, :obj:`bool`): if True, also give the
@@ -546,6 +573,11 @@ class Sonification:
         table = {'source': self.sources.names,
                  'time': self._display_values('time', times),
                  'note': notes}
+
+        # sampler's sounds can be named, so say which is used
+        samples = self._sample_names(notes)
+        if samples is not None:
+            table['sample'] = samples
 
         # flag the events sounding using interpolated values
         if (self.sources.nan_mask is not None) and np.any(self.sources.nan_mask):
@@ -678,8 +710,38 @@ class Sonification:
         table.attrs['source'] = self.sources.names[index]
         table.attrs['note'] = notes[index]
         table.attrs['note_frequency'] = float(notes_to_freqs([notes[index]])[0])
+        samples = self._sample_names([notes[index]])
+        if samples is not None:
+            table.attrs['sample'] = samples[0]
 
         return table
+
+    def _sample_names(self, notes):
+        """Name the alias for each note, given a generator has them.
+
+        Args:
+          notes (:obj:`list(str)`): notes in scientific pitch notation
+
+        Returns:
+          samples (:obj:`list(str)` or :obj:`None`): the alias of the
+          sample each note plays, or None where the generator does not
+          play aliased samples
+        """
+        if not self.generator.supports_aliases:
+            return None
+        aliases = self.generator.aliases
+        if not aliases:
+            return list(notes)
+        # a note between the samples' root notes plays the nearest sample
+        # (as assigned by the sampler's fill_midi), compared by midi number
+        # so sharps and flats agree
+        root_notes = list(aliases.keys())
+        root_mkeys = np.array([note_to_mkey(n) for n in root_notes])
+        samples = []
+        for note in notes:
+            nearest = np.abs(root_mkeys - note_to_mkey(note)).argmin()
+            samples.append(aliases[root_notes[nearest]])
+        return samples
 
     def fixed_table(self, source=None):
         """Tabulate parameters the user did not map.

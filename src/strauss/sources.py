@@ -120,6 +120,7 @@ param_names = {'polar': 'Polar Angle',
                'pitch_lfo/amount': 'Pitch LFO Amount',
                # not mapped parameters, but reported alongside them
                'note': 'Note',
+               'sample': 'Sample',
                'source': 'Source',
                'note_length': 'Note Length'}
 
