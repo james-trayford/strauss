@@ -41,6 +41,9 @@ import logging
 from sf2utils.sf2parse import Sf2File
 from pathlib import Path
 import os
+import re
+import hashlib
+from .tts_caption import render_caption, get_ttsMode, TTSIsNotSupported
 
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message=r"Chunk \(non-data\) not understood, skipping it\.")
@@ -1035,11 +1038,16 @@ class Sampler(Generator):
             bfl, bfr = "\033[1m", "\033[0m"
         else:
             bfl, bfr = '',''
-        if self.sampsource == 'directory':
+        if self.sampsource in ('directory', 'speech'):
 
-            print(f"{bfl}Sample Assignment:{bfr}\n")
-
-            titles = ['Number', 'Home Pitch', 'File Name', 'Note Range', 'Alias']
+            if self.sampsource == 'speech':
+                print(f"{bfl}Phrase Assignment:{bfr}")
+                print(f"Engine: \t {self.engine}")
+                print(f"Voice: \t\t {self.voice if self.voice is not None else 'default'}\n")
+                titles = ['Number', 'Home Pitch', 'Note Range', 'Phrase']
+            else:
+                print(f"{bfl}Sample Assignment:{bfr}\n")
+                titles = ['Number', 'Home Pitch', 'File Name', 'Note Range', 'Alias']
             maxchars = []
             for i in range(len(titles)):
                 maxchars.append(len(titles[i]))
@@ -1049,6 +1057,9 @@ class Sampler(Generator):
                 note = self.samporder[i]
                 fname = Path(self.sampdict[note]).name
                 line = [f"{i+1}.",f"{note}",f"{fname}",f"{' - '.join(self.sampranges[note])}", f"\"{self.aliases[note]}\""]
+                if self.sampsource == 'speech':
+                    # the filename is just the cache entry, so name the phrase
+                    line.pop(2)
                 for j in range(len(line)):
                     maxchars[j] = max(maxchars[j], len(line[j]))
                 lines.append(line)
@@ -1218,6 +1229,268 @@ class Sampler(Generator):
             sstream.filt_sweep(getattr(filters, params['filter_type']),
                                utils.const_or_evo_func(params['cutoff']))
         return sstream    
+
+class Speech(Sampler):
+    """Speech generator class
+
+    This generator class speaks phrases, rendering each with
+    text-to-speech (see :obj:`strauss.tts_caption`) and playing the
+    resultant audio via the :obj:`Sampler` machinery it inherits - so
+    the same envelope, filter, LFO and spatialisation handling applies.
+    Phrases are named in the :obj:`Score` by `alias`, i.e. the phrase
+    itself. Has attribute :obj:`self.gtype = 'speech'`.
+
+    Example:
+      ::
+
+        gen = Speech(['a red giant', 'a white dwarf'])
+        score = Score([['a red giant', 'a white dwarf']], 10)
+
+    Attributes:
+      gtype (:obj:`str`): Generator type
+      phrases (:obj:`list(str)`): the phrases loaded, in the order given
+      voice: the text-to-speech voice used, or :obj:`None` for the
+        current engine's default
+      engine (:obj:`str`): name of the text-to-speech engine used
+      cache_dir (:obj:`Path`): directory rendered phrases are cached in
+      aliases (:obj:`dict`): the phrase each loaded sample is called by
+        in a :obj:`Score`, alongside its root note
+
+    Todo:
+        * Support :obj:`Style` construction, which needs a way to carry
+          a phrase list.
+    """
+    supports_aliases = True
+
+    def __init__(self, phrases, params=None, samprate=48000, voice=None,
+                 cache_dir=None):
+        """
+        Args:
+          phrases (`required`, :obj:`list(str)`): the phrases to speak,
+            each of which becomes a sample that can be named in a
+            :obj:`Score`.
+          params (`optional`, :obj:`dict`): any generator parameters
+            that differ from the generator :obj:`preset`, where keys and
+            values are parameters names and values respectively.
+          samprate (`optional`, :obj:`int`): the sample rate of
+            the generated audio in samples per second (Hz)
+          voice (`optional`): text-to-speech voice, passed to
+            :meth:`strauss.tts_caption.render_caption` as its `model`
+            (see :meth:`strauss.tts_caption.getVoices`). :obj:`None`
+            (default) uses the current engine's default voice.
+          cache_dir (`optional`, :obj:`str`): where rendered phrases are
+            cached, by default :obj:`"~/.cache/strauss/speech"` (or
+            :obj:`$XDG_CACHE_HOME`, where set).
+
+        Raises:
+          TTSIsNotSupported: if no text-to-speech engine is installed.
+          ValueError: if `phrases` is empty, contains an empty phrase,
+            or more distinct phrases than there are notes to place them
+            at.
+
+        Note:
+          Phrases are placed at consecutive semitones from `C1` in the
+          order given, so `pitch` maps low to high onto the phrase list
+          - the same order the :obj:`Score` reads aliases in. Phrases
+          are compared case-insensitively, so `'Hello'` and `'hello'`
+          name the same sample; repeats are dropped, so each distinct
+          phrase is rendered once.
+
+        """
+        if get_ttsMode() == 'None':
+            raise TTSIsNotSupported(
+                "the 'speech' generator needs a text-to-speech engine.\n"
+                "Install one with 'pip install strauss[speech]', or see the\n"
+                "strauss.tts_caption module for the engines supported.")
+
+        if isinstance(phrases, str):
+            raise ValueError("'phrases' should be a list of strings to speak, "
+                             f"not a single string ('{phrases}')")
+        phrases = [str(p).strip() for p in phrases]
+        if not phrases:
+            raise ValueError("'phrases' is empty, provide at least one phrase "
+                             "to speak")
+        if not all(phrases):
+            raise ValueError("'phrases' contains an empty phrase")
+        # a phrase names one sample, so repeats are simply dropped (each
+        # is only worth rendering once), keeping the order first given
+        seen = {}
+        for phrase in phrases:
+            seen.setdefault(phrase.lower(), phrase)
+        phrases = list(seen.values())
+
+        # default speech preset
+        self.gtype = 'speech'
+        self.preset = getattr(presets, self.gtype).load_preset()
+        self.preset['ranges'] = getattr(presets, self.gtype).load_ranges()
+        self.sampsource = 'speech'
+        self.sampfiles = None
+        self.sf_preset = None
+        self.sf_preset_name = None
+        self.sf_note_range = []
+        self.assign_notes = 'sequential'
+
+        self.phrases = phrases
+        self.voice = voice
+        self.engine = get_ttsMode()
+        if cache_dir is None:
+            cache_dir = Path(os.environ.get('XDG_CACHE_HOME',
+                                            Path.home() / '.cache'),
+                             'strauss', 'speech')
+        self.cache_dir = Path(cache_dir)
+
+        # universal initialisation for generator objects:
+        super(Sampler, self).__init__(params, samprate)
+
+        # phrases are the aliases the Score names samples by
+        self.aliases = {}
+
+        # place phrases at consecutive semitones from C1
+        mkey0 = notes.note_to_mkey('C1')
+        if len(phrases) > 128 - mkey0:
+            raise ValueError(f"{len(phrases)} phrases is more than the "
+                             f"{128-mkey0} notes available from 'C1' to place "
+                             "them at")
+        root_notes = [notes.mkey_to_note(mkey0+i) for i in range(len(phrases))]
+
+        # render each phrase up front, then load as any other samples
+        self.sampdict = {}
+        for note, phrase in zip(root_notes, phrases):
+            self.sampdict[note] = self._render_phrase(phrase)
+        self.load_samples()
+
+        # ...and name them by phrase rather than the cache filename
+        self.aliases = dict(zip(root_notes, phrases))
+
+    def _phrase_path(self, phrase):
+        """Path a phrase's rendered audio is cached at.
+
+        Args:
+          phrase (:obj:`str`): phrase to be spoken
+
+        Returns:
+          path (:obj:`Path`): the wav file path, which may not exist yet
+        """
+        if isinstance(self.voice, dict):
+            voicekey = json.dumps(self.voice, sort_keys=True, default=str)
+        else:
+            voicekey = str(self.voice)
+        # the sample rate is part of the key as phrases are cached
+        # already resampled to it
+        key = '|'.join([self.engine, voicekey, str(self.samprate),
+                        phrase.lower()])
+        digest = hashlib.sha1(key.encode('utf-8')).hexdigest()[:12]
+        slug = re.sub(r'\W+', '-', voicekey).strip('-')[:24] or 'default'
+        return Path(self.cache_dir, f"{self.engine}_{slug}_{digest}.wav")
+
+    def _render_phrase(self, phrase):
+        """Render a phrase to audio via text-to-speech, if not cached.
+
+        Args:
+          phrase (:obj:`str`): phrase to be spoken
+
+        Returns:
+          path (:obj:`str`): wav file of the spoken phrase, at the
+          generator's sample rate
+        """
+        path = self._phrase_path(phrase)
+        if path.exists():
+            return str(path)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # atomic copy to avoid partial renders from interrupted render
+        tmp = path.with_name(f"{path.stem}-tmp{os.getpid()}.wav")
+        try:
+            render_caption(phrase, self.samprate, self.voice, str(tmp))
+            os.replace(tmp, path)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+        return str(path)
+
+    def clear_cache(self, all_phrases=False):
+        """Remove cached audio for this generator's phrases.
+
+        Args:
+          all_phrases (`optional`, :obj:`bool`): when :obj:`True`,
+            remove every phrase cached in :obj:`cache_dir`, not just
+            those this generator loaded.
+
+        Returns:
+          removed (:obj:`int`): number of cached files removed
+        """
+        if all_phrases:
+            paths = sorted(self.cache_dir.glob('*.wav'))
+        else:
+            paths = [self._phrase_path(p) for p in self.phrases]
+        removed = 0
+        for path in paths:
+            if path.exists():
+                path.unlink()
+                removed += 1
+        return removed
+
+    def fill_midi(self):
+        """Assign a phrase to every midi note, without pitch shifting.
+
+        As :meth:`Sampler.fill_midi`, but each note plays its nearest
+        phrase as rendered rather than a varispeed copy of it - a
+        phrase spoken faster or slower by note would be a different
+        phrase. Deliberate shifts are still available via the
+        `pitch_shift` parameter.
+        """
+        keys = np.array(list(self.samples.keys()))
+        assigned_mkey = np.array([notes.note_to_mkey(k) for k in keys])
+        keysort = np.argsort(assigned_mkey)
+        assigned_mkey = assigned_mkey[keysort]
+        keys = keys[keysort]
+        idx = 0
+        keylim = keys[0]
+        keylims = [['C-1']]
+        for i in range(128):
+            neardx = abs(i - assigned_mkey).argmin()
+            this_note = notes.mkey_to_note(i)
+            nearkey = keys[neardx]
+            if nearkey != keylim:
+                keylims[idx].append(notes.mkey_to_note(i-1))
+                idx += 1
+                keylims.append([])
+                keylims[idx].append(this_note)
+                keylim = nearkey
+            if this_note != nearkey:
+                # the same sample, at the same speed
+                self.samples[this_note] = self.samples[nearkey]
+                self.samplens[this_note] = self.samplens[nearkey]
+            if this_note[1] == '#':
+                # if a sharp, also assign flat...
+                flat_note = notes.noteflats[i%12]+this_note[2:]
+                if flat_note != nearkey:
+                    # avoid recursion assigning reference to itself!
+                    self.samples[flat_note] = self.samples[this_note]
+                    self.samplens[flat_note] = self.samplens[this_note]
+        keylims[idx].append(notes.mkey_to_note(i))
+        self.sampranges = dict(zip(keys, keylims))
+
+    def resolve_alias(self, alias):
+        """Find the root note of the sample a phrase names.
+
+        As :meth:`Sampler.resolve_alias`, but phrases are matched
+        case-insensitively.
+
+        Args:
+          alias (:obj:`str`): phrase naming a loaded sample
+
+        Returns:
+          note (:obj:`str`): the sample's root note
+
+        Raises:
+          ValueError: if no loaded sample speaks this phrase.
+        """
+        for note, phrase in self.aliases.items():
+            if phrase.lower() == str(alias).strip().lower():
+                return note
+        raise ValueError(f"Speech generator has no phrase '{alias}', choose "
+                         f"from: {sorted(self.aliases.values())}")
+
 
 class Spectralizer(Generator):
     """Spectralizer generator class

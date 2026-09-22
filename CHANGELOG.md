@@ -45,6 +45,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plotting uses new `utilities.MinPixelLocator` to decide on where to put ticks, useful
   given axes can be significantly distorted. 
 
+- `Speech` generator, speaking a list of phrases, e.g.
+  `Speech(['a red giant', 'a white dwarf'])` with the phrases named in the `Score`
+  (`Score([['a red giant', 'a white dwarf']], '0m 10s')`), so `pitch` chooses which
+  phrase each source speaks. Phrases are rendered with text-to-speech up front and
+  cached under `~/.cache/strauss/speech` (`cache_dir` to change, `clear_cache()` to
+  drop), then played through the `Sampler` machinery it subclasses, so envelopes,
+  filters, LFOs and spatialisation all apply. Phrases are never bent by note - each
+  key plays the nearest phrase as rendered - though `pitch_shift` still works if a
+  deliberate shift is wanted. Pick the voice with `Speech(..., voice=...)`. Not yet
+  available via a `Style`.
+- `examples/Speech.py` demonstrating spoken-phrase sonification.
+- `kokoro` text-to-speech engine for captions, alongside `coqui-tts` and `pyttsx3`. The best
+  installed engine is used (in that order), or pick one with `tts_caption.set_engine()`.
+  Engines load on first caption render rather than at import. `pip install strauss[AI-TTS]`
+  now installs `kokoro` (and `coqui-tts` on python < 3.13); `[kokoro]` and `[coqui]` extras
+  install one or the other. `tts_caption.getVoices()` lists the current engine's voices.
+
+### Changed
+
+- The text-to-speech extra is now `pip install strauss[speech]`, with `[TTS]` and
+  `[AI-TTS]` kept as aliases installing exactly the same engines.
+- `Sonification(ttsmodel=...)` defaults to `None`, resolved to the current engine's default
+  voice at render time, so `set_engine()` after import takes effect.
 
 ## v1.5
 

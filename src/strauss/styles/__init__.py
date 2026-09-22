@@ -248,6 +248,8 @@ class Mapping(MonitoredBaseModel):
 class GeneratorStyle(MonitoredBaseModel):
 
     # Generator type - defaults to Synthesizer 
+    # TODO: add 'speech' once a Style can carry the phrases to speak (see
+    # the generator set-up in audio_figure.py)
     type: Literal['sampler', 'synthesizer', 'synth', 'spectralizer'] = Field(
         default='synthesizer',
         title='Generator Type',
