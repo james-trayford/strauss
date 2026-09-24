@@ -85,7 +85,13 @@ Strauss uses the best engine it finds at import, preferring :code:`kokoro`, then
    from strauss import tts_caption
    tts_caption.set_engine('kokoro')
    tts_caption.getVoices(info=True)
-   
+
+A :code:`kokoro` voice is named :code:`<language><gender>_<name>`, so :code:`'af_heart'` is an
+American female voice and :code:`'bf_emma'` a British female one. See the voice list at:
+`hexgrad/Kokoro-82M VOICES.md <https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md>`_.
+A voice is chosen per caption with :code:`Sonification(ttsmodel='af_heart')`, and for spoken
+sources with :code:`Speech(voice='af_heart')`.
+
 Example jupyter notebooks/scripts
 *********************************
 

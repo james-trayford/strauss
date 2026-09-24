@@ -6,7 +6,7 @@ and its animation, and the same across the columns of an
 (or the figure's sonifications) rather than living on it, so the
 figure and the sonification share the one drawing.
 """
-from .sources import Events, display_name, quiet_db
+from .sources import Events, display_name, quiet_db, categorical
 from .notes import rank_notes
 from .utilities import is_notebook, MinPixelLocator, EdgePrunedLocator
 import numpy as np
@@ -129,6 +129,11 @@ def _mapping_forward(soni, key):
       forward (:obj:`callable`): takes input values to reported ones
       unit (:obj:`str`): the unit they are reported in
     """
+    if key in categorical:
+        raise NotImplementedError(
+            f"'{key}' values are labels naming a sound, so there is no "
+            "mapping from input values to plot.")
+
     to_param = soni.sources.input_to_param(key)
 
     if key in ('time', 'time_evo'):
@@ -686,6 +691,14 @@ def mapping_spec(soni, colour_notes=False, per_source=False):
     if 'spectrum' in keys:
         # a spectrum is data across frequency rather than across time
         keys.remove('spectrum')
+    # TODO: a categorical mapping wants a panel of its own, with the
+    # labels down a discrete axis. The related job is to plot scored
+    # aliases as pitch, ticking the axis with the chord's entries
+    # ('kick', 'snare', ...) - which _secondary_axis already does, and
+    # which needs a pitchless ordering in place of rank_notes below.
+    categorical_keys = [k for k in keys if k in categorical]
+    for k in categorical_keys:
+        keys.remove(k)
 
     # a parameter that doesn't change over the sonification - the same
     # for every event, or not evolving for any object - has nothing to
@@ -697,8 +710,13 @@ def mapping_spec(soni, colour_notes=False, per_source=False):
         print("Constant over the sonification, so not plotted: "
               + ', '.join(display_name(k) for k in constant))
     if not keys:
+        extra = ""
+        if categorical_keys:
+            extra = (" Mappings requesting sounds by name ("
+                     + ', '.join(f"'{k}'" for k in categorical_keys)
+                     + ") not supported in plots yet.")
         raise Exception("No mapped parameters that vary over the "
-                        "sonification to plot against the input.")
+                        "sonification to plot against the input." + extra)
 
     # objects are lines over time - a parameter that doesn't evolve
     # is broadcast down their tables, so draws as a flat one - and
@@ -707,12 +725,22 @@ def mapping_spec(soni, colour_notes=False, per_source=False):
     per_source = per_source and not is_events and not by_source
     n_panels = sources.n_sources if per_source else 1
 
-    # each event, or each object, may be coloured by the note it sounds
-    if is_events:
+    # each event, or each object, may be coloured by the note it sounds -
+    # where its sounds have one to rank them by
+
+    if not soni.generator.sounds_have_pitch or categorical_keys:
+        if colour_notes:
+            raise NotImplementedError(
+                "'colour_notes' ranks sources by the pitch they sound, which "
+                f"the '{soni.generator.gtype}' generator's sounds do not have.")
+        notes = np.array([''] * len(tables[0] if is_events else tables))
+        ranked = []
+    elif is_events:
         notes = tables[0]['Note'].to_numpy().ravel().astype(str)
+        ranked = rank_notes(notes)
     else:
         notes = np.array([t.attrs['note'] for t in tables], dtype=str)
-    ranked = rank_notes(notes)
+        ranked = rank_notes(notes)
     note_colours = {n: plt.get_cmap('viridis')(i/max(len(ranked)-1, 1))
                     for i, n in enumerate(ranked)}
     cycle = MAPPING_COLOURS
