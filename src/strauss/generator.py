@@ -1279,12 +1279,12 @@ class Speech(Sampler):
     sounds_have_pitch = False
 
     # a spoken phrase is taken to have begun where it first rises above
-    # this fraction of its peak, with `_trim_pad` seconds kept either side
-    _trim_level = 0.01
-    _trim_pad = 0.02
+    # this level in dB relative to full scale, and ended where it last
+    # falls below it
+    _trim_db = -50.
 
     def __init__(self, phrases=None, params=None, samprate=48000, voice=None,
-                 cache_dir=None, trim=True):
+                 cache_dir=None):
         """
         Args:
           phrases (`optional`, :obj:`list(str)`): the phrases to say,
@@ -1306,20 +1306,21 @@ class Speech(Sampler):
           cache_dir (`optional`, :obj:`str`): where rendered phrases are
             cached, by default :obj:`"~/.cache/strauss/speech"` (or
             :obj:`$XDG_CACHE_HOME`, where set).
-          trim (`optional`, :obj:`bool`): cut silence a text-to-speech
-            engine leaves around a phrase, so that a source is *heard* at
-            the time it sounds. :obj:`True` by default - `kokoro`, for
-            one, pads about a quarter of a second in front of every
-            phrase, which would put every event that late. 
 
         Raises:
           TTSIsNotSupported: if no text-to-speech engine is installed.
-          ValueError: if `phrases` contains an empty phrase.
 
         Note:
           Phrases are placed at consecutive semitones from `C1` in the
           order given, so `pitch` maps low to high onto the phrase list
-          - the same order the :obj:`Score` reads aliases in. 
+          - the same order the :obj:`Score` reads aliases in. Empty
+          phrases are skipped, having nothing to say.
+
+        Note:
+          The silence a text-to-speech engine leaves around a phrase is
+          cut off, so that a source is *heard* at the time it sounds -
+          `kokoro`, for one, pads about a quarter of a second in front
+          of every phrase, which would put every event that late.
 
         """
         if get_ttsMode() == 'None':
@@ -1341,7 +1342,6 @@ class Speech(Sampler):
 
         self.phrases = []
         self.voice = voice
-        self.trim = trim
         self.engine = get_ttsMode()
         if cache_dir is None:
             cache_dir = Path(os.environ.get('XDG_CACHE_HOME',
@@ -1376,14 +1376,15 @@ class Speech(Sampler):
 
         Raises:
           ValueError: if `names` is a single string rather than a list
-            of them, or contains an empty phrase.
+            of them.
+
+        Note:
+          Empty phrases are skipped, having nothing to say.
         """
         if isinstance(names, str):
             raise ValueError("phrases should be a list of strings to say, "
                              f"not a single string ('{names}')")
-        names = [str(n).strip() for n in names]
-        if not all(names):
-            raise ValueError("An empty phrase was given, which cannot be spoken")
+        names = [n for n in (str(n).strip() for n in names) if n]
 
         # a phrase corresponds to one sample, so repeats are dropped (each
         # is only rendered once), keeping the order first given
@@ -1483,9 +1484,14 @@ class Speech(Sampler):
 
         Returns:
           audio (:obj:`ndarray`): the samples to sound, trimmed to the
-          phrase itself unless :obj:`trim` is False
+          phrase itself
         """
         rate, wav = wavfile.read(path)
+        # full scale for the file's sample type, for a level in dBFS
+        if np.issubdtype(wav.dtype, np.integer):
+            full_scale = float(np.iinfo(wav.dtype).max) + 1
+        else:
+            full_scale = 1.
         if wav.ndim > 1:
             wav = wav.mean(axis=1)
         wav = np.asarray(wav, dtype='float64')
@@ -1493,19 +1499,11 @@ class Speech(Sampler):
             # render_caption resamples as it writes, so this is a
             # belt-and-braces check on anything already cached
             wav = utils.resample(rate, self.samprate, wav)
-        if not self.trim:
-            return wav
-
-        peak = np.abs(wav).max()
-        if not peak:
-            return wav
-        loud = np.flatnonzero(np.abs(wav) > self._trim_level*peak)
+        threshold = full_scale * 10**(self._trim_db/20.)
+        loud = np.flatnonzero(np.abs(wav) > threshold)
         if loud.size == 0:
             return wav
-        # keep a little either side, so that a quiet consonant at the
-        # start of a phrase is not clipped off with the silence
-        pad = int(self._trim_pad*self.samprate)
-        return wav[max(0, loud[0]-pad):min(wav.size, loud[-1]+pad+1)]
+        return wav[loud[0]:loud[-1]+1]
 
     def clear_cache(self, all_phrases=False):
         """Remove cached audio for this generator's phrases.

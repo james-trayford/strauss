@@ -356,41 +356,6 @@ def suppress_stdout_stderr():
         with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
             yield (err, out)
 
-def get_supported_coqui_voices():
-    """Show supported Coqui-AI TTS voices
-    
-    """
-    voices = []
-
-    jenny = {"id": Path('tts_models', 'en', 'jenny', 'jenny'),
-             "name": 'jenny',
-             "languages": ['en_GB'],
-             "age": None}
-    
-    voices.append(jenny)
-
-    vits = {"id": Path('tts_models', '{iso_code}', 'fairseq', 'vits'),
-            "name": 'fairseq-{iso_code}',
-            "languages": ['many (https://dl.fbaipublicfiles.com/mms/tts/all-tts-languages.html for iso codes)'],
-            "age": None}
-
-    voices.append(vits)
-
-    vits_ita = {"id": Path('tts_models', 'it', 'mai_female', 'glow-tts'),
-                "name": 'mai',
-                "languages": ['it_IT'],
-                "age": None}
-
-    voices.append(vits_ita)
-
-    thorsten = {"id": Path('tts_models', 'de', 'thorsten', 'vits'),
-                "name": 'thorsten',
-                "languages": ['de_DE'],
-                "age": None}
-
-    voices.append(thorsten)
-
-    return voices
 
 def merge_events_original(duration, max_rate, time, arglist):
     nevents = len(time)

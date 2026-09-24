@@ -7,7 +7,6 @@ and its animation, and the same across the columns of an
 figure and the sonification share the one drawing.
 """
 from .sources import Events, display_name, quiet_db, categorical
-from .notes import rank_notes
 from .utilities import is_notebook, MinPixelLocator, EdgePrunedLocator
 import numpy as np
 import matplotlib.pyplot as plt
@@ -640,12 +639,12 @@ def _mapping_tables(soni):
             for i in range(soni.sources.n_sources)]
 
 
-def plot_mapping(soni, show=True, panel_size=(4.5, 2.5), colour_notes=False,
-                 min_tick_points=20, title=None, per_source=False,
-                 group_gap=0.35, dark=True, waveform=False):
+def plot_mapping(soni, show=True, panel_size=(4.5, 2.5), min_tick_points=20,
+                 title=None, per_source=False, group_gap=0.35, dark=True,
+                 waveform=False):
     """Draw :meth:`strauss.sonification.Sonification.plot_mapping`
     for the sonification `soni`, which documents the arguments."""
-    spec = mapping_spec(soni, colour_notes, per_source)
+    spec = mapping_spec(soni, per_source)
     # a stack of panels per parameter, end to end as they share their
     # time axis, with a gap between one parameter's stack and the next
     with plt.style.context(mapping_style(dark)):
@@ -670,7 +669,7 @@ def plot_mapping(soni, show=True, panel_size=(4.5, 2.5), colour_notes=False,
     return fig
 
 
-def mapping_spec(soni, colour_notes=False, per_source=False):
+def mapping_spec(soni, per_source=False):
     """Work out what :func:`plot_mapping` draws: the tables, the
     parameters with a panel, what's plotted against, and how each
     event or object is coloured. Returned as a dict for
@@ -695,7 +694,7 @@ def mapping_spec(soni, colour_notes=False, per_source=False):
     # labels down a discrete axis. The related job is to plot scored
     # aliases as pitch, ticking the axis with the chord's entries
     # ('kick', 'snare', ...) - which _secondary_axis already does, and
-    # which needs a pitchless ordering in place of rank_notes below.
+    # which needs a pitchless ordering of the aliases.
     categorical_keys = [k for k in keys if k in categorical]
     for k in categorical_keys:
         keys.remove(k)
@@ -725,49 +724,26 @@ def mapping_spec(soni, colour_notes=False, per_source=False):
     per_source = per_source and not is_events and not by_source
     n_panels = sources.n_sources if per_source else 1
 
-    # each event, or each object, may be coloured by the note it sounds -
-    # where its sounds have one to rank them by
-
-    if not soni.generator.sounds_have_pitch or categorical_keys:
-        if colour_notes:
-            raise NotImplementedError(
-                "'colour_notes' ranks sources by the pitch they sound, which "
-                f"the '{soni.generator.gtype}' generator's sounds do not have.")
-        notes = np.array([''] * len(tables[0] if is_events else tables))
-        ranked = []
-    elif is_events:
-        notes = tables[0]['Note'].to_numpy().ravel().astype(str)
-        ranked = rank_notes(notes)
-    else:
-        notes = np.array([t.attrs['note'] for t in tables], dtype=str)
-        ranked = rank_notes(notes)
-    note_colours = {n: plt.get_cmap('viridis')(i/max(len(ranked)-1, 1))
-                    for i, n in enumerate(ranked)}
     cycle = MAPPING_COLOURS
     def colour(i):
         # events share a colour, while each object's line takes the
-        # next of the default cycle, so that the objects can be told apart
-        if colour_notes:
-            return note_colours[notes[i]]
-        # named outright, as 'C0' and so on would be read off the
+        # next of the default cycle, so that the objects can be told apart.
+        # Named outright, as 'C0' and so on would be read off the
         # default cycle once the figure is drawn outside the style
         return cycle[0] if is_events else cycle[i % len(cycle)]
     def style(i):
         # past the end of the colours, lines go dashed, then dotted
         return ['-', ':'][(i // len(cycle)) % 2]
 
-    # a legend naming what each colour is: the notes where coloured by
-    # them, else the objects (events share a colour, so need none)
-    if colour_notes and len(ranked) > 1:
-        handles = [plt.Line2D([], [], marker='o', ls='', color=note_colours[n],
-                              label=n) for n in ranked]
-    elif not is_events and not per_source and sources.n_sources > 1:
+    # a legend naming the objects by colour (events share a colour, so
+    # need none)
+    if not is_events and not per_source and sources.n_sources > 1:
         handles = [plt.Line2D([], [], color=colour(i), ls=style(i), label=names[i])
                    for i in range(sources.n_sources)]
     else:
         handles = None
     return {'keys': keys, 'tables': tables, 'xkey': xkey, 'names': names,
-            'notes': notes, 'ranked': ranked, 'colour': colour, 'style': style,
+            'colour': colour, 'style': style,
             'is_events': is_events, 'by_source': by_source,
             'per_source': per_source, 'n_panels': n_panels, 'handles': handles}
 
@@ -829,11 +805,9 @@ def animate_mapping(soni, fname=None, fps=30, dpi=100, highlight=0.5,
 
     # settle the panels before drawing, so the figure is drawn once
     spec = fit_panels(
-        mapping_spec(soni, kwargs.get('colour_notes', False),
-                           kwargs.get('per_source', False)),
+        mapping_spec(soni, kwargs.get('per_source', False)),
         max_panels,
-        lambda per_source: mapping_spec(soni, 
-            kwargs.get('colour_notes', False), per_source))
+        lambda per_source: mapping_spec(soni, per_source))
     kwargs['per_source'] = spec['per_source']
     fig = plot_mapping(soni, show=False, waveform=waveform, **kwargs)
     draw = mapping_animation(fig.mapping, highlight,
@@ -934,7 +908,7 @@ def draw_mapping(soni, fig, spec, panel_size, group_gap, min_tick_points,
     """
     sources = soni.sources
     keys, tables, xkey, names = (spec[k] for k in ('keys', 'tables', 'xkey', 'names'))
-    notes, ranked, colour, style = (spec[k] for k in ('notes', 'ranked', 'colour', 'style'))
+    colour, style = spec['colour'], spec['style']
     is_events, by_source, per_source, n_panels = (
         spec[k] for k in ('is_events', 'by_source', 'per_source', 'n_panels'))
     handles = spec['handles']
@@ -1039,8 +1013,8 @@ def draw_mapping(soni, fig, spec, panel_size, group_gap, min_tick_points,
 
         for j, ax in enumerate(group):
             if is_events:
-                colours = [colour(i) for i in range(len(notes))]
                 x = xs[0]
+                colours = [colour(i) for i in range(len(x))]
                 y, over, under = _clipped(ys[0], limits)
                 points = ax.scatter(x, y, s=4, c=colours)
                 drawn[ax].append((points, x, y, seconds[0]))
@@ -1050,7 +1024,7 @@ def draw_mapping(soni, fig, spec, panel_size, group_gap, min_tick_points,
                                             c=[c for c, o in zip(colours, oob) if o])
                         drawn[ax].append((arrows, x[oob], y[oob], seconds[0][oob]))
             elif by_source:
-                ax.scatter(xs[0], ys[0], s=10, c=[colour(i) for i in range(len(notes))])
+                ax.scatter(xs[0], ys[0], s=10, c=[colour(i) for i in range(len(xs[0]))])
                 ax.set_xlabel('Source')
                 ax.xaxis.set_major_locator(MaxNLocator(integer=True))
             elif per_source:
@@ -1235,8 +1209,8 @@ def finish_mapping(info, title_gap=0.12):
 
 
 def plot_columns(columns, show=True, panel_size=(4.5, 2.5), title=None,
-                 dark=True, group_gap=0.35, colour_notes=False,
-                 per_source=False, min_tick_points=20, waveform=False):
+                 dark=True, group_gap=0.35, per_source=False,
+                 min_tick_points=20, waveform=False):
     """Draw the mapping plots of several sonifications side by side.
 
     Each of `columns`, a dict of sonifications by name, is drawn as
@@ -1250,7 +1224,7 @@ def plot_columns(columns, show=True, panel_size=(4.5, 2.5), title=None,
       fig (:obj:`matplotlib.figure.Figure`): the figure, with the
       drawn info of each column in `fig.mapping`
     """
-    specs = {n: mapping_spec(soni, colour_notes, per_source)
+    specs = {n: mapping_spec(soni, per_source)
              for n, soni in columns.items()}
     fig = _draw_columns(columns, specs, panel_size, title, dark, group_gap,
                         min_tick_points, waveform)
@@ -1303,13 +1277,12 @@ def animate_columns(columns, duration, write_audio, fname=None, fps=30,
     for :meth:`strauss.sonification.Sonification.animate_mapping`,
     with `kwargs` passed to :func:`plot_columns`.
     """
-    colour_notes = kwargs.get('colour_notes', False)
     specs = {}
     for n, soni in columns.items():
-        spec = mapping_spec(soni, colour_notes, kwargs.get('per_source', False))
+        spec = mapping_spec(soni, kwargs.get('per_source', False))
         specs[n] = fit_panels(
             spec, max_panels,
-            lambda per_source, soni=soni: mapping_spec(soni, colour_notes, per_source),
+            lambda per_source, soni=soni: mapping_spec(soni, per_source),
             name=n)
     fig = _draw_columns(columns, specs, kwargs.get('panel_size', (4.5, 2.5)),
                         kwargs.get('title'), kwargs.get('dark', True),

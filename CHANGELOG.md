@@ -36,8 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plotted as a dashed line against its own axis. Similarly the lower and upper x axes 
   show the `time` or `time_evo` mappings.
 - Plotted values are linked to the timing tables, so these correspond exactly. Each 
-  `Object` is coloured separately, low to high, with a legend where chord changes
-  over the sonification and the notes can't label the pitch axis.
+  `Object` is coloured separately and named in a legend.
 - Table `note` columns are ordered by pitch, and tracks a new `attrs['note_frequency']` 
   to make this simple. 
 - `Sources.input_to_param(key)` stores the function converting input data to expressive
@@ -77,22 +76,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md) in the
   `tts_caption` module docs, `getVoices()`, `Speech(voice=...)`, the README and
   `docs/start.rst`.
-- `Speech` trims leading silence, so a source to improve source timing.
-  (`kokoro` pads ~0.23s in front of every phrase). Cached audio is kept as the
-  engine rendered it and the trim applied on load; `Speech(trim=False)` keeps
-  the padding TODO: Drop kwarg.
-- `kokoro` text-to-speech engine for captions, alongside `coqui-tts` and `pyttsx3`. The best
+- `Speech` always trims the silence around each phrase, to improve source timing
+  (`kokoro` pads ~0.23s in front of every phrase). A phrase starts where it first
+  rises above -50 dBFS and ends where it last falls below it. Cached audio is kept as the engine rendered it and the trim applied on load.
+- `Speech` skips empty phrases rather than raising.
+- `kokoro` text-to-speech engine for captions, alongside `pyttsx3`. The best
   installed engine is used (in that order), or pick one with `tts_caption.set_engine()`.
-  Engines load on first caption render rather than at import. `pip install strauss[AI-TTS]`
-  now installs `kokoro` (and `coqui-tts` on python < 3.13); `[kokoro]` and `[coqui]` extras
-  install one or the other. `tts_caption.getVoices()` lists the current engine's voices.
+  Engines load on first caption render rather than at import. `pip install strauss[speech]`
+  installs `kokoro`. `tts_caption.getVoices()` lists the current engine's voices.
 
 ### Changed
 
 - The text-to-speech extra is now `pip install strauss[speech]`, with `[TTS]` and
   `[AI-TTS]` kept as aliases installing exactly the same engines.
 - `Sonification(ttsmodel=...)` defaults to `None`, resolved to the current engine's default
-  voice at render time, so `set_engine()` after import takes effect.
+  voice at render time, so `set_engine()` after import takes effect. The `kokoro`
+  default voice is `bf_emma`.
+
+### Removed
+
+- The `coqui-tts` text-to-speech engine, its `[coqui]` extra and
+  `utilities.get_supported_coqui_voices()`. `kokoro` replaces it as the neural engine.
 
 ## v1.5
 

@@ -868,9 +868,9 @@ class Sonification:
                                            'origin'])
 
 
-    def plot_mapping(self, show=True, panel_size=(4.5, 2.5), colour_notes=False,
-                     min_tick_points=20, title=None, per_source=False,
-                     group_gap=0.35, dark=True, waveform=False):
+    def plot_mapping(self, show=True, panel_size=(4.5, 2.5), min_tick_points=20,
+                     title=None, per_source=False, group_gap=0.35, dark=True,
+                     waveform=False):
         """Plot each mapped parameter against the input data it came from.
 
         See :func:`strauss.plotting.plot_mapping`, which draws it.
@@ -905,8 +905,6 @@ class Sonification:
           show (`optional`, :obj:`bool`): display the figure once made
           panel_size (`optional`, :obj:`tuple`): width and height of each
             panel in inches
-          colour_notes (`optional`, :obj:`bool`): colour each event or
-            object by the note it sounds, from low to high, with a legend
           min_tick_points (`optional`, :obj:`float`): closest two ticks
             of a converted axis may sit, in points on the page
           title (`optional`, :obj:`str`): title for the figure - the
@@ -925,9 +923,9 @@ class Sonification:
         Returns:
           fig (:obj:`matplotlib.figure.Figure`): the figure
         """
-        return plotting.plot_mapping(self, show, panel_size, colour_notes,
-                                     min_tick_points, title, per_source,
-                                     group_gap, dark, waveform)
+        return plotting.plot_mapping(self, show, panel_size, min_tick_points,
+                                     title, per_source, group_gap, dark,
+                                     waveform)
 
     def animate_mapping(self, fname=None, fps=30, dpi=100, highlight=0.5,
                         preview_fps=15, max_panels=6, ffmpeg_output=False,

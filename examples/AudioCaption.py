@@ -4,7 +4,7 @@
 # ### <u> Generate a sonification with an audio caption in `strauss` </u>
 # Import the relevant modules:
 # 
-# ***Note***: you will need to have some form of python text-to-speech installed (`TTS` or `pyttsx3`) for these examples to work. See the error raised when trying to run the examples below for more info:
+# ***Note***: you will need to have some form of python text-to-speech installed (`kokoro`, via `pip install strauss[speech]`, or `pyttsx3`) for these examples to work. See the error raised when trying to run the examples below for more info:
 from strauss.sonification import Sonification
 from strauss.sources import Events
 from strauss import channels
@@ -56,7 +56,7 @@ from strauss.tts_caption import getVoices
 voices = getVoices(True)
 
 
-# Generate text-to-speech (TTS) for the caption, using the default choice of voice (`"Jenny"` for the `coqui-tts` module, OS default for `pyttsx3`)
+# Generate text-to-speech (TTS) for the caption, using the default choice of voice (`"bf_emma"` for the `kokoro` engine, OS default for `pyttsx3`)
 caption_en = 'In the following audio, a glockenspiel is used to represent stars of varying colour.'
 
 soni = Sonification(score, events, generator, system,
@@ -67,10 +67,11 @@ soni.hear()
 # We could also try an alternative model, if one's available
 caption_en = 'In the following audio, a glockenspiel is used to represent stars of varying colour.'
 
-if mode == 'coqui-tts':
+if mode == 'kokoro':
+    # a British male voice, in place of the default British female one
     soni = Sonification(score, events, generator, system,
                         caption=caption_en,
-                       ttsmodel=Path('tts_models', 'eng', 'fairseq', 'vits'))
+                        ttsmodel='bm_george')
 elif mode == 'pyttsx3':
     for v in voices[::-1]:
         #print(v.languages[0][:2])
@@ -86,25 +87,21 @@ soni.render()
 soni.hear()
 
 
-# Other TTS models are available in several languages. We can demonstrate a German voice, for example
+# Voices are available in several languages. We can demonstrate a non-English voice, for example (Italian for `kokoro`, German for `pyttsx3`)
 caption_de = "In der folgenden Tonspur wird ein Glockenspiel verwendet um Sterne mit unterschiedlichen Farben zu repräsentieren."
 
-if mode == 'coqui-tts':
-    language_index = 0 # or, pick a different index for another langauge
-    iso_codes = ['deu', 'spa', 'ita', 'pol', 'hin']
-    captions = [caption_de,
-                "En el siguiente audio, se utiliza una campana para representar estrellas de diferentes colores.",
+if mode == 'kokoro':
+    language_index = 1 # or, pick a different index for another langauge
+    # kokoro voices are named <language><gender>_<name>, the language
+    # letter choosing the pronunciation (German is not offered)
+    captions = ["En el siguiente audio, se utiliza una campana para representar estrellas de diferentes colores.",
                 "Nell'audio seguente, il suono di un campanello verra utilizzato per rappresentare stelle di diversi colori.",
-                "W następującym nagraniu dźwiękowym dzwonek reprezentuje gwiazdy w różnych kolorach.",
                 "आगे आने वाले ऑडियो में विभिन्न रंगों के तारों को दर्शाने के लिए अलग-अलग स्वरों का उपयोग किया गया है।"]
-    models = [Path('tts_models', 'de', 'thorsten', 'vits'),
-              Path('tts_models', iso_codes[1], 'fairseq', 'vits'),
-              Path('tts_models', iso_codes[3], 'fairseq', 'vits'),
-              Path('tts_models', iso_codes[4], 'fairseq', 'vits')]
+    voices = ['ef_dora', 'if_sara', 'hf_alpha']
 
     soni = Sonification(score, events, generator, system,
                         caption=captions[language_index],
-                        ttsmodel=models[language_index])
+                        ttsmodel=voices[language_index])
 elif mode == 'pyttsx3':
     # find a German-language voice...
     has_voice = 0
@@ -126,11 +123,10 @@ soni.hear()
 # **Note**: the `TTS` can behave unpredictably when using unrecognised characters or terms. Sometimes these will be mispronounced by the TTS, other times they could be skipped entirely. This can be circumvented by writing out the how symbols should be pronounced, or spelling phonetically to improve pronunciation:
 symbol_examples_en = 'The Lyman-α resonance is 1216 Å. The Lyman alpha resonance is twelve hundred and sixteen angstroms. '
 
-if mode == 'coqui-tts':
+if mode == 'kokoro':
     soni = Sonification(score, events, generator, system,
-                        caption=symbol_examples_en, 
-                        ttsmodel=Path('tts_models', 'eng', 'fairseq', 'vits'))
-    
+                        caption=symbol_examples_en)
+
 elif mode == 'pyttsx3':
     for v in voices[::-1]:
         #print(v.languages[0][:2])
