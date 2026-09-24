@@ -12,7 +12,15 @@ import time, in order of preference:
    python < 3.13 only)
 3. ``pyttsx3`` - system TTS, no model download but platform dependent
 
-The engine can be chosen explicitly with :func:`set_engine`.
+The engine can be chosen explicitly with :func:`set_engine`, and the
+voices it offers listed with :func:`getVoices`.
+
+Note:
+  The ``kokoro`` voices are named by language and gender, e.g.
+  ``'af_heart'`` (American female) or ``'bm_george'`` (British male).
+  They are described, with sample audio and quality grades, at
+  https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md -
+  :data:`_kokoro_voices` lists the English ones strauss offers.
 """
 
 from scipy.io import wavfile
@@ -39,6 +47,9 @@ _engine_default_voices = {'kokoro': 'bf_emma',
 # Kokoro ships voices on the huggingface hub rather than exposing a list, so
 # name the bundled English ones here. The first letter gives the language
 # ('a'merican or 'b'ritish English), the second the sex.
+# the English kokoro voices, named <language><gender>_<name>. The full
+# list, with sample audio and quality grades, is at
+# https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md
 _kokoro_voices = [
     {'name': 'af_heart', 'languages': ['en_US']},
     {'name': 'af_bella', 'languages': ['en_US']},
@@ -117,7 +128,7 @@ def get_default_voice():
     return default_tts_voice
 
 def getVoices(info=False):
-  '''Get available voices for text-to-speech.
+  '''Get available voices for the current text-to-speech engine.
 
   When info=True, this prints out information
   for each voice option.
@@ -127,6 +138,13 @@ def getVoices(info=False):
       by default False
       voices (:obj:`list`): List of ``pyttsx3.voice.Voice`` objects
       or ``dict`` objects.
+
+  Note:
+    For ``kokoro``, these are the English voices, named
+    ``<language><gender>_<name>`` - ``'af_heart'`` is an American
+    female voice, ``'bm_george'`` a British male one. They are
+    described, with sample audio and quality grades, at
+    https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md
 
   '''
   if ttsMode == 'pyttsx3':

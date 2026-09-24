@@ -464,6 +464,9 @@ class AudioFigure:
         _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims,
                                          param_lims=out_lims, angle_unit=angle_unit)
 
+        # TODO: Get 'call' column working. Currently as the columns are read as floats. 
+        # also need phrases to be handled correctly for score
+
         # Set up Generator
         # TODO: support the 'speech' generator here, which needs a way for a
         # Style to carry the list of phrases to speak.

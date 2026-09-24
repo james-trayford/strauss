@@ -53,7 +53,8 @@ mappable = ['polar',
             'volume_lfo/amount',
             'pitch_lfo/freq',
             'pitch_lfo/freq_shift',
-            'pitch_lfo/amount']     
+            'pitch_lfo/amount',
+            'call']     
 
 evolvable = ['polar',
              'azimuth',
@@ -68,6 +69,10 @@ evolvable = ['polar',
              'volume_lfo/amount',
              'pitch_lfo/freq_shift',
              'pitch_lfo/amount']
+
+# parameters whose data names the sound to make directly, as labels rather
+# than numbers, and so take no limits, rescaling or interpolation
+categorical = ('call',)
 
 param_limits = [(0,1),#np.pi),
                 (0,1),#2*np.pi),
@@ -92,7 +97,10 @@ param_limits = [(0,1),#np.pi),
                 (0,3),
                 (0,2)]     
 
-param_lim_dict = dict(zip(mappable, param_limits))
+# categorical parameters take no limits, so are left out of the zip - which
+# would otherwise silently truncate and mis-assign every parameter's limits
+param_lim_dict = dict(zip([p for p in mappable if p not in categorical],
+                          param_limits))
 
 
 # readable names for the mapped parameters, for tables and other output.
@@ -118,6 +126,7 @@ param_names = {'polar': 'Polar Angle',
                'pitch_lfo/freq': 'Pitch LFO Frequency',
                'pitch_lfo/freq_shift': 'Pitch LFO Frequency Shift',
                'pitch_lfo/amount': 'Pitch LFO Amount',
+               'call': 'Sound',
                # not mapped parameters, but reported alongside them
                'note': 'Note',
                'sample': 'Sample',
@@ -223,6 +232,7 @@ nan_modes = ('silent', 'interpolate')
 # envelope
 nan_zero_filled = ('spectrum',)
 
+
 def _any_nonfinite(values):
     """Test for any non-finite entry, however the values are nested.
 
@@ -300,6 +310,12 @@ class Source:
     Note:
 	`Source` isn't used directly, instead use child classes
     	`Events` or `Objects`.
+
+    Note:
+      Most mapped quantities are numbers, rescaled to the range of the
+      sound parameter they control. The `call` quantity is *categorical*
+      naming required sound, e.g. 
+      :obj:`{'call': ['kick', 'snare', 'kick']}`.
 
     Attributes:
       mapped_quantities (:obj:`list(str)`): The subset of parameters to
@@ -506,6 +522,14 @@ class Source:
             err_text += f"Please remove any incompatible parameter combinations from the input mapping.\n\n"
             errs.append(err_text)
 
+        # a categorical mapping names the sound outright, so any pitch
+        # mapping alongside it has nothing left to choose
+        for key in categorical:
+            if (key in params) and ('pitch' in params):
+                warn_text += f" - '{key}' names the sound each source makes, so the "
+                warn_text += f"'pitch' mapping is ignored. Remove 'pitch' from the "
+                warn_text += f"mapping, or '{key}' to choose sounds by pitch instead.\n"
+
         # check we know what unit angles are input in
         for ang in spatial_angles:
             if ang in self.param_lims:
@@ -577,6 +601,22 @@ class Source:
 
         return mapvals, vallims
 
+    def _category_labels(self, key):
+        """Read a categorical quantity as the labels naming each sound.
+
+        Categorical values are names, not numbers, so they take no
+        limits, rescaling or interpolation - they are simply tidied and
+        passed through to be resolved against the generator's sounds.
+
+        Args:
+          key (:obj:`str`): the mapped quantity to read
+
+        Returns:
+          labels (:obj:`list` of :obj:`str`): one label per source
+        """
+        rawvals = self._apply_map_funcs(key, self.raw_mapping[key])
+        return [str(v).strip() for v in rawvals]
+
     def _apply_map_funcs(self, key, rawvals):
         """Apply the mapping function(s) for a key, if any were given.
 
@@ -637,6 +677,10 @@ class Source:
           convert (:obj:`callable`): takes input values to mapped
           parameter values
         """
+        if key in categorical:
+            raise Exception(f"'{key}' values are labels naming a sound, not "
+                            "numbers converted to a sound parameter, so there "
+                            "is no input-to-parameter conversion for them.")
         if key not in getattr(self, 'lims', {}):
             raise Exception(f"'{key}' has no mapping limits to convert by - "
                             "run 'apply_mapping_functions' on the sources first.")
@@ -675,6 +719,24 @@ class Source:
                       "a non-finite 'time', as there is no point in the "
                       "sonification to place them at.", stacklevel=3)
         self._keep_sources(~bad)
+
+    def _drop_missing_categories(self):
+        """Discard input data with no label to name its sound with.
+
+        A categorical value names the sound a source makes, so a source
+        without one is silent. 
+        """
+        for key in categorical:
+            if key not in self.raw_mapping:
+                continue
+            bad = np.array([not (isinstance(v, str) and v.strip())
+                            for v in self.raw_mapping[key]])
+            if not bad.any():
+                continue
+            warnings.warn(f"Dropping {bad.sum()} of {self.n_sources} sources "
+                          f"with no '{key}' value, as there is no sound to "
+                          "give them.", stacklevel=3)
+            self._keep_sources(~bad)
 
     def _init_nan_mask(self):
         """Set up an empty non-finite value mask, one entry per source."""
@@ -827,6 +889,10 @@ class Source:
         # interpolate against, so those go before anything reads the time axis
         self._drop_nonfinite_times()
 
+        # likewise a source with no label has no sound to make, and is
+        # dropped before any limits are taken over the sources left
+        self._drop_missing_categories()
+
         # set up dictionaries to store the limits
         self.lims = {}
         self.plims = {}
@@ -841,6 +907,11 @@ class Source:
         self._init_nan_mask()
 
         for key in self.mapped_quantities:
+            if key in categorical:
+                # a label is not a number to take limits over or to test
+                # for missingness - see _drop_missing_categories
+                mapped[key] = self._category_labels(key)
+                continue
             mapped[key], vallims[key] = self._map_values(key)
             if key not in nan_zero_filled:
                 self._update_nan_mask(mapped[key])
@@ -862,6 +933,9 @@ class Source:
         self._warn_fully_missing()
 
         for key in self.mapped_quantities:
+            if key in categorical:
+                self.mapping[key] = list(mapped[key])
+                continue
             mapvals = mapped[key]
 
             # set parameter limits if specified
@@ -922,6 +996,9 @@ class Source:
         for key in self.mapping:
             if key == "time_evo":
                 continue
+            if key in categorical:
+                # str is iterable, so catch before doing something weird
+                continue
             if key == "spectrum":
                 # if hasattr(self.mapping[key][0][0], "__iter__"):
                 # ^ in case we want to catch and pre process multi-spectra
@@ -960,6 +1037,13 @@ class Events(Source):
           coldict (:obj:`dict`): keys are self.mapped_values, with
         	entries integer indexes for their corresponding column.
         """
+        # TODO: this reads floats only, so a categorical column (see
+        # 'categorical') cannot come in this way - use 'fromdict' for now
+        for key in coldict:
+            if key in categorical:
+                raise NotImplementedError(
+                    f"'{key}' names sounds with labels, which cannot be read "
+                    "from a file yet - use 'fromdict' to provide them.")
         data = np.genfromtxt(datafile)
         for key in self.mapped_quantities:
             self.raw_mapping[key] = data[:,coldict[key]] 
@@ -1029,6 +1113,13 @@ class Objects(Source):
         for key in self.mapped_quantities:
             if key in datadict:
                 d = datadict[key]
+                if key in categorical:
+                    # one label per object, naming the sound it makes
+                    if isinstance(d, (list, tuple, np.ndarray)) and any(
+                            isinstance(v, (list, tuple, np.ndarray)) for v in d):
+                        raise ValueError(
+                            f"'{key}' cannot evolve - each source sounds one "
+                            "thing, so give one label per object.")
                 if (type(d) is not list) and (np.array(d).ndim <= 1):
                     self.raw_mapping[key] = [d]
                 else:
