@@ -143,8 +143,8 @@ class Sonification:
                              "does not support aliases.")
 
         # a generator that can make a sound to order does so
-        if (labels or aliases) and self.generator.provisions_aliases:
-            self.generator.provision_aliases(labels + list(aliases))
+        if (labels or aliases) and self.generator.makes_aliases:
+            self.generator.make_aliases(labels + list(aliases))
 
         if aliases:
             known = set(self.generator.aliases.values())
