@@ -106,10 +106,23 @@ class Generator:
       supports_aliases (:obj:`bool`): whether the generator can play
         sounds named by an alias in the :obj:`Score` (see
         :meth:`Sampler.resolve_alias`) rather than a note.
+      makes_aliases (:obj:`bool`): whether the generator can make
+        a sound it doesn't have, when asked (see
+        :meth:`Speech.make_aliases`).
+      sounds_have_pitch (:obj:`bool`): whether the generator's sounds
+        have a  meaningful single pitch. Otherwise (for spoken
+        phrases, say), the note a sound is filed under is an internal
+        detail and is left out of the sonification tables.
 
     """
     # generators whose sounds can be named by alias override this
     supports_aliases = False
+
+    # ...and those that can make a named sound on demand, this
+    makes_aliases = False
+
+    # generators whose sounds carry no pitch to report override this
+    sounds_have_pitch = True
 
     def __init__(self, params={}, samprate=48000):
         """
@@ -1055,7 +1068,8 @@ class Sampler(Generator):
 
             for i in range(len(self.samporder)):
                 note = self.samporder[i]
-                fname = Path(self.sampdict[note]).name
+                fname = ('' if self.sampsource == 'speech'
+                         else Path(self.sampdict[note]).name)
                 line = [f"{i+1}.",f"{note}",f"{fname}",f"{' - '.join(self.sampranges[note])}", f"\"{self.aliases[note]}\""]
                 if self.sampsource == 'speech':
                     # the filename is just the cache entry, so name the phrase
@@ -1261,14 +1275,23 @@ class Speech(Sampler):
           a phrase list.
     """
     supports_aliases = True
+    makes_aliases = True
+    sounds_have_pitch = False
 
-    def __init__(self, phrases, params=None, samprate=48000, voice=None,
-                 cache_dir=None):
+    # a spoken phrase is taken to have begun where it first rises above
+    # this fraction of its peak, with `_trim_pad` seconds kept either side
+    _trim_level = 0.01
+    _trim_pad = 0.02
+
+    def __init__(self, phrases=None, params=None, samprate=48000, voice=None,
+                 cache_dir=None, trim=True):
         """
         Args:
-          phrases (`required`, :obj:`list(str)`): the phrases to speak,
-            each of which becomes a sample that can be named in a
-            :obj:`Score`.
+          phrases (`optional`, :obj:`list(str)`): the phrases to say,
+            each of which becomes a sample that can be called by in a
+            :obj:`Score` or by a `call` mapping. Where none are given,
+            the generator starts empty and generates whatever the
+            sonification asks for (see :meth:`make_aliases`).
           params (`optional`, :obj:`dict`): any generator parameters
             that differ from the generator :obj:`preset`, where keys and
             values are parameters names and values respectively.
@@ -1277,24 +1300,26 @@ class Speech(Sampler):
           voice (`optional`): text-to-speech voice, passed to
             :meth:`strauss.tts_caption.render_caption` as its `model`
             (see :meth:`strauss.tts_caption.getVoices`). :obj:`None`
-            (default) uses the current engine's default voice.
+            (default) uses the current engine's default voice. The
+            ``kokoro`` voices are described at
+            https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md
           cache_dir (`optional`, :obj:`str`): where rendered phrases are
             cached, by default :obj:`"~/.cache/strauss/speech"` (or
             :obj:`$XDG_CACHE_HOME`, where set).
+          trim (`optional`, :obj:`bool`): cut silence a text-to-speech
+            engine leaves around a phrase, so that a source is *heard* at
+            the time it sounds. :obj:`True` by default - `kokoro`, for
+            one, pads about a quarter of a second in front of every
+            phrase, which would put every event that late. 
 
         Raises:
           TTSIsNotSupported: if no text-to-speech engine is installed.
-          ValueError: if `phrases` is empty, contains an empty phrase,
-            or more distinct phrases than there are notes to place them
-            at.
+          ValueError: if `phrases` contains an empty phrase.
 
         Note:
           Phrases are placed at consecutive semitones from `C1` in the
           order given, so `pitch` maps low to high onto the phrase list
-          - the same order the :obj:`Score` reads aliases in. Phrases
-          are compared case-insensitively, so `'Hello'` and `'hello'`
-          name the same sample; repeats are dropped, so each distinct
-          phrase is rendered once.
+          - the same order the :obj:`Score` reads aliases in. 
 
         """
         if get_ttsMode() == 'None':
@@ -1302,22 +1327,6 @@ class Speech(Sampler):
                 "the 'speech' generator needs a text-to-speech engine.\n"
                 "Install one with 'pip install strauss[speech]', or see the\n"
                 "strauss.tts_caption module for the engines supported.")
-
-        if isinstance(phrases, str):
-            raise ValueError("'phrases' should be a list of strings to speak, "
-                             f"not a single string ('{phrases}')")
-        phrases = [str(p).strip() for p in phrases]
-        if not phrases:
-            raise ValueError("'phrases' is empty, provide at least one phrase "
-                             "to speak")
-        if not all(phrases):
-            raise ValueError("'phrases' contains an empty phrase")
-        # a phrase names one sample, so repeats are simply dropped (each
-        # is only worth rendering once), keeping the order first given
-        seen = {}
-        for phrase in phrases:
-            seen.setdefault(phrase.lower(), phrase)
-        phrases = list(seen.values())
 
         # default speech preset
         self.gtype = 'speech'
@@ -1330,8 +1339,9 @@ class Speech(Sampler):
         self.sf_note_range = []
         self.assign_notes = 'sequential'
 
-        self.phrases = phrases
+        self.phrases = []
         self.voice = voice
+        self.trim = trim
         self.engine = get_ttsMode()
         if cache_dir is None:
             cache_dir = Path(os.environ.get('XDG_CACHE_HOME',
@@ -1342,25 +1352,78 @@ class Speech(Sampler):
         # universal initialisation for generator objects:
         super(Sampler, self).__init__(params, samprate)
 
-        # phrases are the aliases the Score names samples by
+        # phrases are the aliases a Score or 'call' mapping names samples by
         self.aliases = {}
+        self.samples = {}
+        self.samplens = {}
+        self.sampdict = {}
+        self.samporder = []
+        self.sampranges = {}
 
-        # place phrases at consecutive semitones from C1
+        if phrases is not None:
+            self.make_aliases(phrases)
+
+    def make_aliases(self, names):
+        """Say any of the phrases the generator does not yet have.
+
+        Phrases are rendered and loaded as samples, so they can be called
+        in a :obj:`Score` or by a `call` mapping. Pre-loaded phrases are
+        kept, and rendered audio is cached, so calling repeatedly is
+        economical.
+
+        Args:
+          names (:obj:`list` of :obj:`str`): phrases to say
+
+        Raises:
+          ValueError: if `names` is a single string rather than a list
+            of them, or contains an empty phrase.
+        """
+        if isinstance(names, str):
+            raise ValueError("phrases should be a list of strings to say, "
+                             f"not a single string ('{names}')")
+        names = [str(n).strip() for n in names]
+        if not all(names):
+            raise ValueError("An empty phrase was given, which cannot be spoken")
+
+        # a phrase corresponds to one sample, so repeats are dropped (each
+        # is only rendered once), keeping the order first given
+        known = {p.lower(): p for p in self.phrases}
+        added = []
+        for name in names:
+            if name.lower() in known:
+                continue
+            known[name.lower()] = name
+            added.append(name)
+        if not added:
+            return
+
+        self.phrases = self.phrases + added
+        self._load_phrases()
+
+    def _load_phrases(self):
+        """Render and load every phrase, as a sampler loads its samples.
+
+        Phrases are placed at consecutive semitones from `C1` in the
+        order given. The notes are only labels to file the samples
+        under - a phrase is never bent to pitch - so they are allowed to
+        run past the top of the midi range where there are enough
+        phrases to need it.
+        """
         mkey0 = notes.note_to_mkey('C1')
-        if len(phrases) > 128 - mkey0:
-            raise ValueError(f"{len(phrases)} phrases is more than the "
-                             f"{128-mkey0} notes available from 'C1' to place "
-                             "them at")
-        root_notes = [notes.mkey_to_note(mkey0+i) for i in range(len(phrases))]
+        root_notes = [notes.mkey_to_note(mkey0+i)
+                      for i in range(len(self.phrases))]
 
         # render each phrase up front, then load as any other samples
         self.sampdict = {}
-        for note, phrase in zip(root_notes, phrases):
-            self.sampdict[note] = self._render_phrase(phrase)
+        self.phrase_files = {}
+        for note, phrase in zip(root_notes, self.phrases):
+            path = self._render_phrase(phrase)
+            self.phrase_files[note] = path
+            self.sampdict[note] = self._phrase_audio(path)
         self.load_samples()
 
         # ...and name them by phrase rather than the cache filename
-        self.aliases = dict(zip(root_notes, phrases))
+        self.aliases = dict(zip(root_notes, self.phrases))
 
     def _phrase_path(self, phrase):
         """Path a phrase's rendered audio is cached at.
@@ -1407,6 +1470,43 @@ class Speech(Sampler):
                 tmp.unlink()
         return str(path)
 
+    def _phrase_audio(self, path):
+        """Read a rendered phrase, with its silence cut off.
+
+        Text-to-speech engines pad a phrase with silence at either end.
+        Left in, that silence would delay every source by the same
+        amount - a quarter of a second, for `kokoro` - so that a star
+        called out on the beat is heard late.
+
+        Args:
+          path (:obj:`str`): wav file of the spoken phrase
+
+        Returns:
+          audio (:obj:`ndarray`): the samples to sound, trimmed to the
+          phrase itself unless :obj:`trim` is False
+        """
+        rate, wav = wavfile.read(path)
+        if wav.ndim > 1:
+            wav = wav.mean(axis=1)
+        wav = np.asarray(wav, dtype='float64')
+        if rate != self.samprate:
+            # render_caption resamples as it writes, so this is a
+            # belt-and-braces check on anything already cached
+            wav = utils.resample(rate, self.samprate, wav)
+        if not self.trim:
+            return wav
+
+        peak = np.abs(wav).max()
+        if not peak:
+            return wav
+        loud = np.flatnonzero(np.abs(wav) > self._trim_level*peak)
+        if loud.size == 0:
+            return wav
+        # keep a little either side, so that a quiet consonant at the
+        # start of a phrase is not clipped off with the silence
+        pad = int(self._trim_pad*self.samprate)
+        return wav[max(0, loud[0]-pad):min(wav.size, loud[-1]+pad+1)]
+
     def clear_cache(self, all_phrases=False):
         """Remove cached audio for this generator's phrases.
 
@@ -1446,7 +1546,9 @@ class Speech(Sampler):
         idx = 0
         keylim = keys[0]
         keylims = [['C-1']]
-        for i in range(128):
+        # phrases can go above midi range
+        topkey = max(127, int(assigned_mkey[-1]))
+        for i in range(topkey+1):
             neardx = abs(i - assigned_mkey).argmin()
             this_note = notes.mkey_to_note(i)
             nearkey = keys[neardx]

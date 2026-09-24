@@ -120,20 +120,54 @@ class Sonification:
         # sonification owns an instance of the Generator
         self.generator = generator
 
+        # where the the sound is named per source via 'call', 
+        # the score's chord is not read
+        calls = [str(c) for c in
+                 getattr(self.sources, 'mapping', {}).get('call', [])]
+        labels = list(dict.fromkeys(calls))
+        # whether the source calls the sound, rather than the Score
+        self._called = 'call' in getattr(self.sources, 'mapping', {})
+        if labels and not self.generator.supports_aliases:
+            raise ValueError(f"Sources map 'call' to name the sound they "
+                             f"make, but the '{self.generator.gtype}' "
+                             "generator does not name its sounds. Use a "
+                             "'sampler' or 'speech' generator, or map "
+                             "'pitch' to choose from the Score instead.")
+
         # any sample aliases named in the score must be sounds the
         # generator has, or every source would fail at render
         aliases = getattr(self.score, 'aliases', [])
+        if aliases and not self.generator.supports_aliases:
+            raise ValueError(f"Score names samples by alias {aliases}, "
+                             f"but the '{self.generator.gtype}' generator "
+                             "does not support aliases.")
+
+        # a generator that can make a sound to order does so
+        if (labels or aliases) and self.generator.provisions_aliases:
+            self.generator.provision_aliases(labels + list(aliases))
+
         if aliases:
-            if not self.generator.supports_aliases:
-                raise ValueError(f"Score names samples by alias {aliases}, "
-                                 f"but the '{self.generator.gtype}' generator "
-                                 "does not support aliases.")
             known = set(self.generator.aliases.values())
             unknown = [a for a in aliases if a not in known]
             if unknown:
                 raise ValueError(f"Score uses sample aliases {unknown} that "
                                  "aren't loaded, choose from: "
                                  f"{sorted(known)}")
+
+        # resolve each label, so an unknown one is caught
+        # here rather than mid-render. 
+        self._call_notes = {}
+        if labels:
+            unknown = []
+            for label in labels:
+                try:
+                    self._call_notes[label] = self.generator.resolve_alias(label)
+                except ValueError:
+                    unknown.append(label)
+            if unknown:
+                raise ValueError(f"Sources 'call' sounds the generator "
+                                 f"doesn't have: {unknown}, choose from: "
+                                 f"{sorted(self.generator.aliases.values())}")
 
         # the Sources handle the data, and so decide what is
         # interpolated and which events sound - from here these
@@ -202,6 +236,15 @@ class Sonification:
             self.sources.mapping['time'] = [0.] * self.sources.n_sources
             self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources
 
+        # mapped time is a fraction of the sonification length
+        times = np.array(self.sources.mapping['time']) * self.score.length
+
+        if 'call' in self.sources.mapping:
+            # skip Score specification for call
+            notes = [self._call_notes[str(c)]
+                     for c in self.sources.mapping['call']]
+            return notes, times
+
         # index each chord
         cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
         cbin = np.clip(cbin-1, 0, self.score.nchords-1)
@@ -227,9 +270,6 @@ class Sonification:
                 # a sample named by alias plays at its home note
                 entry = self.generator.resolve_alias(entry)
             notes.append(entry)
-
-        # mapped time is a fraction of the sonification length
-        times = np.array(self.sources.mapping['time']) * self.score.length
 
         return notes, times
 
@@ -282,6 +322,10 @@ class Sonification:
             # for k in self.sources.mapping.keys():
             #     sourcemap[k] = self.soures.mapping[k][source]
             nested_dict_idx_reassign(self.sources.mapping, sourcemap, source)
+
+            # the label naming the sound has done its job in choosing the
+            # note - it is not a parameter the generator plays with
+            sourcemap.pop('call', None)
 
             sourcemap['note'] = note
 
@@ -571,13 +615,19 @@ class Sonification:
 
         # each event is a source, so is named by it
         table = {'source': self.sources.names,
-                 'time': self._display_values('time', times),
-                 'note': notes}
+                 'time': self._display_values('time', times)}
 
-        # sampler's sounds can be named, so say which is used
+        # a spoken phrase, say, has no meaningful pitch - the note it
+        # is stored under dropped from user-facing table
+        report_notes = self.generator.sounds_have_pitch
+        if report_notes:
+            table['note'] = notes
+
+        # sampler's sounds can be named, so say which is used. Where the
+        # data named it, that column says it already
         samples = self._sample_names(notes)
         if samples is not None:
-            table['sample'] = samples
+            table['call' if self._called else 'sample'] = samples
 
         # flag the events sounding using interpolated values
         if (self.sources.nan_mask is not None) and np.any(self.sources.nan_mask):
@@ -586,9 +636,9 @@ class Sonification:
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':
                 continue
-            if key not in ('time', 'time_evo', 'pitch'):
-                # time and pitch are already given by the time and note
-                # of each row, in the terms actually heard
+            if key not in ('time', 'time_evo', 'pitch', 'call'):
+                # time, pitch and call are already given by the time, note
+                # and sound of each row, in the terms actually heard
                 table[key] = self._display_values(
                     key, np.asarray(self.sources.mapped_samples[key]))
             if include_input:
@@ -597,13 +647,13 @@ class Sonification:
 
         table = pd.DataFrame(table).sort_values('time', kind='stable',
                                                 ignore_index=True)
-        # notes order by pitch rather than by name, so that sorting or
-        # ranking the column puts C3 below A3 - and keep the frequency each
-        # sounds at alongside the table, for anything numerical
-        table['note'] = pd.Categorical(table['note'],
-                                       categories=rank_notes(notes), ordered=True)
+        # order by frequency not alphabetically, as octave starts at C!
+        if report_notes:
+            table['note'] = pd.Categorical(table['note'],
+                                           categories=rank_notes(notes), ordered=True)
         table = self._with_units(self._round_numbers(table))
-        table.attrs['note_frequency'] = notes_to_freqs(table['Note'].to_numpy().ravel())
+        if report_notes:
+            table.attrs['note_frequency'] = notes_to_freqs(table['Note'].to_numpy().ravel())
 
         return table
 
@@ -693,9 +743,9 @@ class Sonification:
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':
                 continue
-            if key not in ('time', 'time_evo', 'pitch'):
-                # time and pitch are already given by the time column and
-                # the note of the object, in the terms actually heard
+            if key not in ('time', 'time_evo', 'pitch', 'call'):
+                # time, pitch and call are already given by the time column
+                # and the sound of the object, in the terms actually heard
                 table[key] = self._display_values(
                     key, _down_column(self.sources.mapped_samples[key][index]))
             if include_input:
@@ -708,11 +758,13 @@ class Sonification:
 
         notes, _ = self._assign_notes()
         table.attrs['source'] = self.sources.names[index]
-        table.attrs['note'] = notes[index]
-        table.attrs['note_frequency'] = float(notes_to_freqs([notes[index]])[0])
+        # a spoken phrase has no meaningful pitch
+        if self.generator.sounds_have_pitch:
+            table.attrs['note'] = notes[index]
+            table.attrs['note_frequency'] = float(notes_to_freqs([notes[index]])[0])
         samples = self._sample_names([notes[index]])
         if samples is not None:
-            table.attrs['sample'] = samples[0]
+            table.attrs['call' if self._called else 'sample'] = samples[0]
 
         return table
 
@@ -782,8 +834,10 @@ class Sonification:
                 continue
 
             if key == 'pitch':
-                # a mapped pitch is an internal fraction, of no use to the
-                # reader - what is heard is the note it resolves to
+                if self._called or not self.generator.sounds_have_pitch:
+                    # single pitch meaningless in this case
+                    continue
+                # pitch as mapped is meaningless to the user - report note
                 notes, _ = self._assign_notes()
                 values = np.unique(notes if index is None else [notes[index]])
                 values = values.astype(str).tolist()

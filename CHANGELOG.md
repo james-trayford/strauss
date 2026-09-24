@@ -56,6 +56,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deliberate shift is wanted. Pick the voice with `Speech(..., voice=...)`. Not yet
   available via a `Style`.
 - `examples/Speech.py` demonstrating spoken-phrase sonification.
+- `call`, a *categorical* source mapping: input specifies the sound each source
+  makes, e.g. `{'call': ['a red giant', 'a white dwarf', ...]}` for a `Speech`
+  generator or `{'call': ['kick', 'snare', ...]}` for a `Sampler`. Labels are
+ requested from the generator's sounds rather than rescaled, so the `Score`'s
+  chord is not read at all (a `pitch` mapping alongside is ignored, with a
+  warning), and a source with no label is silent. Reported in `event_table()`
+  and `object_table()` as the `Sound` column, with the label as typed under
+  `include_input=True`. Not yet supported from a file, by `AudioFigure`, or in
+  `plot_mapping()`.
+- `Speech()` can be constructed with no phrases: a sonification requests
+  whatever its sources and score want, via the new `Speech.make_aliases()`
+  and `Generator.make_aliases` flag and stored aribtrarily in scientific
+  note notation (e.g. C#4).
+- `Generator.sounds_have_pitch` flags generators for which a single 'pitch'
+  is meaningful (`Speech`), whose tables now leave out the `note` column and
+  `note_frequency`, both of which were meaningless there.
+- Point to where `kokoro` voice names documented (the model's own voice
+  list, with sample audio and quality grades, at
+  https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md) in the
+  `tts_caption` module docs, `getVoices()`, `Speech(voice=...)`, the README and
+  `docs/start.rst`.
+- `Speech` trims leading silence, so a source to improve source timing.
+  (`kokoro` pads ~0.23s in front of every phrase). Cached audio is kept as the
+  engine rendered it and the trim applied on load; `Speech(trim=False)` keeps
+  the padding TODO: Drop kwarg.
 - `kokoro` text-to-speech engine for captions, alongside `coqui-tts` and `pyttsx3`. The best
   installed engine is used (in that order), or pick one with `tts_caption.set_engine()`.
   Engines load on first caption render rather than at import. `pip install strauss[AI-TTS]`

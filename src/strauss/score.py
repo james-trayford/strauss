@@ -59,6 +59,9 @@ class Score:
           chord, so `pitch` maps from the first entry to the last - e.g.
           :obj:`['E3', 'snare', 'C3']` becomes :obj:`['C3', 'snare', 'E3']`
           and a low `pitch` sounds C3, high E3 and in between the snare.
+          Where the :obj:`Sources` map `call`, the data names the sound
+          each source makes and the chord is skipped - only the
+          `length` below is used.
          length: (:obj:`str` or :obj:`float`): the length of the
           sonification. If a string, parse minutes and seconds from
     	  format 'Xm Y.Zs'. If a float, read as seconds.
