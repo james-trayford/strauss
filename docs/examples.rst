@@ -8,7 +8,7 @@ Here, we explain some of the example sonfications included in the :code:`example
 
 Audio Caption (:code:`AudioCaption.ipynb`)
 ******************************************
-The *Audio Caption* example demonstrates how to add audio captions to a sonification, using a text-to-speech (TTS) module. The TTS module is not included in the standard Strauss installation, but it can be installed by using :code:`pip install strauss[AI-TTS]`, or with the system text-to-speech module :code:`pyttsx3` (see here for more details see :ref:`tts-install`). This example uses the Strauss :code:`Sampler` to play a short sequence of glockenspiel notes, then generates an audio caption using a standard TTS voice. The notebook allows the user to try different voices and languages from TTS.
+The *Audio Caption* example demonstrates how to add audio captions to a sonification, using a text-to-speech (TTS) module. The TTS module is not included in the standard Strauss installation, but it can be installed by using :code:`pip install strauss[speech]`, or with the system text-to-speech module :code:`pyttsx3` (see here for more details see :ref:`tts-install`). This example uses the Strauss :code:`Sampler` to play a short sequence of glockenspiel notes, then generates an audio caption using a standard TTS voice. The notebook allows the user to try different voices.
 
 There are examples of audio captioning with different voices in the following spectrogram videos
 
