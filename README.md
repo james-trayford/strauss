@@ -49,7 +49,7 @@ and activate the environment with
 
 ### Installing with text-to-speech support
 
-*STRAUSS* can also be installed with text-to-speech (TTS) support, allowing audio captioning of sonifications and future accessibility features, via the [kokoro](https://pypi.org/project/kokoro/) and [coqui TTS](https://pypi.org/project/coqui-tts/) modules. Due to the specific module requirements of these, install can sometimes lead to incompatibilities with other modules and be slower, so they are packaged with *STRAUSS* as an optional extra. If you'd like to use these features, its easy to directly from PyPI:
+*STRAUSS* can also be installed with text-to-speech (TTS) support, allowing audio captioning of sonifications and future accessibility features, via the [kokoro](https://pypi.org/project/kokoro/) module. Due to the specific module requirements of this, install can sometimes lead to incompatibilities with other modules and be slower, so they are packaged with *STRAUSS* as an optional extra. If you'd like to use these features, its easy to directly from PyPI:
 
 `pip install 'strauss[speech]'`
 
@@ -60,11 +60,9 @@ or if you're working from a local copy of the repository, as above, use
 with or without the `-e` option depending on whether you want to edit the *STRAUSS* code or not, as above. 
 
 
-The best available engine is used automatically (`kokoro`, then `coqui`, then the system `pyttsx3`), or choose one with `strauss.tts_caption.set_engine('kokoro')`. To install just one engine, use the `[kokoro]` or `[coqui]` extra instead. The same extra is needed for the `Speech` generator, which speaks phrases as part of the sonification itself. `tts_caption.getVoices(info=True)` lists voices, and`kokoro` ones are described with sample audio at [hexgrad/Kokoro-82M VOICES.md](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md).
+The best available engine is used automatically (`kokoro`, then the system `pyttsx3`), or choose one with `strauss.tts_caption.set_engine('kokoro')`. The same extra is needed for the `Speech` generator, which speaks phrases as part of the sonification itself. `tts_caption.getVoices(info=True)` lists voices, and`kokoro` ones are described with sample audio at [hexgrad/Kokoro-82M VOICES.md](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md).
 
 ***Note***: `[speech]` is also available under its older names `[TTS]` and `[AI-TTS]`, which install exactly the same engines. These are an optional extra rather than a default because `kokoro` pulls in `torch`, which is a few hundred MB; the voice models themselves are only downloaded the first time you render speech.
-
-***Note***: The `coqui` AI TTS is currently supported for python versions `<= 3.12` - on `python==3.13` the `[speech]` extra installs `kokoro` only.
 
 ## Citing STRAUSS
 

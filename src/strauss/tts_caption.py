@@ -3,14 +3,12 @@
 This uses text-to-speech (TTS) to allow captions represented as strings
 to be converted to spoken audio to precede the sonification.
 
-Three TTS engines are supported, and the best available is picked at
+Two TTS engines are supported, and the best available is picked at
 import time, in order of preference:
 
 1. ``kokoro`` - neural TTS, good quality, runs offline once the model is
    downloaded (``pip install strauss[speech]``)
-2. ``coqui-tts`` - the original neural backend (``pip install strauss[speech]``,
-   python < 3.13 only)
-3. ``pyttsx3`` - system TTS, no model download but platform dependent
+2. ``pyttsx3`` - system TTS, no model download but platform dependent
 
 The engine can be chosen explicitly with :func:`set_engine`, and the
 voices it offers listed with :func:`getVoices`.
@@ -29,19 +27,16 @@ import strauss.utilities as utils
 import importlib.util
 import os
 import warnings
-from pathlib import Path
 
 # ordered by preference
-ENGINE_PREFERENCE = ('kokoro', 'coqui-tts', 'pyttsx3')
+ENGINE_PREFERENCE = ('kokoro', 'pyttsx3')
 
 # module name that must be importable for each engine
 _engine_modules = {'kokoro': 'kokoro',
-                   'coqui-tts': 'TTS',
                    'pyttsx3': 'pyttsx3'}
 
 # default voice for each engine, given to ``Sonification(ttsmodel=...)``
 _engine_default_voices = {'kokoro': 'bf_emma',
-                          'coqui-tts': Path('tts_models','en','jenny', 'jenny'),
                           'pyttsx3': {}} # i.e. system default TTS (if exists)
 
 # Kokoro ships voices on the huggingface hub rather than exposing a list, so
@@ -78,7 +73,7 @@ _no_tts_message = (
     "strauss has not been installed with text-to-speech support. \n"
     "This is not installed by default, due to some specific module requirements of the TTS modules.\n"
     "Reinstalling strauss with 'pip install strauss[speech]' will give you access to this function\n"
-    "(installing the 'kokoro' engine, and 'coqui-tts' on python < 3.13). You can also install\n"
+    "(installing the 'kokoro' engine). You can also install\n"
     "pyttsx3 to use your system's text-to-speech voices instead. Currently the most compatible\n"
     "version is not published on PyPI, but you can install from the test repo with \n"
     "'pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple/ pyttsx3==2.99'")
@@ -94,7 +89,7 @@ def set_engine(engine):
     first rendered, so switching is cheap.
 
     Args:
-      engine (:obj:`str`): one of ``'kokoro'``, ``'coqui-tts'`` or ``'pyttsx3'``
+      engine (:obj:`str`): one of ``'kokoro'`` or ``'pyttsx3'``
 
     Raises:
       TTSIsNotSupported: if the engine's module isn't installed.
@@ -114,7 +109,7 @@ def _init_engine():
         if _available(engine):
             set_engine(engine)
             if engine == 'pyttsx3':
-                warnings.warn("Neural TTS modules (kokoro, coqui) not found, using pyttsx3 instead. Note this is platform \n"
+                warnings.warn("Neural TTS module (kokoro) not found, using pyttsx3 instead. Note this is platform \n"
                               "dependent and can be problematic for linux-based systems (using the espeak engine)")
             return
 
@@ -152,9 +147,6 @@ def getVoices(info=False):
       engine = pyttsx3.init()
       voices = engine.getProperty('voices')
       getter = vars
-  elif ttsMode == 'coqui-tts':
-      voices = utils.get_supported_coqui_voices()
-      getter = dict
   elif ttsMode == 'kokoro':
       voices = _kokoro_voices
       getter = dict
@@ -189,24 +181,19 @@ def render_caption(caption, samprate, model, caption_path):
     If Kokoro is selected, text from user input is converted with text-to-
     speech software from Kokoro - https://pypi.org/project/kokoro/ .
 
-    If Coqui-AI is selected, text from user input is converted with text-to-
-    speech software from Coqui-AI - https://pypi.org/project/TTS/ .
-    You can view publicly available voice models with 'TTS.list_models()'
-
     If pyttsx3 (https://pypi.org/project/pyttsx3/) is selected, text from
     user input is converted offline using the system voices.
 
     Note:
     STRAUSS checks which engines are available at import, setting ``ttsMode``
-    to the first found of ``kokoro``, ``coqui-tts`` or ``pyttsx3``. Choose
+    to the first found of ``kokoro`` or ``pyttsx3``. Choose
     explicitly with ``set_engine``.
 
     Args:
       caption (:obj:`str`): script to be spoken by the TTS voice
       samprate (:obj:`int`): samples per second
-      model (:obj:`str` for Kokoro and Coqui-AI; :obj:`dict` for pyttsx3):
-        for Kokoro: a voice name (see ``getVoices``); for Coqui-AI:
-        valid name of TTS voice from the underlying TTS module; for pyttsx3:
+      model (:obj:`str` for Kokoro; :obj:`dict` for pyttsx3):
+        for Kokoro: a voice name (see ``getVoices``); for pyttsx3:
         dictionary with keys of 'rate' (percent of speed, signed int16),
         'volume' (float from 0 to 1), and/or 'voice' (the voice 'id' that can
         be chosen from the list given by the ``getVoices`` function).
@@ -226,20 +213,6 @@ def render_caption(caption, samprate, model, caption_path):
       chunks = [audio for _, _, audio in pipeline(caption, voice=str(model), split_pattern=r'\n+')]
       audio = np.clip(np.concatenate(chunks), -1., 1.)
       wavfile.write(caption_path, 24000, (audio * 32767).astype(np.int16))
-
-    elif ttsMode == 'coqui-tts':
-      from TTS.api import TTS
-
-      # TODO: do this better with logging. We can filter TTS function output, e.g. alert to downloading models...
-      print('Rendering caption (this can take a while if the caption is long, or if the TTS model needs downloading)...')
-
-      # capture stdout from the talkative TTS module
-      with utils.Capturing() as output:
-          # Load in the tts model
-          tts = TTS(str(model), progress_bar=False, gpu=False)
-
-          # render to speech, and write as a wav file (allow )
-          tts.tts_to_file(text=caption, file_path=caption_path)
 
     elif ttsMode == 'pyttsx3':
       import pyttsx3

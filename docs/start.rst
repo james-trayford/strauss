@@ -59,7 +59,7 @@ If you would like to use system TTS, you will need to install the (as of writing
 
    pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple/ pyttsx3==2.99
 
-If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`speech` dependency (also available as :code:`TTS` or :code:`AI-TTS`), which installs the :code:`kokoro` and :code:`coqui` engines. This is also what the :code:`Speech` generator needs:
+If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`speech` dependency (also available as :code:`TTS` or :code:`AI-TTS`), which installs the :code:`kokoro` engine. This is also what the :code:`Speech` generator needs:
 
 .. code-block:: bash
 
@@ -72,12 +72,10 @@ or, for an install from a local repository copy:
    pip install -e ".[speech]"
 
 .. note::
-   The :code:`coqui` engine is currently supported for python version :code:`<= 3.12`. To install
-   just one engine use the :code:`[kokoro]` or :code:`[coqui]` extra instead. These are an
-   optional extra rather than a default as :code:`kokoro` pulls in :code:`torch`, which is
+   This is an optional extra rather than a default as :code:`kokoro` pulls in :code:`torch`, which is
    a few hundred MB; voice models download on first use.
 
-Strauss uses the best engine it finds at import, preferring :code:`kokoro`, then :code:`coqui`, then
+Strauss uses the best engine it finds at import, preferring :code:`kokoro`, then
 :code:`pyttsx3`. To choose one explicitly, or list the voices it offers:
 
 .. code-block:: python
