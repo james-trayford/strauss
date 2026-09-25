@@ -933,7 +933,8 @@ class Sampler(Generator):
                 keylim = keys[neardx]
             if this_note != nearkey:
                 self.samples[this_note] = lambda x, s=sfac, k=nearkey: self.samples[k](x*s)  
-                self.samplens[this_note] = sfac*self.samplens[nearkey]
+                # read `sfac` times faster, so lasts 1/`sfac` as long
+                self.samplens[this_note] = self.samplens[nearkey]/sfac
             if this_note[1] == '#':
                 # if a sharp, also assign flat...
                 flat_note = notes.noteflats[i%12]+this_note[2:]
@@ -1094,26 +1095,44 @@ class Sampler(Generator):
         #     samples *= pow(2., params['pitch_shift']/12.)
         
         # sample looping if specified
+        xfade = 0
         if params['looping'] != 'off':
             startsamp = params['loop_start']*samprate
-            endsamp = params['loop_end']*samprate
+            # a loop can't run past the end of the sample
+            endsamp = min(params['loop_end']*samprate,
+                          self.samplens[params['note']])
 
-            # find clean loop points within an audible (< 20Hz) cycle
-            startsamp += np.argmin(samplefunc(np.arange(audbuff) + startsamp))
-            endsamp += np.argmin(samplefunc(np.arange(audbuff) + endsamp))
+            if params['looping'] == 'forward':
+                # cross-fade length in samples, at most half the loop
+                xfade = min(params.get('loop_xfade', 0.)*samprate,
+                            (endsamp-startsamp)/2)
+
+            if not xfade:
+                # find clean loop points within an audible (< 20Hz) cycle
+                startsamp += np.argmin(samplefunc(np.arange(audbuff) + startsamp))
+                endsamp += np.argmin(samplefunc(np.arange(audbuff) + endsamp))
 
             if params['looping'] == 'forwardback':
                 samples = forward_back_loopsamp(samples,#sstream.samples,
                                                 startsamp,
                                                 endsamp)
             elif params['looping'] == 'forward':
+                # account for x-fade transition 
                 samples = forward_loopsamp(samples,#sstream.samples,
-                                           startsamp,
+                                           startsamp + xfade,
                                            endsamp)
         
                 
         # generate stream values
         values = samplefunc(samples)
+
+        if xfade:
+            # cross-fade of the loop's end into start, mitigating dropouts
+            tail = samples >= endsamp - xfade
+            into = samples[tail] - (endsamp - xfade)
+            angle = 0.5*np.pi*into/xfade
+            values[tail] = (values[tail]*np.cos(angle)
+                            + samplefunc(startsamp + into)*np.sin(angle))
 
         # get volume envelope
         env = self.envelope(sstream.samples, params)

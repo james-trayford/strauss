@@ -18,6 +18,9 @@ looping: "off"
 # If loop_end is longer than the sample, clip to end of the sample.
 loop_start: 0.
 loop_end:  10.
+# If looping "forward", seconds over which the end of the loop is
+# cross-faded into its start. 0 for a hard loop.
+loop_xfade: 0.
 
 # define the note volume envelope applied to the samples
 # A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
@@ -99,6 +102,9 @@ _meta:
     If looping, starting point of loop in seconds.
   loop_end: >-
     If looping, ending point of loop in seconds. If loop_end is longer than the sample, clip to end of the sample.
+  loop_xfade: >-
+    If looping `'forward'`, duration in seconds over which the end of the loop is cross-faded (equal-power) into its
+    start, for a seamless loop. `0` for a hard loop, joined at a quiet point within a buffer of each loop point.
   volume_envelope:
     _doc: >-
       Define the note volume envelope applied to the samples. _'ADSR'_ is a common parametrisation in sound synthesis,
