@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Cross-fade looping for the `Sampler`: with `looping: "forward"`, `loop_xfade` (seconds)
+  cross-fades the end of the loop into its start (equal-power), removing the click at
+  each repeat. Defaults to `0`, a hard loop as before.
+
+### Fixed
+
+- `loop_end` is now clipped to the end of the sample, as documented. 
+- Notes played by pitch-shifting the nearest sample had their `'sample'` note length
+  inverted.
+
 ## v1.5
 
 ### Added
