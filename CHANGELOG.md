@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `pydantic` (used by styles) is now an install requirement, so `import strauss` works on a
+  fresh install.
 - `loop_end` is now clipped to the end of the sample, as documented. 
 - Notes played by pitch-shifting the nearest sample had their `'sample'` note length
   inverted.
