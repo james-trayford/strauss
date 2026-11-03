@@ -675,8 +675,7 @@ class AudioFigure:
             sonification(s) to plot. Otherwise, plot all.
           show (`optional`, :obj:`bool`): display the figure once made
           panel_size (`optional`, :obj:`tuple`): width and height of each
-            panel in inches - 4 by 2.5 for columns, otherwise the
-            sonification's default
+            panel in inches - `strauss.plotting.PANEL_SIZE` by default
           title (`optional`, :obj:`str`): title across the whole figure
 
         Returns:
@@ -689,7 +688,7 @@ class AudioFigure:
                 kwargs['panel_size'] = panel_size
             fig = soni.plot_mapping(show=show, title=title or name, **kwargs)
         else:
-            fig = plotting.plot_columns(columns, show, panel_size or (4.5, 2.5),
+            fig = plotting.plot_columns(columns, show, panel_size or plotting.PANEL_SIZE,
                                         title, **kwargs)
         self.mapping_figure = fig
         return fig

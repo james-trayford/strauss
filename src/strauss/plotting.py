@@ -81,6 +81,15 @@ MARGIN = 0.1
 # height of the waveform panel, as a fraction of a mapping panel's
 WAVEFORM_HEIGHT = 0.25
 
+# default width and height of each panel, in inches
+PANEL_SIZE = (6., 3.5)
+
+# fewest ticks along an axis with a scale, to read its variation by
+MIN_TICKS = 3
+
+# round steps for the input axes' ticks, as matplotlib's own
+TICK_STEPS = [1, 2, 2.5, 5, 10]
+
 # Use STRAUSS branding colours by default
 PLOT_THEMES = {
     'dark': {'bg': '#0b0f1a', 'fg': '#ecf0f1',
@@ -459,7 +468,8 @@ def _secondary_axis(soni, ax, key, which, functions, data, min_pixels,
     if which == 'x':
         min_pixels *= 2.5
     axis.set_major_locator(MinPixelLocator(None, to_pixels, min_pixels, lo, hi,
-                                           log=_reads_log(forward, finite)))
+                                           log=_reads_log(forward, finite),
+                                           min_ticks=MIN_TICKS))
     return secondary
 
 
@@ -676,7 +686,7 @@ def _mapping_tables(soni):
             for i in range(soni.sources.n_sources)]
 
 
-def plot_mapping(soni, show=True, panel_size=(4.5, 2.5), min_tick_points=20,
+def plot_mapping(soni, show=True, panel_size=PANEL_SIZE, min_tick_points=20,
                  title=None, per_source=False, group_gap=0.35, theme='dark',
                  waveform=False):
     """Draw :meth:`strauss.sonification.Sonification.plot_mapping`
@@ -1082,15 +1092,23 @@ def draw_mapping(soni, fig, spec, panel_size, group_gap, min_tick_points,
 
             ax.tick_params(axis='both', direction='in')
             ax.ticklabel_format(useOffset=False, style='plain')
+            if not by_source:
+                ax.xaxis.set_major_locator(MaxNLocator(
+                    nbins='auto', steps=TICK_STEPS, min_n_ticks=MIN_TICKS))
             if j < len(group) - 1:
                 # panels of a stack share their time axis, so only the
                 # last is labelled along the bottom
                 ax.tick_params(axis='x', labelbottom=False)
             if j > 0:
                 # panels clash, so the top tick of each below
-                # the first would collide with the one above's bottom
+                # the first would collide with the one above's bottom -
+                # asking for one more, as it may be dropped
                 ax.yaxis.set_major_locator(EdgePrunedLocator(
-                    MaxNLocator(nbins='auto'), upper=0.1))
+                    MaxNLocator(nbins='auto', steps=TICK_STEPS,
+                                min_n_ticks=MIN_TICKS + 1), upper=0.1))
+            else:
+                ax.yaxis.set_major_locator(MaxNLocator(
+                    nbins='auto', steps=TICK_STEPS, min_n_ticks=MIN_TICKS))
 
             if limits is not None:
                 ax.set_ylim(*limits)
@@ -1252,7 +1270,7 @@ def finish_mapping(info, title_gap=0.12):
             mid.yaxis.set_label_coords((left - pad - box.x0)/box.width, 0.5)
 
 
-def plot_columns(columns, show=True, panel_size=(4.5, 2.5), title=None,
+def plot_columns(columns, show=True, panel_size=PANEL_SIZE, title=None,
                  theme='dark', group_gap=0.35, per_source=False,
                  min_tick_points=20, waveform=False):
     """Draw the mapping plots of several sonifications side by side.
@@ -1330,7 +1348,7 @@ def animate_columns(columns, duration, write_audio, fname=None, fps=30,
             spec, max_panels,
             lambda per_source, soni=soni: mapping_spec(soni, per_source, theme),
             name=n)
-    fig = _draw_columns(columns, specs, kwargs.get('panel_size', (4.5, 2.5)),
+    fig = _draw_columns(columns, specs, kwargs.get('panel_size', PANEL_SIZE),
                         kwargs.get('title'), kwargs.get('group_gap', 0.35),
                         kwargs.get('min_tick_points', 20), waveform)
     window = 1./(preview_fps if fname is None else fps)

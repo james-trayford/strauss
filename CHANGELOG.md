@@ -14,7 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-fade looping for the `Sampler`: with `looping: "forward"`, `loop_xfade` (seconds)
   cross-fades the end of the loop into its start (equal-power), removing the click at
   each repeat. Defaults to `0`, a hard loop as before.
-=======
 - `Sampler` samples can be named in a `Score` by *alias* rather than note, e.g.
   `Score([['kick', 'snare', 'hat']], 10)`, with `pitch` then binning sources onto
   the named samples as for notes. Notes and aliases can be mixed: notes are
@@ -47,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `theme='light'`, or a dict giving the theme's own `bg`, `fg` and `series` colours
   (`strauss.plotting.PLOT_THEMES`). Text is set in a sans serif, titles in bold italic and
   tick numbers monospaced, using Lato and Sometype Mono where installed.
+- Mapping plot panels default to 6 x 3.5 inches (`strauss.plotting.PANEL_SIZE`), and every
+  axis with a scale keeps at least 3 ticks (`MIN_TICKS`) where they fit - a frequency over
+  less than a decade, say, is ticked in even steps rather than by a lone round decade.
 - Table `note` columns are ordered by pitch, and tracks a new `attrs['note_frequency']` 
   to make this simple. 
 - `Sources.input_to_param(key)` stores the function converting input data to expressive

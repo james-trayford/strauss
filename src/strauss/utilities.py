@@ -739,24 +739,31 @@ class MinPixelLocator(Locator):
       max_val (:obj:`float`, optional): highest tick value to keep
       log (:obj:`bool`, optional): place candidates by decade, as for
         a frequency in Hz, rather than evenly
+      min_ticks (:obj:`int`, optional): fewest ticks to read a scale
+        by. Where the usual ticks fall short, denser candidates are
+        added wherever they fit, then even steps in place of decades,
+        then ticks closer than `min_pixels` - but never closer than
+        `0.6*min_pixels`, so fewer remain on an axis too short for them.
+        Not applied with a `base_locator`, whose ticks are its own
     """
     def __init__(self, base_locator, to_pixels, min_pixels=40,
-                 min_val=None, max_val=None, log=False):
+                 min_val=None, max_val=None, log=False, min_ticks=3):
         self.base_locator = base_locator
         self.to_pixels = to_pixels
         self.min_pixels = min_pixels
         self.min_val = min_val
         self.max_val = max_val
         self.log = log
+        self.min_ticks = min_ticks
 
     def __call__(self):
         vmin, vmax = self.axis.get_view_interval()
         return self.tick_values(vmin, vmax)
 
-    def _candidates(self, vmin, vmax):
+    def _candidates(self, vmin, vmax, log):
         if self.base_locator is not None:
             return [self.base_locator.tick_values(vmin, vmax)]
-        if self.log and vmax > 0:
+        if log and vmax > 0:
             # round numbers at each decade - then in 2s and 5s, then
             # every step
             from matplotlib.ticker import LogLocator
@@ -777,9 +784,9 @@ class MinPixelLocator(Locator):
             vmin = max(vmin, self.min_val)
         if self.max_val is not None:
             vmax = min(vmax, self.max_val)
-        sets = self._candidates(vmin, vmax)
+        sets = self._candidates(vmin, vmax, self.log)
         base = np.asarray(sets[0], dtype=float)
-        kept = self._prune(base)
+        kept = self._prune(base, self.min_pixels)
         # only fill to the spacing the usual ticks would have had, were
         # the axis evenly spread, so that one that is stays as it was
         length = abs(np.diff(self.to_pixels([vmin, vmax]))[0])
@@ -787,7 +794,35 @@ class MinPixelLocator(Locator):
         spacing = max(self.min_pixels, 0.6*nominal)
         for candidates in sets[1:]:
             kept = self._fill(kept, np.asarray(candidates, dtype=float), spacing, nominal)
-        return kept
+        if self.base_locator is not None or kept.size >= self.min_ticks:
+            return kept
+
+        # too few to read the scale by: take denser candidates wherever
+        # they fit, then even steps where decades leave too few (a
+        # frequency over less than a decade, say), then let them closer
+        tries = [kept]
+        for log, spacing in ((self.log, self.min_pixels),
+                             (False, self.min_pixels),
+                             (False, 0.6*self.min_pixels)):
+            ticks = self._dense(self._candidates(vmin, vmax, log), spacing)
+            if ticks.size >= self.min_ticks:
+                return ticks
+            tries.append(ticks)
+        return max(tries, key=np.size)
+
+    def _dense(self, sets, spacing):
+        """The ticks of `sets` in turn, each kept where it sits `spacing`
+        pixels clear of those already kept."""
+        kept = self._prune(np.asarray(sets[0], dtype=float), spacing)
+        pixels = list(np.asarray(self.to_pixels(kept), dtype=float))
+        kept = list(kept)
+        for candidates in sets[1:]:
+            candidates = self._in_range(np.asarray(candidates, dtype=float))
+            for tick, pixel in zip(candidates, np.asarray(self.to_pixels(candidates), dtype=float)):
+                if not pixels or np.min(np.abs(np.asarray(pixels) - pixel)) >= spacing:
+                    kept.append(tick)
+                    pixels.append(pixel)
+        return np.array(sorted(kept))
 
     def _in_range(self, ticks):
         if self.min_val is not None:
@@ -823,7 +858,7 @@ class MinPixelLocator(Locator):
                 pixels.append(pixel)
         return np.array(sorted(kept))
 
-    def _prune(self, ticks):
+    def _prune(self, ticks, spacing):
         ticks = self._in_range(ticks)
         if ticks.size < 2:
             return ticks
@@ -833,7 +868,7 @@ class MinPixelLocator(Locator):
         kept = [ticks[0]]
         last = pixels[0]
         for tick, pixel in zip(ticks[1:], pixels[1:]):
-            if abs(pixel - last) >= self.min_pixels:
+            if abs(pixel - last) >= spacing:
                 kept.append(tick)
                 last = pixel
 

@@ -868,7 +868,7 @@ class Sonification:
                                            'origin'])
 
 
-    def plot_mapping(self, show=True, panel_size=(4.5, 2.5), min_tick_points=20,
+    def plot_mapping(self, show=True, panel_size=plotting.PANEL_SIZE, min_tick_points=20,
                      title=None, per_source=False, group_gap=0.35, theme='dark',
                      waveform=False):
         """Plot each mapped parameter against the input data it came from.
