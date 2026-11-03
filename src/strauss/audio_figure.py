@@ -79,6 +79,8 @@ _kw_defaults = {
     'caption': None,
     'name': None,
     'level': 1,
+    # notes to play, overriding the style's own notes where given
+    'notes': None,
 }
 
 _exclude_keys = ['name', 'level']
@@ -173,6 +175,9 @@ class AudioFigure:
                     a path to a CSV file, or a Pandas DataFrame.
             style (dict, optional): A dictionary defining the sonification style,
                                     including parameters for score, sources, and generator.
+            notes (list or str, optional): the notes to play in place of the
+                                    style's own, as a list such as ['C3'] or
+                                    ['C3', 'G3'], or a chord name such as 'Cmaj7'.
             **kwargs: Additional parameters to override or supplement the style.
 
         Returns:
@@ -185,6 +190,8 @@ class AudioFigure:
         if not sonpars['style']:
             sonpars['style'] = 'default'
         style = styles.Style(**load_style(sonpars['style']))
+        if sonpars['notes'] is not None:
+            style.notes = sonpars['notes']
 
         # an entry is a data mapping or a fixed value by what it holds, not by
         # where it sits in the map. Data mappings take the input data in the

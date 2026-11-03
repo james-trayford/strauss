@@ -19,12 +19,6 @@ import tempfile
 from pathlib import Path
 
 
-def _is_dark(ax):
-    """Whether axes are drawn on a dark background."""
-    from matplotlib.colors import to_rgb
-    return sum(to_rgb(ax.get_facecolor())) < 1.5
-
-
 def preview_animation(fig, draw, duration, preview_fps):
     """A `FuncAnimation` of `draw(t)` over `duration` seconds at
     `preview_fps`, shown in a notebook."""
@@ -81,34 +75,78 @@ def stream_video(fig, draw, duration, fps, dpi, write_audio, fname,
         raise RuntimeError(f"ffmpeg failed while writing {fname}")
 
 
-# the Okabe-Ito colours, less black, ordered so that neighbours in the
-# cycle differ in lightness as well as hue. As they are for the dark
-# background the plots default to, the blue is lightened to read on
-# it and white takes the place of black, for eight in all
 # clearance in inches between a figure's edges and anything drawn in it
 MARGIN = 0.1
 
 # height of the waveform panel, as a fraction of a mapping panel's
 WAVEFORM_HEIGHT = 0.25
 
-MAPPING_COLOURS = ['#56B4E9', '#E69F00', '#009E73', '#F0E442',
-                   '#CC79A7', '#D55E00', '#4A9BE0']
+# Use STRAUSS branding colours by default
+PLOT_THEMES = {
+    'dark': {'bg': '#0b0f1a', 'fg': '#ecf0f1',
+             'series': ['#6ea8d6', '#c75b50', '#f9ab4a',
+                        '#009E73', '#F0E442', '#CC79A7']},
+    'light': {'bg': '#fbfaf6', 'fg': '#130f0e',
+              'series': ['#3f7fb5', '#b5473c', '#e08a1f',
+                         '#00805d', '#6a4c93', '#b0588d']},
+}
+
+# titles in a heavy italic sans serif, following branding
+TITLE_FONT = {'family': 'sans-serif', 'weight': 'bold', 'style': 'italic'}
 
 
-def mapping_style(dark):
+def plot_theme(theme):
+    """The colours of a mapping plot theme.
+
+    Args:
+      theme (:obj:`str` or :obj:`dict`): the name of one of
+        `PLOT_THEMES`, or a theme of its own, giving the background
+        `'bg'`, the foreground `'fg'` for text and axes, and the
+        `'series'` of colours for sources to cycle through
+
+    Returns:
+      theme (:obj:`dict`): the theme, with the `'shade'` of
+      alternate pitch bins added, a touch off the background
+    """
+    from matplotlib.colors import to_rgb
+    if isinstance(theme, str):
+        if theme not in PLOT_THEMES:
+            raise ValueError(f"Unknown plot theme '{theme}', not one of "
+                             + ', '.join(f"'{t}'" for t in PLOT_THEMES))
+        theme = PLOT_THEMES[theme]
+    theme = dict(theme)
+    bg, fg = np.array(to_rgb(theme['bg'])), np.array(to_rgb(theme['fg']))
+    theme.setdefault('shade', tuple(bg + 0.08*(fg - bg)))
+    return theme
+
+
+def mapping_style(theme):
     """The style the mapping plot is drawn in.
 
     Args:
-      dark (:obj:`bool`): whether on a dark background
+      theme (:obj:`dict`): the theme, as from :func:`plot_theme`
 
     Returns:
-      style (:obj:`list`): style sheets and settings for
-      :func:`matplotlib.style.context`
+      style (:obj:`dict`): settings for :func:`matplotlib.style.context`
     """
     from cycler import cycler
-    settings = {'axes.prop_cycle': cycler(color=MAPPING_COLOURS),
-                'font.size': 12}
-    return (['dark_background', settings] if dark else [settings])
+    bg, fg = theme['bg'], theme['fg']
+    return {'axes.prop_cycle': cycler(color=theme['series']),
+            'font.size': 12,
+            'figure.facecolor': bg, 'axes.facecolor': bg,
+            'savefig.facecolor': bg,
+            'text.color': fg, 'axes.labelcolor': fg, 'axes.edgecolor': fg,
+            'xtick.color': fg, 'ytick.color': fg,
+            'axes.spines.top': False, 'axes.spines.right': False,
+            'axes.grid': True, 'grid.color': fg, 'grid.alpha': 0.12,
+            'lines.solid_capstyle': 'round',
+            'lines.solid_joinstyle': 'round',
+            # the brand fonts where installed, else matplotlib's own:
+            # a sans serif, with the tick numbers set monospaced by
+            # draw_mapping, as no setting reaches those alone
+            'font.family': 'sans-serif',
+            'font.monospace': ['Sometype Mono', 'DejaVu Sans Mono'],
+            'font.sans-serif': ['Lato', 'DejaVu Sans']}
 
 
 def _mapping_forward(soni, key):
@@ -485,13 +523,14 @@ def _pitch_limits(soni, functions, pad=0.25):
     return lo - margin, hi + margin
 
 
-def _shade_pitch_bins(soni, ax, functions):
+def _shade_pitch_bins(soni, ax, functions, shade):
     """Shade alternate pitch bins behind the data, to show them.
 
     Args:
       ax (:obj:`matplotlib.axes.Axes`): the pitch panel
       functions (:obj:`tuple`): forward and inverse functions between
         the input and the fraction of the chord it selects
+      shade: the colour of the background-shaded bins
     """
     nints = len(soni.score.note_sequence[0])
     edges = np.asarray(functions[1](np.arange(nints + 1) / nints), dtype=float)
@@ -503,8 +542,6 @@ def _shade_pitch_bins(soni, ax, functions):
     else:
         edges[0], edges[-1] = yhi, ylo
     for i in range(0, nints, 2):
-        # a touch off the background, whichever it is
-        shade = '0.15' if _is_dark(ax) else '0.95'
         ax.axhspan(*sorted(edges[i:i+2]), color=shade, lw=0, zorder=0)
 
 
@@ -640,14 +677,14 @@ def _mapping_tables(soni):
 
 
 def plot_mapping(soni, show=True, panel_size=(4.5, 2.5), min_tick_points=20,
-                 title=None, per_source=False, group_gap=0.35, dark=True,
+                 title=None, per_source=False, group_gap=0.35, theme='dark',
                  waveform=False):
     """Draw :meth:`strauss.sonification.Sonification.plot_mapping`
     for the sonification `soni`, which documents the arguments."""
-    spec = mapping_spec(soni, per_source)
+    spec = mapping_spec(soni, per_source, theme)
     # a stack of panels per parameter, end to end as they share their
     # time axis, with a gap between one parameter's stack and the next
-    with plt.style.context(mapping_style(dark)):
+    with plt.style.context(mapping_style(spec['theme'])):
         fig = plt.figure(figsize=(panel_size[0],
                                   mapping_height(spec, panel_size, waveform)),
                          layout='constrained')
@@ -669,11 +706,12 @@ def plot_mapping(soni, show=True, panel_size=(4.5, 2.5), min_tick_points=20,
     return fig
 
 
-def mapping_spec(soni, per_source=False):
-    """Work out what :func:`plot_mapping` draws: the tables, the
-    parameters with a panel, what's plotted against, and how each
-    event or object is coloured. Returned as a dict for
-    :func:`draw_mapping`."""
+def mapping_spec(soni, per_source=False, theme='dark'):
+    """What does :func:`plot_mapping` do: the tables, the
+    parameters with a panel, what's plotted against them, and how each
+    event or object is assigned by the `theme`. Returned as a dict
+    for :func:`draw_mapping`."""
+    theme = plot_theme(theme)
     soni._check_can_tabulate()
     sources = soni.sources
     is_events = isinstance(sources, Events)
@@ -724,10 +762,10 @@ def mapping_spec(soni, per_source=False):
     per_source = per_source and not is_events and not by_source
     n_panels = sources.n_sources if per_source else 1
 
-    cycle = MAPPING_COLOURS
+    cycle = theme['series']
     def colour(i):
         # events share a colour, while each object's line takes the
-        # next of the default cycle, so that the objects can be told apart.
+        # next of the theme's series, so that the objects can be told apart.
         # Named outright, as 'C0' and so on would be read off the
         # default cycle once the figure is drawn outside the style
         return cycle[0] if is_events else cycle[i % len(cycle)]
@@ -743,7 +781,7 @@ def mapping_spec(soni, per_source=False):
     else:
         handles = None
     return {'keys': keys, 'tables': tables, 'xkey': xkey, 'names': names,
-            'colour': colour, 'style': style,
+            'colour': colour, 'style': style, 'theme': theme,
             'is_events': is_events, 'by_source': by_source,
             'per_source': per_source, 'n_panels': n_panels, 'handles': handles}
 
@@ -804,10 +842,11 @@ def animate_mapping(soni, fname=None, fps=30, dpi=100, highlight=0.5,
                         "has its audio.")
 
     # settle the panels before drawing, so the figure is drawn once
+    theme = kwargs.get('theme', 'dark')
     spec = fit_panels(
-        mapping_spec(soni, kwargs.get('per_source', False)),
+        mapping_spec(soni, kwargs.get('per_source', False), theme),
         max_panels,
-        lambda per_source: mapping_spec(soni, per_source))
+        lambda per_source: mapping_spec(soni, per_source, theme))
     kwargs['per_source'] = spec['per_source']
     fig = plot_mapping(soni, show=False, waveform=waveform, **kwargs)
     draw = mapping_animation(fig.mapping, highlight,
@@ -845,8 +884,7 @@ def mapping_animation(info, highlight, window=1./30):
         to_input = lambda t: float(np.interp(t, seconds, inputs))
     lo = to_input(0.)
 
-    dark = _is_dark(info['axes'][0])
-    head_colour = 'w' if dark else 'k'
+    head_colour = info['theme']['fg']
     heads, points, markers = [], [], []
     for ax in info['axes']:
         heads.append(ax.axvline(lo, c=head_colour, lw=1.5, alpha=0.8, zorder=50))
@@ -1049,14 +1087,14 @@ def draw_mapping(soni, fig, spec, panel_size, group_gap, min_tick_points,
                 # last is labelled along the bottom
                 ax.tick_params(axis='x', labelbottom=False)
             if j > 0:
-                # panels butt together, so the top tick of each below
+                # panels clash, so the top tick of each below
                 # the first would collide with the one above's bottom
                 ax.yaxis.set_major_locator(EdgePrunedLocator(
                     MaxNLocator(nbins='auto'), upper=0.1))
 
             if limits is not None:
                 ax.set_ylim(*limits)
-                _shade_pitch_bins(soni, ax, functions)
+                _shade_pitch_bins(soni, ax, functions, spec['theme']['shade'])
 
             if xspan is not None:
                 secx = _secondary_axis(soni, ax, xkey, 'x', xfunctions, np.asarray(xspan),
@@ -1100,14 +1138,20 @@ def draw_mapping(soni, fig, spec, panel_size, group_gap, min_tick_points,
                         else 'Source')
 
     if title:
-        fig.suptitle(title, fontweight='bold')
+        fig.suptitle(title, **TITLE_FONT)
+
+    # numbers in a monospace, so ticks line up digit for digit - the
+    # converted axes too, which are children of the panels
+    for ax in axes:
+        for a in [ax, *ax.child_axes]:
+            a.tick_params(labelfontfamily='monospace')
 
     # what the animation needs: the panels, what each drew and when
     # each point of it sounds, and where the time runs on the input
     # axis - and what finishing the layout needs
     return {'figure': fig, 'axes': axes, 'groups': groups, 'drawn': drawn,
             'strip': strip, 'title': bool(title), 'waveform': wave,
-            'is_events': is_events,
+            'is_events': is_events, 'theme': spec['theme'],
             'animate': xkey is not None and not by_source,
             'to_input': xfunctions[1] if xfunctions else None,
             'seconds': np.concatenate(seconds),
@@ -1209,7 +1253,7 @@ def finish_mapping(info, title_gap=0.12):
 
 
 def plot_columns(columns, show=True, panel_size=(4.5, 2.5), title=None,
-                 dark=True, group_gap=0.35, per_source=False,
+                 theme='dark', group_gap=0.35, per_source=False,
                  min_tick_points=20, waveform=False):
     """Draw the mapping plots of several sonifications side by side.
 
@@ -1224,9 +1268,9 @@ def plot_columns(columns, show=True, panel_size=(4.5, 2.5), title=None,
       fig (:obj:`matplotlib.figure.Figure`): the figure, with the
       drawn info of each column in `fig.mapping`
     """
-    specs = {n: mapping_spec(soni, per_source)
+    specs = {n: mapping_spec(soni, per_source, theme)
              for n, soni in columns.items()}
-    fig = _draw_columns(columns, specs, panel_size, title, dark, group_gap,
+    fig = _draw_columns(columns, specs, panel_size, title, group_gap,
                         min_tick_points, waveform)
     if show:
         if is_notebook():
@@ -1237,13 +1281,14 @@ def plot_columns(columns, show=True, panel_size=(4.5, 2.5), title=None,
     return fig
 
 
-def _draw_columns(columns, specs, panel_size, title, dark, group_gap,
+def _draw_columns(columns, specs, panel_size, title, group_gap,
                   min_tick_points, waveform=False):
-    """Draw the mapping panels of each sonification's spec in a
-    subfigure of its own, side by side."""
+    """Draw the mapping panels of each sonification in a
+    subfigure of its own, side by side, in the theme of the first."""
     heights = {n: mapping_height(specs[n], panel_size, waveform) for n in columns}
     tallest = max(heights.values())
-    with plt.style.context(mapping_style(dark)):
+    theme = next(iter(specs.values()))['theme']
+    with plt.style.context(mapping_style(theme)):
         fig = plt.figure(figsize=(panel_size[0]*len(columns), tallest),
                          layout='constrained')
         subfigs = np.atleast_1d(fig.subfigures(1, len(columns)))
@@ -1256,7 +1301,7 @@ def _draw_columns(columns, specs, panel_size, title, dark, group_gap,
                                       spare=tallest - heights[n],
                                       waveform=waveform))
         if title:
-            fig.suptitle(title, fontweight='bold')
+            fig.suptitle(title, **TITLE_FONT)
         fig.canvas.draw()
         fig.set_layout_engine('none')
         for info in infos:
@@ -1277,16 +1322,16 @@ def animate_columns(columns, duration, write_audio, fname=None, fps=30,
     for :meth:`strauss.sonification.Sonification.animate_mapping`,
     with `kwargs` passed to :func:`plot_columns`.
     """
+    theme = kwargs.get('theme', 'dark')
     specs = {}
     for n, soni in columns.items():
-        spec = mapping_spec(soni, kwargs.get('per_source', False))
+        spec = mapping_spec(soni, kwargs.get('per_source', False), theme)
         specs[n] = fit_panels(
             spec, max_panels,
-            lambda per_source, soni=soni: mapping_spec(soni, per_source),
+            lambda per_source, soni=soni: mapping_spec(soni, per_source, theme),
             name=n)
     fig = _draw_columns(columns, specs, kwargs.get('panel_size', (4.5, 2.5)),
-                        kwargs.get('title'), kwargs.get('dark', True),
-                        kwargs.get('group_gap', 0.35),
+                        kwargs.get('title'), kwargs.get('group_gap', 0.35),
                         kwargs.get('min_tick_points', 20), waveform)
     window = 1./(preview_fps if fname is None else fps)
     draws = [mapping_animation(info, highlight, window) for info in fig.mapping]

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `notes` keyword for `AudioFigure.sonify()`, overriding the style's notes for one call,
+  so a style can be reused at a different pitch (e.g. `notes=['C3']`).
 - Cross-fade looping for the `Sampler`: with `looping: "forward"`, `loop_xfade` (seconds)
   cross-fades the end of the loop into its start (equal-power), removing the click at
   each repeat. Defaults to `0`, a hard loop as before.
@@ -41,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   show the `time` or `time_evo` mappings.
 - Plotted values are linked to the timing tables, so these correspond exactly. Each 
   `Object` is coloured separately and named in a legend.
+- Mapping plots are drawn in the STRAUSS colours, via `theme='dark'` (default) or
+  `theme='light'`, or a dict giving the theme's own `bg`, `fg` and `series` colours
+  (`strauss.plotting.PLOT_THEMES`). Text is set in a sans serif, titles in bold italic and
+  tick numbers monospaced, using Lato and Sometype Mono where installed.
 - Table `note` columns are ordered by pitch, and tracks a new `attrs['note_frequency']` 
   to make this simple. 
 - `Sources.input_to_param(key)` stores the function converting input data to expressive

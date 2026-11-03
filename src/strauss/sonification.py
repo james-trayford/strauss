@@ -869,7 +869,7 @@ class Sonification:
 
 
     def plot_mapping(self, show=True, panel_size=(4.5, 2.5), min_tick_points=20,
-                     title=None, per_source=False, group_gap=0.35, dark=True,
+                     title=None, per_source=False, group_gap=0.35, theme='dark',
                      waveform=False):
         """Plot each mapped parameter against the input data it came from.
 
@@ -915,7 +915,9 @@ class Sonification:
           group_gap (`optional`, :obj:`float`): vertical gap between the
             panels of one parameter and the next, as a fraction of a
             panel's height
-          dark (`optional`, :obj:`bool`): draw on a dark background
+          theme (`optional`, :obj:`str` or :obj:`dict`): the theme
+            used to plot: `'dark'` or `'light'`, or a theme of its own -
+            see :func:`strauss.plotting.plot_theme`
           waveform (`optional`, :obj:`bool`): add a bare panel below
             showing the rendered audio's waveform, its channels summed
             and scaled to peak at the panel's edges
@@ -924,7 +926,7 @@ class Sonification:
           fig (:obj:`matplotlib.figure.Figure`): the figure
         """
         return plotting.plot_mapping(self, show, panel_size, min_tick_points,
-                                     title, per_source, group_gap, dark,
+                                     title, per_source, group_gap, theme,
                                      waveform)
 
     def animate_mapping(self, fname=None, fps=30, dpi=100, highlight=0.5,
