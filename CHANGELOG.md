@@ -66,7 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key plays the nearest phrase as rendered - though `pitch_shift` still works if a
   deliberate shift is wanted. Pick the voice with `Speech(..., voice=...)`. Not yet
   available via a `Style`.
-- `examples/Speech.py` demonstrating spoken-phrase sonification.
 - `call`, a *categorical* source mapping: input specifies the sound each source
   makes, e.g. `{'call': ['a red giant', 'a white dwarf', ...]}` for a `Speech`
   generator or `{'call': ['kick', 'snare', ...]}` for a `Sampler`. Labels are
@@ -112,6 +111,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Sonification.hear()` plays to a mono output device (e.g. 'Microsoft Teams Audio', the
+  default output during a Teams call) by mixing down, where it raised PortAudio's
+  `Invalid number of channels`. Other playback errors are reported rather than raised.
 - `pydantic` (used by styles) is now an install requirement, so `import strauss` works on a
   fresh install.
 - `loop_end` is now clipped to the end of the sample, as documented. 

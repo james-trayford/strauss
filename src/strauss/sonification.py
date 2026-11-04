@@ -1261,12 +1261,27 @@ class Sonification:
         else:
             outfmt = np.column_stack(channels[:2])/vmax
 
+        # play no more channels than the output device takes: a call
+        # app's virtual device (e.g. 'Microsoft Teams Audio') can be mono
+        try:
+            device = sd.query_devices(kind='output')
+        except Exception:
+            device = None
+        if device is not None and device['max_output_channels'] == 1:
+            outfmt = outfmt.mean(axis=1, keepdims=True)
+
         dur = int(np.round(outfmt.shape[0]/self.out_channels['0'].samprate))
         playback_msg = f"Playing Sonification ({dur} s): "
         print(playback_msg)
         try:
             sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
-        except OSError as error: 
+        except getattr(sd, 'PortAudioError', ()) as error:
+            # PortAudio is there, but the device won't take the audio
+            name = device['name'] if device is not None else 'default'
+            print(f"Couldn't play to the '{name}' output device: {error}\n"
+                  "Try another output device, or save the audio with "
+                  "Sonification.save().")
+        except OSError as error:
             print(error) 
             print("The Sonification.hear() function requires the PortAudio C-library. This may be missing from your system or \n"
                   "unsupported in this context. This should be installed by pip on Windows and OSx automatically with the \n "
