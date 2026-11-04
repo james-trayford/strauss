@@ -60,7 +60,7 @@ or if you're working from a local copy of the repository, as above, use
 with or without the `-e` option depending on whether you want to edit the *STRAUSS* code or not, as above. 
 
 
-The best available engine is used automatically (`kokoro`, then the system `pyttsx3`), or choose one with `strauss.tts_caption.set_engine('kokoro')`. The same extra is needed for the `Speech` generator, which speaks phrases as part of the sonification itself. `tts_caption.getVoices(info=True)` lists voices, and`kokoro` ones are described with sample audio at [hexgrad/Kokoro-82M VOICES.md](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md).
+The best available engine is used automatically (`kokoro`, then the system `pyttsx3`), or chosen with `strauss.tts_caption.set_engine('kokoro')`. This is needed for the `Speech` generator, which can use spoken words to annotate the sonification. `tts_caption.getVoices(info=True)` lists voices, and `kokoro` ones are described with sample audio at [hexgrad/Kokoro-82M VOICES.md](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md).
 
 ***Note***: `[speech]` is also available under its older names `[TTS]` and `[AI-TTS]`, which install exactly the same engines. These are an optional extra rather than a default because `kokoro` pulls in `torch`, which is a few hundred MB; the voice models themselves are only downloaded the first time you render speech.
 

@@ -75,6 +75,14 @@ or, for an install from a local repository copy:
    This is an optional extra rather than a default as :code:`kokoro` pulls in :code:`torch`, which is
    a few hundred MB; voice models download on first use.
 
+.. note::
+   :code:`kokoro` and its :code:`misaki` dependency on PyPI only support Python up to 3.12, so on
+   Python 3.13 :code:`speech` installs without :code:`kokoro`. Their GitHub versions support 3.13:
+
+   .. code-block:: bash
+
+      pip install "misaki[en] @ git+https://github.com/hexgrad/misaki.git" "kokoro @ git+https://github.com/hexgrad/kokoro.git" "strauss[speech]"
+
 Strauss uses the best engine it finds at import, preferring :code:`kokoro`, then
 :code:`pyttsx3`. To choose one explicitly, or list the voices it offers:
 

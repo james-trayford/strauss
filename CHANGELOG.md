@@ -99,7 +99,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The text-to-speech extra is now `pip install strauss[speech]`, with `[TTS]` and
-  `[AI-TTS]` kept as aliases installing exactly the same engines.
+  `[AI-TTS]` kept as aliases installing exactly the same engines. On Python 3.13 they
+  install without `kokoro`, whose PyPI releases stop at 3.12, rather than failing; the
+  README gives the install from `kokoro`'s GitHub for 3.13.
 - `Sonification(ttsmodel=...)` defaults to `None`, resolved to the current engine's default
   voice at render time, so `set_engine()` after import takes effect. The `kokoro`
   default voice is `bf_emma`.
