@@ -25,6 +25,7 @@ Note:
 """
 
 from scipy.io import wavfile
+from scipy.signal import butter, sosfiltfilt
 import numpy as np
 import strauss.utilities as utils
 import importlib.util
@@ -35,6 +36,10 @@ import warnings
 
 # ordered by preference
 ENGINE_PREFERENCE = ('kokoro', 'kokoro-onnx', 'pyttsx3')
+
+# cut-off of the high-pass filter applied to kokoro and kokoro-onnx audio, in Hz.
+# Below the voice, so that the speech is unchanged
+_highpass_hz = 30.
 
 # module name that must be importable for each engine
 _engine_modules = {'kokoro': 'kokoro',
@@ -213,8 +218,18 @@ def _get_kokoro_onnx_model():
     return _kokoro_onnx_model
 
 def _write_kokoro_audio(chunks, caption_path):
-    """Write chunks of 24 kHz audio from kokoro or kokoro-onnx to a wav file."""
-    audio = np.clip(np.concatenate(chunks), -1., 1.)
+    """Write chunks of 24 kHz audio from kokoro or kokoro-onnx to a wav file.
+
+    The ``kokoro-onnx`` model has a growing DC offset. high-pass filter removes 
+    corrects this, leaving audible speech unchanged.
+    """
+    audio = np.concatenate(chunks)
+    # zero-phase, so that the speech isn't shifted. Too-short audio can't be
+    # filtered, and has no speech to speak of
+    if audio.size > 1:
+        sos = butter(4, _highpass_hz, 'high', fs=24000, output='sos')
+        audio = sosfiltfilt(sos, audio, padlen=min(audio.size-1, 12000))
+    audio = np.clip(audio, -1., 1.)
     wavfile.write(caption_path, 24000, (audio * 32767).astype(np.int16))
 
 def render_caption(caption, samprate, model, caption_path):

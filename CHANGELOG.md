@@ -117,6 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
+- filter `Speech` to avoid DC-term-like offsets on `kokoro-onnx`.`kokoro`-like audio is now high-pass filtered at 30 Hz, and `Speech` applies 5 ms fades at sample ends.
 - `Sonification.hear()` plays to a mono output device (e.g. 'Microsoft Teams Audio', the
   default output during a Teams call) by mixing down, where it raised PortAudio's
   `Invalid number of channels`. Other playback errors are reported rather than raised.

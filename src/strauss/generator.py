@@ -1302,6 +1302,9 @@ class Speech(Sampler):
     # falls below it
     _trim_db = -50.
 
+    # add fades to the ends of speech audio, to avoid artefacts
+    _fade_time = 0.005
+
     def __init__(self, phrases=None, params=None, samprate=48000, voice=None,
                  cache_dir=None):
         """
@@ -1522,7 +1525,12 @@ class Speech(Sampler):
         loud = np.flatnonzero(np.abs(wav) > threshold)
         if loud.size == 0:
             return wav
-        return wav[loud[0]:loud[-1]+1]
+        wav = wav[loud[0]:loud[-1]+1]
+        nfade = min(int(self._fade_time*self.samprate), wav.size//2)
+        fade = np.sin(0.5*np.pi*np.arange(nfade)/nfade)**2
+        wav[:nfade] *= fade
+        wav[wav.size-nfade:] *= fade[::-1]
+        return wav
 
     def clear_cache(self, all_phrases=False):
         """Remove cached audio for this generator's phrases.
