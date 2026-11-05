@@ -59,7 +59,7 @@ If you would like to use system TTS, you will need to install the (as of writing
 
    pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple/ pyttsx3==2.99
 
-If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`speech` dependency (also available as :code:`TTS` or :code:`AI-TTS`), which installs the :code:`kokoro` engine. This is also what the :code:`Speech` generator needs:
+If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`speech` dependency (also available as :code:`TTS` or :code:`AI-TTS`), which installs the :code:`kokoro` engine (or :code:`kokoro-onnx` on Python 3.13). 
 
 .. code-block:: bash
 
@@ -76,15 +76,17 @@ or, for an install from a local repository copy:
    a few hundred MB; voice models download on first use.
 
 .. note::
-   :code:`kokoro` and its :code:`misaki` dependency on PyPI only support Python up to 3.12, so on
-   Python 3.13 :code:`speech` installs without :code:`kokoro`. Their GitHub versions support 3.13:
+   :code:`kokoro` only supports Python<=3.12, so installs :code:`kokoro-onnx` (different pronunciation engine and  lacking Japanese and Mandarin voices). To use it on earlier versions, install
+   :code:`strauss[kokoro-onnx]`.
+
+   :code:`kokoro-onnx` doesn't yet allow Python 3.14 due to version limits, in this case you can try to force install with: 
 
    .. code-block:: bash
 
-      pip install "misaki[en] @ git+https://github.com/hexgrad/misaki.git" "kokoro @ git+https://github.com/hexgrad/kokoro.git" "strauss[speech]"
+      pip install --ignore-requires-python kokoro-onnx==0.6.1
 
-Strauss uses the best engine it finds at import, preferring :code:`kokoro`, then
-:code:`pyttsx3`. To choose one explicitly, or list the voices it offers:
+Strauss uses our favoured engine, prioritising :code:`kokoro`, (or
+:code:`kokoro-onnx`) with :code:`pyttsx3` as a fall back option. To choose one explicitly, or list voices:
 
 .. code-block:: python
 

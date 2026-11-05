@@ -95,16 +95,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed engine is used (in that order), or pick one with `tts_caption.set_engine()`.
   Engines load on first caption render rather than at import. `pip install strauss[speech]`
   installs `kokoro`. `tts_caption.getVoices()` lists the current engine's voices.
+- `kokoro-onnx` text-to-speech engine, running the same model and voices as `kokoro`
+  without `torch`, preferred after `kokoro` and before `pyttsx3`. Its model files download
+  on first render. Japanese and Mandarin voices aren't available, and pronunciation can
+  differ slightly as it uses `espeak-ng`. Also available as `pip install strauss[kokoro-onnx]`.
 
 ### Changed
 
 - The text-to-speech extra is now `pip install strauss[speech]`, with `[TTS]` and
   `[AI-TTS]` kept as aliases installing exactly the same engines. On Python 3.13 they
-  install without `kokoro`, whose PyPI releases stop at 3.12, rather than failing; the
-  README gives the install from `kokoro`'s GitHub for 3.13.
+  install `kokoro-onnx` in place of `kokoro`, whose PyPI releases stop at 3.12. On 3.14 they
+  install no engine, as `kokoro-onnx` doesn't yet allow it; the README gives an override.
 - `Sonification(ttsmodel=...)` defaults to `None`, resolved to the current engine's default
-  voice at render time, so `set_engine()` after import takes effect. The `kokoro`
-  default voice is `bf_emma`.
+  voice at render time, so `set_engine()` after import takes effect. The default voice
+  for `kokoro` and `kokoro-onnx` is `bf_emma`.
 
 ### Removed
 

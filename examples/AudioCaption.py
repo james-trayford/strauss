@@ -67,7 +67,7 @@ soni.hear()
 # We could also try an alternative model, if one's available
 caption_en = 'In the following audio, a glockenspiel is used to represent stars of varying colour.'
 
-if mode == 'kokoro':
+if mode.startswith('kokoro'):
     # a British male voice, in place of the default British female one
     soni = Sonification(score, events, generator, system,
                         caption=caption_en,
@@ -90,7 +90,7 @@ soni.hear()
 # Voices are available in several languages. We can demonstrate a non-English voice, for example (Italian for `kokoro`, German for `pyttsx3`)
 caption_de = "In der folgenden Tonspur wird ein Glockenspiel verwendet um Sterne mit unterschiedlichen Farben zu repräsentieren."
 
-if mode == 'kokoro':
+if mode.startswith('kokoro'):
     language_index = 1 # or, pick a different index for another langauge
     # kokoro voices are named <language><gender>_<name>, the language
     # letter choosing the pronunciation (German is not offered)
@@ -123,7 +123,7 @@ soni.hear()
 # **Note**: the `TTS` can behave unpredictably when using unrecognised characters or terms. Sometimes these will be mispronounced by the TTS, other times they could be skipped entirely. This can be circumvented by writing out the how symbols should be pronounced, or spelling phonetically to improve pronunciation:
 symbol_examples_en = 'The Lyman-α resonance is 1216 Å. The Lyman alpha resonance is twelve hundred and sixteen angstroms. '
 
-if mode == 'kokoro':
+if mode.startswith('kokoro'):
     soni = Sonification(score, events, generator, system,
                         caption=symbol_examples_en)
 
