@@ -115,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `coqui-tts` text-to-speech engine, its `[coqui]` extra and
   `utilities.get_supported_coqui_voices()`. `kokoro` replaces it as the neural engine.
 
-### Fixed
+### Fixes
 
 - `Sonification.hear()` plays to a mono output device (e.g. 'Microsoft Teams Audio', the
   default output during a Teams call) by mixing down, where it raised PortAudio's
@@ -125,6 +125,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `loop_end` is now clipped to the end of the sample, as documented. 
 - Notes played by pitch-shifting the nearest sample had their `'sample'` note length
   inverted.
+- The `sci_fi` and `twinkle` styles now work, as they lacked a `time_evo` mapping and `notes`,
+  and naming samples that weren't registered. `Space Strings` and `Bright Mallets` are now
+  downloaded on first use from the Sonification Suite's `sound-assets-v1.0` release.
+- A style with no `notes` raises a clearer error from `AudioFigure.sonify()`.
+- `AudioFigure.sonify()` now accepts pandas `Series`.
+- `AudioFigure.sonify()` warns about unrecognised keywords rather than ignoring,
+  and only reads keywords *starting* with `fix_` as fixed values (so `prefix_volume` no
+  longer fixes `volume`!)
+- `strauss.animate_mapping()` added alongside `strauss.plot_mapping()`, for the active figure.
+- The `AudioFigure.sonify()` docstring described `style` as a dict, where it takes a built-in
+  style name or a path to a style file. Mapping function examples in `Style` schema used
+  names that failed validation (`log(x)`, `-x`) renamed (`log10` and `invert`).
 
 ## v1.5
 

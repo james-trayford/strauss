@@ -101,18 +101,18 @@ class Mapping(MonitoredBaseModel):
         examples=[(0.1, 0.8), (0, 24)]
     )
 
-    # The mapping function can either be a string e.g. 'log(x)' or a list of strings e.g. ['log(x)', '-x']. Defaults to None (x=x).
+    # The mapping function can either be a string e.g. 'log10' or a list of strings e.g. ['log10', 'invert']. Defaults to None (x=x).
     function: Union[str, List[str], None] = Field(
         default=None,
         title='Mapping Function',
         description=(
             'The mathematical function to apply when mapping this parameter data. '
-            'This is useful for scaling the data (e.g logarithmically) or reversing the polarity (-x) '
-            'so that the biggest values become the smallest values. '
-            f'The string must correspond to one of the pre-defined functions: {AVAILABLE_FUNCTIONS}'
+            'This is useful for scaling the data (e.g logarithmically) or flipping the polarity ("invert", '
+            'so that e.g. the biggest values become the smallest values). '
+            f'The string must correspond to one of the pre-defined functions: {AVAILABLE_FUNCTIONS}. '
             'Multiple functions can be applied at once by providing a list of strings in the order you want the functions applied.'
         ),
-        examples=['log2', ['invert', 'log10']]
+        examples=['log2', ['log10', 'invert']]
     )
 
     fixed: Union[int, float, None] = Field(
@@ -421,7 +421,7 @@ class Style(MonitoredBaseModel):
                 "mods": {
                     "filter": "on",
                     "cutoff": 0.8,
-                    "volume_envolope": {'A': 0.3}
+                    "volume_envelope": {'A': 0.3}
                 }
             }
         ]
@@ -517,16 +517,16 @@ class Style(MonitoredBaseModel):
                     "input": "flux",
                     "input_range": ["1%", "99%"],
                     "output": "pitch",
-                    "function": "log(x)"
+                    "function": "log10"
                 }
             ],
 
-            # 6. Multiple functions (invert + log)
+            # 6. Multiple functions (log, then invert)
             [
                 {
                     "input": "distance",
                     "output": "volume",
-                    "function": ["-x", "log(x)"]
+                    "function": ["log10", "invert"]
                 }
             ],
 
@@ -542,7 +542,7 @@ class Style(MonitoredBaseModel):
                     "input": "magnitude",
                     "output": "volume",
                     "output_range": [0.2, 1],
-                    "function": "-x"
+                    "function": "invert"
                 },
                 {
                     "input": "ra",

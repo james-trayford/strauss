@@ -171,27 +171,43 @@ class AudioFigure:
         Generate a sonification in a matplotlib-like interface and add it to the AudioFigure.
 
         Args:
-            data: The input data for sonification. This can be multiple arrays, 
-                    a path to a CSV file, or a Pandas DataFrame.
-            style (dict, optional): A dictionary defining the sonification style,
-                                    including parameters for score, sources, and generator.
+            data: The input data for sonification. This can be multiple arrays
+                    or Pandas Series, a path to a CSV file, or a Pandas DataFrame.
+            style (str or Path, optional): The name of a built-in style (e.g.
+                                    'windy'), or the path to a style YAML file.
+                                    Defaults to 'default' (free pitch mapping).
             notes (list or str, optional): the notes to play in place of the
                                     style's own, as a list such as ['C3'] or
                                     ['C3', 'G3'], or a chord name such as 'Cmaj7'.
             **kwargs: Additional parameters to override or supplement the style.
+                                    Keywords not recognised raise a warning.
 
         Returns:
             The generated Sonification object.
         """
-        
+
+        unknown = [k for k in kwargs
+                   if k not in _kw_defaults and not k.startswith('fix_')]
+        if unknown:
+            warnings.warn(f"Ignoring unrecognised keywords: {unknown}. Choose "
+                          f"from {list(_kw_defaults)}, or 'fix_<parameter>' to "
+                          "fix a parameter's value.")
+
         sonpars, is_default = fill_from_kwargs(kwargs)
-        
+
         # Load style
         if not sonpars['style']:
             sonpars['style'] = 'default'
         style = styles.Style(**load_style(sonpars['style']))
         if sonpars['notes'] is not None:
             style.notes = sonpars['notes']
+        if style.notes is None:
+            #TODO: allow a style to have no notes, and use aliases instead.
+            raise ValueError(f"Style '{style.name}' has no notes to play, "
+                             "so 'notes' must be given, e.g. notes=['C3'].")
+
+        # a Series indexes by label rather than position, so take its values
+        args = tuple(a.to_numpy() if isinstance(a, pd.Series) else a for a in args)
 
         # an entry is a data mapping or a fixed value by what it holds, not by
         # where it sits in the map. Data mappings take the input data in the
@@ -437,9 +453,8 @@ class AudioFigure:
 
         # and finally overwrite with any kwarg fixed values:
         for k in sonpars.keys():
-            ksplit = k.split('fix_')
-            if len(ksplit) > 1:
-                prop = ksplit[1]
+            if k.startswith('fix_'):
+                prop = k[len('fix_'):]
                 if prop in to_map:
                     # already mapped, so overwrite it in place rather than
                     # mapping the same parameter twice

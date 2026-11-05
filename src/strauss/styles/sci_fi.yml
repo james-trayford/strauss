@@ -10,16 +10,21 @@ generator:
   preset: 'sustain'
   sample: 'Space Strings'
   mods:
-    looping: 'forwardback'
+    looping: 'forward'
     loop_start: 0.2
     loop_end: 5.
+    loop_xfade: 0.5
     filter: 'on'
 
 sources: 'objects'
 
 map:
+  - output: 'time_evo'
+
   - output: 'cutoff'
-    output_range: [0.3, 1]  
+    output_range: [0.3, 1]
+
+notes: ['A3']
 
 
 

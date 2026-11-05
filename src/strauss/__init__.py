@@ -64,3 +64,7 @@ def list_tables():
 def plot_mapping(name=None, **kwargs):
     fig = _get_current_figure()
     return fig.plot_mapping(name, **kwargs)
+
+def animate_mapping(name=None, **kwargs):
+    fig = _get_current_figure()
+    return fig.animate_mapping(name, **kwargs)
