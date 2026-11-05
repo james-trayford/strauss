@@ -60,3 +60,11 @@ def get_table(name=None, source=None, include_input=False):
 def list_tables():
     fig = _get_current_figure()
     fig.list_tables()
+
+def plot_mapping(name=None, **kwargs):
+    fig = _get_current_figure()
+    return fig.plot_mapping(name, **kwargs)
+
+def animate_mapping(name=None, **kwargs):
+    fig = _get_current_figure()
+    return fig.animate_mapping(name, **kwargs)

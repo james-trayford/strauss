@@ -14,13 +14,16 @@ Todo:
 """
 
 from .stream import Stream
+from .notes import notes_to_freqs, rank_notes, note_to_mkey
 from .channels import audio_channels
+from .score import is_alias
 from .sources import (Events, Objects, spatial_angles, display_name,
                       param_converters, param_lim_dict)
 from .utilities import decimals_for_range
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .utilities import write_audio, ffmpeg_layout, parse_level
-from .tts_caption import render_caption, get_ttsMode, default_tts_voice
+from . import plotting
+from .tts_caption import render_caption
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -48,6 +51,8 @@ try:
 except ModuleNotFoundError:
     tqdm = list
 
+
+
 class Sonification:
     """Representing the overall sonification
 
@@ -62,7 +67,7 @@ class Sonification:
     """
     def __init__(self, score, sources, generator, audio_setup='stereo',
                  caption=None, samprate=48000, declick_time=0.03,
-                 ttsmodel=default_tts_voice, handle_nans=None):
+                 ttsmodel=None, handle_nans=None):
         """
         Args:
          score (:class:`~strauss.score.Score`): Sonification :obj:`Score`
@@ -82,8 +87,10 @@ class Sonification:
          declick_time (:obj:`float`) duration of start and end fades applied
           on save and dispolay to remove audible clicks from sample
           discontinuity
-         ttsmodel (:obj:`str` or :obj:`PosixPath`) file path to the
-          text-to-speech model used for captions.
+         ttsmodel (:obj:`str`, :obj:`PosixPath` or :obj:`dict`) the
+          text-to-speech voice used for captions, in the form the current
+          engine expects (see :obj:`tts_caption.getVoices`). Defaults to
+          the engine's default voice at render time.
          handle_nans (:obj:`str`) how to treat the audio any source's
           non-finite data corresponds to, either :obj:`'silent'` or
           :obj:`'interpolate'`. Taken from the :obj:`Sources` where not
@@ -112,6 +119,55 @@ class Sonification:
 
         # sonification owns an instance of the Generator
         self.generator = generator
+
+        # where the the sound is named per source via 'call', 
+        # the score's chord is not read
+        calls = [str(c) for c in
+                 getattr(self.sources, 'mapping', {}).get('call', [])]
+        labels = list(dict.fromkeys(calls))
+        # whether the source calls the sound, rather than the Score
+        self._called = 'call' in getattr(self.sources, 'mapping', {})
+        if labels and not self.generator.supports_aliases:
+            raise ValueError(f"Sources map 'call' to name the sound they "
+                             f"make, but the '{self.generator.gtype}' "
+                             "generator does not name its sounds. Use a "
+                             "'sampler' or 'speech' generator, or map "
+                             "'pitch' to choose from the Score instead.")
+
+        # any sample aliases named in the score must be sounds the
+        # generator has, or every source would fail at render
+        aliases = getattr(self.score, 'aliases', [])
+        if aliases and not self.generator.supports_aliases:
+            raise ValueError(f"Score names samples by alias {aliases}, "
+                             f"but the '{self.generator.gtype}' generator "
+                             "does not support aliases.")
+
+        # a generator that can make a sound to order does so
+        if (labels or aliases) and self.generator.makes_aliases:
+            self.generator.make_aliases(labels + list(aliases))
+
+        if aliases:
+            known = set(self.generator.aliases.values())
+            unknown = [a for a in aliases if a not in known]
+            if unknown:
+                raise ValueError(f"Score uses sample aliases {unknown} that "
+                                 "aren't loaded, choose from: "
+                                 f"{sorted(known)}")
+
+        # resolve each label, so an unknown one is caught
+        # here rather than mid-render. 
+        self._call_notes = {}
+        if labels:
+            unknown = []
+            for label in labels:
+                try:
+                    self._call_notes[label] = self.generator.resolve_alias(label)
+                except ValueError:
+                    unknown.append(label)
+            if unknown:
+                raise ValueError(f"Sources 'call' sounds the generator "
+                                 f"doesn't have: {unknown}, choose from: "
+                                 f"{sorted(self.generator.aliases.values())}")
 
         # the Sources handle the data, and so decide what is
         # interpolated and which events sound - from here these
@@ -164,6 +220,11 @@ class Sonification:
           As in :meth:`render`, sources with no `time` mapping are all
           assumed to start at zero and last the full sonification.
 
+        Note:
+          Where the score names a sample by alias, the note returned is
+          the root note of that sample (see
+          :meth:`~strauss.generator.Sampler.resolve_alias`).
+
         Returns:
           notes (:obj:`list(str)`): note played by each source, in
             scientific pitch notation (e.g. :obj:`'A4'`)
@@ -174,6 +235,15 @@ class Sonification:
         if "time" not in self.sources.mapping:
             self.sources.mapping['time'] = [0.] * self.sources.n_sources
             self.sources.mapping['note_length'] = [self.score.length] * self.sources.n_sources
+
+        # mapped time is a fraction of the sonification length
+        times = np.array(self.sources.mapping['time']) * self.score.length
+
+        if 'call' in self.sources.mapping:
+            # skip Score specification for call
+            notes = [self._call_notes[str(c)]
+                     for c in self.sources.mapping['call']]
+            return notes, times
 
         # index each chord
         cbin = np.digitize(self.sources.mapping['time'], self.score.fracbins, 0)
@@ -195,10 +265,11 @@ class Sonification:
         for source in range(self.sources.n_sources):
             chord = self.score.note_sequence[cbin[source]]
             nints = self.score.nintervals[cbin[source]]
-            notes.append(chord[int(pitchfrac[source] * nints)])
-
-        # mapped time is a fraction of the sonification length
-        times = np.array(self.sources.mapping['time']) * self.score.length
+            entry = chord[int(pitchfrac[source] * nints)]
+            if is_alias(entry):
+                # a sample named by alias plays at its home note
+                entry = self.generator.resolve_alias(entry)
+            notes.append(entry)
 
         return notes, times
 
@@ -251,6 +322,10 @@ class Sonification:
             # for k in self.sources.mapping.keys():
             #     sourcemap[k] = self.soures.mapping[k][source]
             nested_dict_idx_reassign(self.sources.mapping, sourcemap, source)
+
+            # the label naming the sound has done its job in choosing the
+            # note - it is not a parameter the generator plays with
+            sourcemap.pop('call', None)
 
             sourcemap['note'] = note
 
@@ -307,8 +382,6 @@ class Sonification:
 
         # produce mono audio of caption, if one is provided
         if str(self.caption or '').strip():
-            ttsMode = get_ttsMode() # determine if using coqui-ai or pyttsx3
-
             # use a temporary directory to ensure caption file cleanup
             with tempfile.TemporaryDirectory() as cdir:
                 cpath = Path(cdir, 'caption.wav')
@@ -518,7 +591,12 @@ class Sonification:
           sonification in seconds, and `note` the note it ultimately
           sounds. Spatial angles are given in degrees, or in the
           sonification's `angle_unit` where one was asked for, rather
-          than as mapped fractions.
+          than as mapped fractions. The `note` column is ordered by
+          pitch, so sorting or ranking it puts low notes before high
+          ones whatever their names, and the frequency of each row's
+          note in Hz is kept in the table's `attrs['note_frequency']`.
+          For a :class:`~strauss.generator.Sampler`, a `sample` column
+          names the sample each row sounds, by its alias.
 
         Args:
           include_input (`optional`, :obj:`bool`): if True, also give the
@@ -537,8 +615,19 @@ class Sonification:
 
         # each event is a source, so is named by it
         table = {'source': self.sources.names,
-                 'time': self._display_values('time', times),
-                 'note': notes}
+                 'time': self._display_values('time', times)}
+
+        # a spoken phrase, say, has no meaningful pitch - the note it
+        # is stored under dropped from user-facing table
+        report_notes = self.generator.sounds_have_pitch
+        if report_notes:
+            table['note'] = notes
+
+        # sampler's sounds can be named, so say which is used. Where the
+        # data named it, that column says it already
+        samples = self._sample_names(notes)
+        if samples is not None:
+            table['call' if self._called else 'sample'] = samples
 
         # flag the events sounding using interpolated values
         if (self.sources.nan_mask is not None) and np.any(self.sources.nan_mask):
@@ -547,9 +636,9 @@ class Sonification:
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':
                 continue
-            if key not in ('time', 'time_evo', 'pitch'):
-                # time and pitch are already given by the time and note
-                # of each row, in the terms actually heard
+            if key not in ('time', 'time_evo', 'pitch', 'call'):
+                # time, pitch and call are already given by the time, note
+                # and sound of each row, in the terms actually heard
                 table[key] = self._display_values(
                     key, np.asarray(self.sources.mapped_samples[key]))
             if include_input:
@@ -558,8 +647,15 @@ class Sonification:
 
         table = pd.DataFrame(table).sort_values('time', kind='stable',
                                                 ignore_index=True)
+        # order by frequency not alphabetically, as octave starts at C!
+        if report_notes:
+            table['note'] = pd.Categorical(table['note'],
+                                           categories=rank_notes(notes), ordered=True)
+        table = self._with_units(self._round_numbers(table))
+        if report_notes:
+            table.attrs['note_frequency'] = notes_to_freqs(table['Note'].to_numpy().ravel())
 
-        return self._with_units(self._round_numbers(table))
+        return table
 
     def _resolve_source(self, source=None):
         """Resolve a source name or index, defaulting to a lone source.
@@ -599,8 +695,9 @@ class Sonification:
           replaces the mapped `time_evo` parameter, and spatial angles
           are given in degrees, or in the sonification's `angle_unit`
           where one was asked for. The note the
-          object plays, and its name, are given by the `note` and
-          `source` entries of the table's `attrs`.
+          object plays, its frequency in Hz, and its name, are given by
+          the `note`, `note_frequency` and `source` entries of the
+          table's `attrs`.
 
         Args:
           source (`optional`, :obj:`str` or :obj:`int`): name or index
@@ -646,9 +743,9 @@ class Sonification:
         for key in self.sources.mapped_quantities:
             if self.sources.origin.get(key, 'mapped') != 'mapped':
                 continue
-            if key not in ('time', 'time_evo', 'pitch'):
-                # time and pitch are already given by the time column and
-                # the note of the object, in the terms actually heard
+            if key not in ('time', 'time_evo', 'pitch', 'call'):
+                # time, pitch and call are already given by the time column
+                # and the sound of the object, in the terms actually heard
                 table[key] = self._display_values(
                     key, _down_column(self.sources.mapped_samples[key][index]))
             if include_input:
@@ -661,9 +758,42 @@ class Sonification:
 
         notes, _ = self._assign_notes()
         table.attrs['source'] = self.sources.names[index]
-        table.attrs['note'] = notes[index]
+        # a spoken phrase has no meaningful pitch
+        if self.generator.sounds_have_pitch:
+            table.attrs['note'] = notes[index]
+            table.attrs['note_frequency'] = float(notes_to_freqs([notes[index]])[0])
+        samples = self._sample_names([notes[index]])
+        if samples is not None:
+            table.attrs['call' if self._called else 'sample'] = samples[0]
 
         return table
+
+    def _sample_names(self, notes):
+        """Name the alias for each note, given a generator has them.
+
+        Args:
+          notes (:obj:`list(str)`): notes in scientific pitch notation
+
+        Returns:
+          samples (:obj:`list(str)` or :obj:`None`): the alias of the
+          sample each note plays, or None where the generator does not
+          play aliased samples
+        """
+        if not self.generator.supports_aliases:
+            return None
+        aliases = self.generator.aliases
+        if not aliases:
+            return list(notes)
+        # a note between the samples' root notes plays the nearest sample
+        # (as assigned by the sampler's fill_midi), compared by midi number
+        # so sharps and flats agree
+        root_notes = list(aliases.keys())
+        root_mkeys = np.array([note_to_mkey(n) for n in root_notes])
+        samples = []
+        for note in notes:
+            nearest = np.abs(root_mkeys - note_to_mkey(note)).argmin()
+            samples.append(aliases[root_notes[nearest]])
+        return samples
 
     def fixed_table(self, source=None):
         """Tabulate parameters the user did not map.
@@ -704,8 +834,10 @@ class Sonification:
                 continue
 
             if key == 'pitch':
-                # a mapped pitch is an internal fraction, of no use to the
-                # reader - what is heard is the note it resolves to
+                if self._called or not self.generator.sounds_have_pitch:
+                    # single pitch meaningless in this case
+                    continue
+                # pitch as mapped is meaningless to the user - report note
                 notes, _ = self._assign_notes()
                 values = np.unique(notes if index is None else [notes[index]])
                 values = values.astype(str).tolist()
@@ -734,6 +866,116 @@ class Sonification:
 
         return pd.DataFrame(rows, columns=['parameter', 'value', 'unit',
                                            'origin'])
+
+
+    def plot_mapping(self, show=True, panel_size=plotting.PANEL_SIZE, min_tick_points=20,
+                     title=None, per_source=False, group_gap=0.35, theme='dark',
+                     waveform=False):
+        """Plot each mapped parameter against the input data it came from.
+
+        See :func:`strauss.plotting.plot_mapping`, which draws it.
+
+        One panel per parameter mapped, showing the mapped input data
+        against the input data for time. The counterpart to the input
+        data axes show the expressed parameter: the time in the
+        sonification in seconds along the top, and the parameter along
+        the right in relevant units. 
+
+        Events plotted as points, and objects as lines, coloured
+        in turn and named in a legend by the sources' `names`. With
+        `per_source`, each object instead takes a panel of its own: the
+        panels of a parameter stacked end to end, sharing its axes, with
+        a gap between one parameter's stack and the next.
+
+        Where a mapping acts on the data as a whole rather than on each
+        value (ranking it, say) the far axis is read off the tables
+        instead. Where a parameter can't be shown that way at all - its
+        mapping folds back on itself over the data (a polar angle over
+        more than half a turn, say) - the panel instead shows what
+        sounded, from the tables, in place of the input.
+
+        Note:
+          Plotting comes from the timing tables, so the plot shows
+          the events after any merging of events and handling of missing
+          data. Parameters that don't change over the sonification are 
+          left out, and listed instead. Out of bound values that are 
+          clipped plotted using an indicative arrow.
+
+        Args:
+          show (`optional`, :obj:`bool`): display the figure once made
+          panel_size (`optional`, :obj:`tuple`): width and height of each
+            panel in inches
+          min_tick_points (`optional`, :obj:`float`): closest two ticks
+            of a converted axis may sit, in points on the page
+          title (`optional`, :obj:`str`): title for the figure - the
+            name of the sonification, when plotted from an
+            :class:`~strauss.audio_figure.AudioFigure`
+          per_source (`optional`, :obj:`bool`): for objects, give each
+            source its own panel of every parameter
+          group_gap (`optional`, :obj:`float`): vertical gap between the
+            panels of one parameter and the next, as a fraction of a
+            panel's height
+          theme (`optional`, :obj:`str` or :obj:`dict`): the theme
+            used to plot: `'dark'` or `'light'`, or a theme of its own -
+            see :func:`strauss.plotting.plot_theme`
+          waveform (`optional`, :obj:`bool`): add a bare panel below
+            showing the rendered audio's waveform, its channels summed
+            and scaled to peak at the panel's edges
+
+        Returns:
+          fig (:obj:`matplotlib.figure.Figure`): the figure
+        """
+        return plotting.plot_mapping(self, show, panel_size, min_tick_points,
+                                     title, per_source, group_gap, theme,
+                                     waveform)
+
+    def animate_mapping(self, fname=None, fps=30, dpi=100, highlight=0.5,
+                        preview_fps=15, max_panels=6, ffmpeg_output=False,
+                        waveform=True, **kwargs):
+        """Animate the mapping plot along with the sonification.
+
+        See :func:`strauss.plotting.animate_mapping`, which draws it.
+
+        Draws the figure of :meth:`plot_mapping`, and runs a playhead
+        across it following the sonification. Events emphasised as they
+        pass, while each object uses a marker to indicate the 
+        instantaneous values.
+
+        Provided a filename, the frames are streamed straight to `ffmpeg`
+        and written as a video with the rendered audio - nothing is saved
+        in between, so this needs `ffmpeg` and a rendered sonification.
+        Otherwise a preview animation is returned, and shown if run in a
+        notebook environment.
+
+        Args:
+          fname (`optional`, :obj:`str`): the video file to write, e.g.
+            `'mapping.mp4'`. Otherwise, the animation is returned and
+            displayed if we are in a notebook environment.
+          fps (`optional`, :obj:`float`): frames per second of the video
+          dpi (`optional`, :obj:`float`): dots per inch the frames are
+            drawn at, setting the video's size from the figure
+          highlight (`optional`, :obj:`float`): time in seconds an event
+            takes to fade back after it sounds
+          preview_fps (`optional`, :obj:`float`): frames per second of
+            the preview
+          max_panels (`optional`, :obj:`int`): most panels to animate,
+            beyond which their text is too small to read in a frame. A
+            panel per source asking for more falls back to a panel per
+            parameter, with a warning
+          ffmpeg_output (`optional`, :obj:`bool`): print `ffmpeg`'s
+            output to screen
+          waveform (`optional`, :obj:`bool`): add a bare panel below
+            showing the waveform of the audio playing over each frame,
+            the channels summed and scaled to peak at the panel's edges
+          **kwargs: passed on to :meth:`plot_mapping`
+
+        Returns:
+          anim (:obj:`matplotlib.animation.FuncAnimation`): the preview
+          animation, when no `fname` is given
+        """
+        return plotting.animate_mapping(self, fname, fps, dpi, highlight,
+                                        preview_fps, max_panels, ffmpeg_output,
+                                        waveform, **kwargs)
 
     def add_ticks(self, increment, duration=0.04, tick_vol=0.25):
         # TODO this should probably use a dedicated generator...
@@ -1019,12 +1261,27 @@ class Sonification:
         else:
             outfmt = np.column_stack(channels[:2])/vmax
 
+        # play no more channels than the output device takes: a call
+        # app's virtual device (e.g. 'Microsoft Teams Audio') can be mono
+        try:
+            device = sd.query_devices(kind='output')
+        except Exception:
+            device = None
+        if device is not None and device['max_output_channels'] == 1:
+            outfmt = outfmt.mean(axis=1, keepdims=True)
+
         dur = int(np.round(outfmt.shape[0]/self.out_channels['0'].samprate))
         playback_msg = f"Playing Sonification ({dur} s): "
         print(playback_msg)
         try:
             sd.play(outfmt,self.out_channels['0'].samprate,blocking=1)
-        except OSError as error: 
+        except getattr(sd, 'PortAudioError', ()) as error:
+            # PortAudio is there, but the device won't take the audio
+            name = device['name'] if device is not None else 'default'
+            print(f"Couldn't play to the '{name}' output device: {error}\n"
+                  "Try another output device, or save the audio with "
+                  "Sonification.save().")
+        except OSError as error:
             print(error) 
             print("The Sonification.hear() function requires the PortAudio C-library. This may be missing from your system or \n"
                   "unsupported in this context. This should be installed by pip on Windows and OSx automatically with the \n "

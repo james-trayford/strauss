@@ -22,6 +22,7 @@ from .score import Score
 from .sources import Events, Objects, set_limits
 from .generator import Synthesizer, Sampler, Spectralizer
 from .sonification import Sonification
+from . import plotting
 from .utilities import (nested_dict_reassign, merge_events, rescale_values,
                         parse_level)
 
@@ -31,7 +32,7 @@ from .stream import Stream
 from .channels import audio_channels
 from .utilities import const_or_evo, nested_dict_idx_reassign, apply_fades, rescale_values, NoSoundDevice, is_notebook
 from .utilities import write_audio, ffmpeg_layout
-from .tts_caption import render_caption, get_ttsMode, default_tts_voice
+from .tts_caption import render_caption
 from scipy.io import wavfile
 import IPython.display as ipd
 import subprocess as sp
@@ -78,6 +79,8 @@ _kw_defaults = {
     'caption': None,
     'name': None,
     'level': 1,
+    # notes to play, overriding the style's own notes where given
+    'notes': None,
 }
 
 _exclude_keys = ['name', 'level']
@@ -168,22 +171,43 @@ class AudioFigure:
         Generate a sonification in a matplotlib-like interface and add it to the AudioFigure.
 
         Args:
-            data: The input data for sonification. This can be multiple arrays, 
-                    a path to a CSV file, or a Pandas DataFrame.
-            style (dict, optional): A dictionary defining the sonification style,
-                                    including parameters for score, sources, and generator.
+            data: The input data for sonification. This can be multiple arrays
+                    or Pandas Series, a path to a CSV file, or a Pandas DataFrame.
+            style (str or Path, optional): The name of a built-in style (e.g.
+                                    'windy'), or the path to a style YAML file.
+                                    Defaults to 'default' (free pitch mapping).
+            notes (list or str, optional): the notes to play in place of the
+                                    style's own, as a list such as ['C3'] or
+                                    ['C3', 'G3'], or a chord name such as 'Cmaj7'.
             **kwargs: Additional parameters to override or supplement the style.
+                                    Keywords not recognised raise a warning.
 
         Returns:
             The generated Sonification object.
         """
-        
+
+        unknown = [k for k in kwargs
+                   if k not in _kw_defaults and not k.startswith('fix_')]
+        if unknown:
+            warnings.warn(f"Ignoring unrecognised keywords: {unknown}. Choose "
+                          f"from {list(_kw_defaults)}, or 'fix_<parameter>' to "
+                          "fix a parameter's value.")
+
         sonpars, is_default = fill_from_kwargs(kwargs)
-        
+
         # Load style
         if not sonpars['style']:
             sonpars['style'] = 'default'
         style = styles.Style(**load_style(sonpars['style']))
+        if sonpars['notes'] is not None:
+            style.notes = sonpars['notes']
+        if style.notes is None:
+            #TODO: allow a style to have no notes, and use aliases instead.
+            raise ValueError(f"Style '{style.name}' has no notes to play, "
+                             "so 'notes' must be given, e.g. notes=['C3'].")
+
+        # a Series indexes by label rather than position, so take its values
+        args = tuple(a.to_numpy() if isinstance(a, pd.Series) else a for a in args)
 
         # an entry is a data mapping or a fixed value by what it holds, not by
         # where it sits in the map. Data mappings take the input data in the
@@ -429,9 +453,8 @@ class AudioFigure:
 
         # and finally overwrite with any kwarg fixed values:
         for k in sonpars.keys():
-            ksplit = k.split('fix_')
-            if len(ksplit) > 1:
-                prop = ksplit[1]
+            if k.startswith('fix_'):
+                prop = k[len('fix_'):]
                 if prop in to_map:
                     # already mapped, so overwrite it in place rather than
                     # mapping the same parameter twice
@@ -463,7 +486,12 @@ class AudioFigure:
         _sources.apply_mapping_functions(map_funcs=mapping_functions, map_lims=in_lims,
                                          param_lims=out_lims, angle_unit=angle_unit)
 
+        # TODO: Get 'call' column working. Currently as the columns are read as floats. 
+        # also need phrases to be handled correctly for score
+
         # Set up Generator
+        # TODO: support the 'speech' generator here, which needs a way for a
+        # Style to carry the list of phrases to speak.
         gentype = style.generator.type
         
         if gentype == 'sampler':
@@ -637,6 +665,89 @@ class AudioFigure:
             return soni.event_table(include_input=include_input)
 
         return soni.object_table(source, include_input=include_input)
+
+    def _mapping_columns(self, name):
+        """The sonifications a mapping plot shows, by name: one, a list
+        of them, or all where `name` is None."""
+        if name is None:
+            return dict(self.sonifications)
+        if isinstance(name, str):
+            name = [name]
+        return {n: self._get_sonification(n) for n in name}
+
+    def plot_mapping(self, name=None, show=True, panel_size=None,
+                     title=None, **kwargs):
+        """Plot constituent sonifications' mapped parameters against
+        their input data, with one column per sonification.
+
+        Each column is the plot of
+        :meth:`strauss.sonification.Sonification.plot_mapping` for one
+        sonification, titled by its name in this figure. Can pass
+        `plot_mapping` kwargs to modify the animation templates.
+
+        Args:
+          name (`optional`, :obj:`str` or :obj:`list`): name(s) of the
+            sonification(s) to plot. Otherwise, plot all.
+          show (`optional`, :obj:`bool`): display the figure once made
+          panel_size (`optional`, :obj:`tuple`): width and height of each
+            panel in inches - `strauss.plotting.PANEL_SIZE` by default
+          title (`optional`, :obj:`str`): title across the whole figure
+
+        Returns:
+          fig (:obj:`matplotlib.figure.Figure`): the figure
+        """
+        columns = self._mapping_columns(name)
+        if len(columns) == 1:
+            (name, soni), = columns.items()
+            if panel_size is not None:
+                kwargs['panel_size'] = panel_size
+            fig = soni.plot_mapping(show=show, title=title or name, **kwargs)
+        else:
+            fig = plotting.plot_columns(columns, show, panel_size or plotting.PANEL_SIZE,
+                                        title, **kwargs)
+        self.mapping_figure = fig
+        return fig
+
+    def animate_mapping(self, name=None, fname=None, fps=30, dpi=100,
+                        highlight=0.5, preview_fps=10, max_panels=6,
+                        ffmpeg_output=False, waveform=True, **kwargs):
+        """Animate the figure's mapping plot along with its mixed audio.
+
+        Draws the figure of :meth:`plot_mapping`, and runs a playhead
+        across every column at the pace of the sonifications, as
+        :meth:`strauss.sonification.Sonification.animate_mapping` does
+        for one. The video's audio is the `AudioFigure`'s master mix. 
+        Renders the figure first if needed.
+
+        Args:
+          name (`optional`, :obj:`str` or :obj:`list`): name(s) of the
+            sonification(s). Otherwise, animate all.
+          fname (`optional`, :obj:`str`): the video filename to write. 
+            Else the animation data is returned.
+          fps, dpi, highlight, preview_fps, max_panels, ffmpeg_output,
+            waveform: as for
+            :meth:`strauss.sonification.Sonification.animate_mapping`.
+            `max_panels` applies to each column, and each column gets
+            its own sonification's waveform
+          **kwargs: passed on to :meth:`plot_mapping`
+
+        Returns:
+          anim (:obj:`matplotlib.animation.FuncAnimation`): the preview
+          animation, when no `fname` is given
+        """
+        columns = self._mapping_columns(name)
+        if len(columns) == 1:
+            (name, soni), = columns.items()
+            kwargs.setdefault('title', name)
+            return soni.animate_mapping(fname, fps, dpi, highlight, preview_fps,
+                                        max_panels, ffmpeg_output, waveform,
+                                        **kwargs)
+        if fname is not None and not self.is_rendered:
+            self.render()
+        return plotting.animate_columns(columns, self.length, self.save, fname,
+                                        fps, dpi, highlight, preview_fps,
+                                        max_panels, ffmpeg_output, waveform,
+                                        **kwargs)
 
     def list_tables(self):
         """Print the tables available from this figure.

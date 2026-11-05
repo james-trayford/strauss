@@ -41,6 +41,9 @@ import logging
 from sf2utils.sf2parse import Sf2File
 from pathlib import Path
 import os
+import re
+import hashlib
+from .tts_caption import render_caption, get_ttsMode, TTSIsNotSupported
 
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message=r"Chunk \(non-data\) not understood, skipping it\.")
@@ -100,8 +103,27 @@ class Generator:
       audbuff (:obj:`int`): Samples per audio buffer
       preset (:obj:`dict`): Dictionary of parameters defining the
         generator.
+      supports_aliases (:obj:`bool`): whether the generator can play
+        sounds named by an alias in the :obj:`Score` (see
+        :meth:`Sampler.resolve_alias`) rather than a note.
+      makes_aliases (:obj:`bool`): whether the generator can make
+        a sound it doesn't have, when asked (see
+        :meth:`Speech.make_aliases`).
+      sounds_have_pitch (:obj:`bool`): whether the generator's sounds
+        have a  meaningful single pitch. Otherwise (for spoken
+        phrases, say), the note a sound is filed under is an internal
+        detail and is left out of the sonification tables.
 
     """
+    # generators whose sounds can be named by alias override this
+    supports_aliases = False
+
+    # ...and those that can make a named sound on demand, this
+    makes_aliases = False
+
+    # generators whose sounds carry no pitch to report override this
+    sounds_have_pitch = True
+
     def __init__(self, params={}, samprate=48000):
         """
         Args:
@@ -601,18 +623,22 @@ class Sampler(Generator):
     attribute :obj:`self.gtype = 'sampler'`.
 
     Attributes:
-      gtype (:obj:`str`): Generator type 
-    
+      gtype (:obj:`str`): Generator type
+      aliases (:obj:`dict`): name each loaded sample can be called by in
+        a :obj:`Score`, alongside the sample's home note. Defaults to the
+        filename stem (e.g. `'snare'` for `snare.wav`), and can be
+        changed with :meth:`set_aliases`.
+
     Todo:
     	* Add zone mapping for samples (e.g. allow a sample to define
           a range of notes played at different speeds).
-        * Support non-scientifically named notes? (e.g
-    	  :obj:`'cymbal'`, :obj:`'snare'`). 
         * Have sample loading defined via the preset rather than the
           :obj:`sampfiles` variable?
     """
+    supports_aliases = True
 
-    def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None):
+    def __init__(self, sampfiles, params=None, samprate=48000, sf_preset=None,
+                 assign_notes='sequential'):
         """
         Args:
           sampfiles (`required`, :obj:`str`): string pointing to samples
@@ -630,18 +656,31 @@ class Sampler(Generator):
             All `.sf2` files should contain at least one preset. When
             given default `None` value, will print available presets
             and select the first preset. Note presets are 1-indexed.
+          assign_notes (`optional`, :obj:`str`): how samples whose
+            filenames carry no note tag are given a home note. With
+            `'sequential'` (default) they take consecutive semitones from
+            `C3` in filename order, skipping any note a tagged sample has.
+            With `'detect'` the note is found from the sample's strongest
+            frequency, for tuned samples that are simply untagged.
         
         Note:
-          It is necessary to assign a note for each sample in order to
-          choose different sample based on the ``pitch`` parameter. This
-          is also the case for non-pitched sounds, following a similar
+          Each sample is assigned a home note in order to choose between
+          samples based on the ``pitch`` parameter, following a similar
           approach to a [keyboard sampler]
           (https://support.apple.com/en-lk/guide/logicpro/lgcp4eecaaff/mac)
           where each key can triggers a different chosen sample. If
           `drumset_C1.wav` is a kick drum and `drumset_D1.wav` is a snare
           drum for :obj:`Score` with `chord_sequence=[["C1", "D1"]]`, events
           mapped to a higher (lower) `pitch` will sound as snare (kick) drums.
-          
+
+          Samples whose filename carries no note tag (e.g. `kick.wav`) are
+          assigned a home note automatically (see `assign_notes`), and
+          can be named in the
+          :obj:`Score` by their `alias` instead - the filename stem by
+          default, so `chord_sequence=[["kick", "snare"]]`. See
+          :meth:`info` to list the assignments and :meth:`set_aliases`
+          to change them.
+
         """
         # default sampler preset
         self.gtype = 'sampler'
@@ -652,6 +691,10 @@ class Sampler(Generator):
         self.sf_preset = sf_preset
         self.sf_preset_name = None
         self.sf_note_range = []
+        if assign_notes not in ('sequential', 'detect'):
+            raise ValueError(f"assign_notes '{assign_notes}' not recognised, "
+                             "choose from 'sequential' or 'detect'")
+        self.assign_notes = assign_notes
         
         # universal initialisation for generator objects:
         super().__init__(params, samprate)
@@ -886,8 +929,16 @@ class Sampler(Generator):
                 self.aliases[note] = note
             mkeys.append(mkey)
             root_notes.append(note)
+        # untagged samples are placed from C1 in the order given, unless
+        # asked to find their pitch, in which case they go at the note
+        # detected.
+        mkey = notes.note_to_mkey('C1')
         for wav in unassigned_wavs:
-            sintp, slen, mkey = process_sample(wav, self.samprate, find_pitch=True)
+            if self.assign_notes == 'detect':
+                sintp, slen, mkey = process_sample(wav, self.samprate, find_pitch=True)
+                mkey = int(np.clip(mkey, 0, 127))
+            else:
+                sintp, slen = process_sample(wav, self.samprate)
             note = notes.mkey_to_note(mkey)
             while note in self.samples:
                 mkey += 1
@@ -944,7 +995,54 @@ class Sampler(Generator):
                     self.samplens[flat_note] = self.samplens[this_note]                
         keylims[idx].append(notes.mkey_to_note(i))
         self.sampranges = dict(zip(keys, keylims))
-            
+
+    def set_aliases(self, aliases):
+        """Name loaded samples, to call them by alias in a :obj:`Score`.
+
+        Each sample may have one alias, so exiting aliases are overwritten. 
+
+        Args:
+          aliases (:obj:`dict`): keys are the new aliases, values the
+            home note of the sample each names (see :meth:`info`),
+            e.g. :obj:`{'kick': 'C1', 'snare': 'D1'}`.
+
+        Raises:
+          ValueError: if a note has no sample loaded at it, or an alias
+            already names a different sample.
+        """
+        for alias, note in aliases.items():
+            alias = str(alias)
+            if note not in self.sampdict:
+                raise ValueError(f"No sample is loaded at note '{note}' to alias as "
+                                 f"'{alias}', choose from: {[str(n) for n in self.samporder]}")
+            # a name must pick out one sample. Renaming the same sample is fine
+            taken = [n for n, a in self.aliases.items() if a == alias and n != note]
+            if taken:
+                raise ValueError(f"Alias '{alias}' already names the sample at "
+                                 f"note '{taken[0]}'")
+            if notes.valid_note(alias):
+                raise ValueError(f"Alias '{alias}' is a note name, so would be "
+                                 "read as a note in the Score")
+            self.aliases[note] = alias
+
+    def resolve_alias(self, alias):
+        """Find the root note of the sample an alias names.
+
+        Args:
+          alias (:obj:`str`): alias of a loaded sample
+
+        Returns:
+          note (:obj:`str`): the sample's root note
+
+        Raises:
+          ValueError: if no loaded sample has this alias.
+        """
+        for note, name in self.aliases.items():
+            if name == alias:
+                return note
+        raise ValueError(f"Sampler has no sample aliased '{alias}', choose "
+                         f"from: {sorted(self.aliases.values())}")
+
     def info(self, pretty=True):
         """
         Print info about the sampler set-up
@@ -954,11 +1052,16 @@ class Sampler(Generator):
             bfl, bfr = "\033[1m", "\033[0m"
         else:
             bfl, bfr = '',''
-        if self.sampsource == 'directory':
+        if self.sampsource in ('directory', 'speech'):
 
-            print(f"{bfl}Sample Assignment:{bfr}\n")
-
-            titles = ['Number', 'Home Pitch', 'File Name', 'Note Range', 'Alias']
+            if self.sampsource == 'speech':
+                print(f"{bfl}Phrase Assignment:{bfr}")
+                print(f"Engine: \t {self.engine}")
+                print(f"Voice: \t\t {self.voice if self.voice is not None else 'default'}\n")
+                titles = ['Number', 'Home Pitch', 'Note Range', 'Phrase']
+            else:
+                print(f"{bfl}Sample Assignment:{bfr}\n")
+                titles = ['Number', 'Home Pitch', 'File Name', 'Note Range', 'Alias']
             maxchars = []
             for i in range(len(titles)):
                 maxchars.append(len(titles[i]))
@@ -966,8 +1069,12 @@ class Sampler(Generator):
 
             for i in range(len(self.samporder)):
                 note = self.samporder[i]
-                fname = Path(self.sampdict[note]).name
+                fname = ('' if self.sampsource == 'speech'
+                         else Path(self.sampdict[note]).name)
                 line = [f"{i+1}.",f"{note}",f"{fname}",f"{' - '.join(self.sampranges[note])}", f"\"{self.aliases[note]}\""]
+                if self.sampsource == 'speech':
+                    # the filename is just the cache entry, so name the phrase
+                    line.pop(2)
                 for j in range(len(line)):
                     maxchars[j] = max(maxchars[j], len(line[j]))
                 lines.append(line)
@@ -1155,6 +1262,362 @@ class Sampler(Generator):
             sstream.filt_sweep(getattr(filters, params['filter_type']),
                                utils.const_or_evo_func(params['cutoff']))
         return sstream    
+
+class Speech(Sampler):
+    """Speech generator class
+
+    This generator class speaks phrases, rendering each with
+    text-to-speech (see :obj:`strauss.tts_caption`) and playing the
+    resultant audio via the :obj:`Sampler` machinery it inherits - so
+    the same envelope, filter, LFO and spatialisation handling applies.
+    Phrases are named in the :obj:`Score` by `alias`, i.e. the phrase
+    itself. Has attribute :obj:`self.gtype = 'speech'`.
+
+    Example:
+      ::
+
+        gen = Speech(['a red giant', 'a white dwarf'])
+        score = Score([['a red giant', 'a white dwarf']], 10)
+
+    Attributes:
+      gtype (:obj:`str`): Generator type
+      phrases (:obj:`list(str)`): the phrases loaded, in the order given
+      voice: the text-to-speech voice used, or :obj:`None` for the
+        current engine's default
+      engine (:obj:`str`): name of the text-to-speech engine used
+      cache_dir (:obj:`Path`): directory rendered phrases are cached in
+      aliases (:obj:`dict`): the phrase each loaded sample is called by
+        in a :obj:`Score`, alongside its root note
+
+    Todo:
+        * Support :obj:`Style` construction, which needs a way to carry
+          a phrase list.
+    """
+    supports_aliases = True
+    makes_aliases = True
+    sounds_have_pitch = False
+
+    # a spoken phrase is taken to have begun where it first rises above
+    # this level in dB relative to full scale, and ended where it last
+    # falls below it
+    _trim_db = -50.
+
+    # add fades to the ends of speech audio, to avoid artefacts
+    _fade_time = 0.005
+
+    def __init__(self, phrases=None, params=None, samprate=48000, voice=None,
+                 cache_dir=None):
+        """
+        Args:
+          phrases (`optional`, :obj:`list(str)`): the phrases to say,
+            each of which becomes a sample that can be called by in a
+            :obj:`Score` or by a `call` mapping. Where none are given,
+            the generator starts empty and generates whatever the
+            sonification asks for (see :meth:`make_aliases`).
+          params (`optional`, :obj:`dict`): any generator parameters
+            that differ from the generator :obj:`preset`, where keys and
+            values are parameters names and values respectively.
+          samprate (`optional`, :obj:`int`): the sample rate of
+            the generated audio in samples per second (Hz)
+          voice (`optional`): text-to-speech voice, passed to
+            :meth:`strauss.tts_caption.render_caption` as its `model`
+            (see :meth:`strauss.tts_caption.getVoices`). :obj:`None`
+            (default) uses the current engine's default voice. The
+            ``kokoro`` voices are described at
+            https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md
+          cache_dir (`optional`, :obj:`str`): where rendered phrases are
+            cached, by default :obj:`"~/.cache/strauss/speech"` (or
+            :obj:`$XDG_CACHE_HOME`, where set).
+
+        Raises:
+          TTSIsNotSupported: if no text-to-speech engine is installed.
+
+        Note:
+          Phrases are placed at consecutive semitones from `C1` in the
+          order given, so `pitch` maps low to high onto the phrase list
+          - the same order the :obj:`Score` reads aliases in. Empty
+          phrases are skipped, having nothing to say.
+
+        Note:
+          The silence a text-to-speech engine leaves around a phrase is
+          cut off, so that a source is *heard* at the time it sounds -
+          `kokoro`, for one, pads about a quarter of a second in front
+          of every phrase, which would put every event that late.
+
+        """
+        if get_ttsMode() == 'None':
+            raise TTSIsNotSupported(
+                "the 'speech' generator needs a text-to-speech engine.\n"
+                "Install one with 'pip install strauss[speech]', or see the\n"
+                "strauss.tts_caption module for the engines supported.")
+
+        # default speech preset
+        self.gtype = 'speech'
+        self.preset = getattr(presets, self.gtype).load_preset()
+        self.preset['ranges'] = getattr(presets, self.gtype).load_ranges()
+        self.sampsource = 'speech'
+        self.sampfiles = None
+        self.sf_preset = None
+        self.sf_preset_name = None
+        self.sf_note_range = []
+        self.assign_notes = 'sequential'
+
+        self.phrases = []
+        self.voice = voice
+        self.engine = get_ttsMode()
+        if cache_dir is None:
+            cache_dir = Path(os.environ.get('XDG_CACHE_HOME',
+                                            Path.home() / '.cache'),
+                             'strauss', 'speech')
+        self.cache_dir = Path(cache_dir)
+
+        # universal initialisation for generator objects:
+        super(Sampler, self).__init__(params, samprate)
+
+        # phrases are the aliases a Score or 'call' mapping names samples by
+        self.aliases = {}
+        self.samples = {}
+        self.samplens = {}
+        self.sampdict = {}
+        self.samporder = []
+        self.sampranges = {}
+
+        if phrases is not None:
+            self.make_aliases(phrases)
+
+    def make_aliases(self, names):
+        """Say any of the phrases the generator does not yet have.
+
+        Phrases are rendered and loaded as samples, so they can be called
+        in a :obj:`Score` or by a `call` mapping. Pre-loaded phrases are
+        kept, and rendered audio is cached, so calling repeatedly is
+        economical.
+
+        Args:
+          names (:obj:`list` of :obj:`str`): phrases to say
+
+        Raises:
+          ValueError: if `names` is a single string rather than a list
+            of them.
+
+        Note:
+          Empty phrases are skipped, having nothing to say.
+        """
+        if isinstance(names, str):
+            raise ValueError("phrases should be a list of strings to say, "
+                             f"not a single string ('{names}')")
+        names = [n for n in (str(n).strip() for n in names) if n]
+
+        # a phrase corresponds to one sample, so repeats are dropped (each
+        # is only rendered once), keeping the order first given
+        known = {p.lower(): p for p in self.phrases}
+        added = []
+        for name in names:
+            if name.lower() in known:
+                continue
+            known[name.lower()] = name
+            added.append(name)
+        if not added:
+            return
+
+        self.phrases = self.phrases + added
+        self._load_phrases()
+
+    def _load_phrases(self):
+        """Render and load every phrase, as a sampler loads its samples.
+
+        Phrases are placed at consecutive semitones from `C1` in the
+        order given. The notes are only labels to file the samples
+        under - a phrase is never bent to pitch - so they are allowed to
+        run past the top of the midi range where there are enough
+        phrases to need it.
+        """
+        mkey0 = notes.note_to_mkey('C1')
+        root_notes = [notes.mkey_to_note(mkey0+i)
+                      for i in range(len(self.phrases))]
+
+        # render each phrase up front, then load as any other samples
+        self.sampdict = {}
+        self.phrase_files = {}
+        for note, phrase in zip(root_notes, self.phrases):
+            path = self._render_phrase(phrase)
+            self.phrase_files[note] = path
+            self.sampdict[note] = self._phrase_audio(path)
+        self.load_samples()
+
+        # ...and name them by phrase rather than the cache filename
+        self.aliases = dict(zip(root_notes, self.phrases))
+
+    def _phrase_path(self, phrase):
+        """Path a phrase's rendered audio is cached at.
+
+        Args:
+          phrase (:obj:`str`): phrase to be spoken
+
+        Returns:
+          path (:obj:`Path`): the wav file path, which may not exist yet
+        """
+        if isinstance(self.voice, dict):
+            voicekey = json.dumps(self.voice, sort_keys=True, default=str)
+        else:
+            voicekey = str(self.voice)
+        # the sample rate is part of the key as phrases are cached
+        # already resampled to it
+        key = '|'.join([self.engine, voicekey, str(self.samprate),
+                        phrase.lower()])
+        digest = hashlib.sha1(key.encode('utf-8')).hexdigest()[:12]
+        slug = re.sub(r'\W+', '-', voicekey).strip('-')[:24] or 'default'
+        return Path(self.cache_dir, f"{self.engine}_{slug}_{digest}.wav")
+
+    def _render_phrase(self, phrase):
+        """Render a phrase to audio via text-to-speech, if not cached.
+
+        Args:
+          phrase (:obj:`str`): phrase to be spoken
+
+        Returns:
+          path (:obj:`str`): wav file of the spoken phrase, at the
+          generator's sample rate
+        """
+        path = self._phrase_path(phrase)
+        if path.exists():
+            return str(path)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # atomic copy to avoid partial renders from interrupted render
+        tmp = path.with_name(f"{path.stem}-tmp{os.getpid()}.wav")
+        try:
+            render_caption(phrase, self.samprate, self.voice, str(tmp))
+            os.replace(tmp, path)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+        return str(path)
+
+    def _phrase_audio(self, path):
+        """Read a rendered phrase, with its silence cut off.
+
+        Text-to-speech engines pad a phrase with silence at either end.
+        Left in, that silence would delay every source by the same
+        amount - a quarter of a second, for `kokoro` - so that a star
+        called out on the beat is heard late.
+
+        Args:
+          path (:obj:`str`): wav file of the spoken phrase
+
+        Returns:
+          audio (:obj:`ndarray`): the samples to sound, trimmed to the
+          phrase itself
+        """
+        rate, wav = wavfile.read(path)
+        # full scale for the file's sample type, for a level in dBFS
+        if np.issubdtype(wav.dtype, np.integer):
+            full_scale = float(np.iinfo(wav.dtype).max) + 1
+        else:
+            full_scale = 1.
+        if wav.ndim > 1:
+            wav = wav.mean(axis=1)
+        wav = np.asarray(wav, dtype='float64')
+        if rate != self.samprate:
+            # render_caption resamples as it writes, so this is a
+            # belt-and-braces check on anything already cached
+            wav = utils.resample(rate, self.samprate, wav)
+        threshold = full_scale * 10**(self._trim_db/20.)
+        loud = np.flatnonzero(np.abs(wav) > threshold)
+        if loud.size == 0:
+            return wav
+        wav = wav[loud[0]:loud[-1]+1]
+        nfade = min(int(self._fade_time*self.samprate), wav.size//2)
+        fade = np.sin(0.5*np.pi*np.arange(nfade)/nfade)**2
+        wav[:nfade] *= fade
+        wav[wav.size-nfade:] *= fade[::-1]
+        return wav
+
+    def clear_cache(self, all_phrases=False):
+        """Remove cached audio for this generator's phrases.
+
+        Args:
+          all_phrases (`optional`, :obj:`bool`): when :obj:`True`,
+            remove every phrase cached in :obj:`cache_dir`, not just
+            those this generator loaded.
+
+        Returns:
+          removed (:obj:`int`): number of cached files removed
+        """
+        if all_phrases:
+            paths = sorted(self.cache_dir.glob('*.wav'))
+        else:
+            paths = [self._phrase_path(p) for p in self.phrases]
+        removed = 0
+        for path in paths:
+            if path.exists():
+                path.unlink()
+                removed += 1
+        return removed
+
+    def fill_midi(self):
+        """Assign a phrase to every midi note, without pitch shifting.
+
+        As :meth:`Sampler.fill_midi`, but each note plays its nearest
+        phrase as rendered rather than a varispeed copy of it - a
+        phrase spoken faster or slower by note would be a different
+        phrase. Deliberate shifts are still available via the
+        `pitch_shift` parameter.
+        """
+        keys = np.array(list(self.samples.keys()))
+        assigned_mkey = np.array([notes.note_to_mkey(k) for k in keys])
+        keysort = np.argsort(assigned_mkey)
+        assigned_mkey = assigned_mkey[keysort]
+        keys = keys[keysort]
+        idx = 0
+        keylim = keys[0]
+        keylims = [['C-1']]
+        # phrases can go above midi range
+        topkey = max(127, int(assigned_mkey[-1]))
+        for i in range(topkey+1):
+            neardx = abs(i - assigned_mkey).argmin()
+            this_note = notes.mkey_to_note(i)
+            nearkey = keys[neardx]
+            if nearkey != keylim:
+                keylims[idx].append(notes.mkey_to_note(i-1))
+                idx += 1
+                keylims.append([])
+                keylims[idx].append(this_note)
+                keylim = nearkey
+            if this_note != nearkey:
+                # the same sample, at the same speed
+                self.samples[this_note] = self.samples[nearkey]
+                self.samplens[this_note] = self.samplens[nearkey]
+            if this_note[1] == '#':
+                # if a sharp, also assign flat...
+                flat_note = notes.noteflats[i%12]+this_note[2:]
+                if flat_note != nearkey:
+                    # avoid recursion assigning reference to itself!
+                    self.samples[flat_note] = self.samples[this_note]
+                    self.samplens[flat_note] = self.samplens[this_note]
+        keylims[idx].append(notes.mkey_to_note(i))
+        self.sampranges = dict(zip(keys, keylims))
+
+    def resolve_alias(self, alias):
+        """Find the root note of the sample a phrase names.
+
+        As :meth:`Sampler.resolve_alias`, but phrases are matched
+        case-insensitively.
+
+        Args:
+          alias (:obj:`str`): phrase naming a loaded sample
+
+        Returns:
+          note (:obj:`str`): the sample's root note
+
+        Raises:
+          ValueError: if no loaded sample speaks this phrase.
+        """
+        for note, phrase in self.aliases.items():
+            if phrase.lower() == str(alias).strip().lower():
+                return note
+        raise ValueError(f"Speech generator has no phrase '{alias}', choose "
+                         f"from: {sorted(self.aliases.values())}")
+
 
 class Spectralizer(Generator):
     """Spectralizer generator class
