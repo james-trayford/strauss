@@ -4,6 +4,15 @@
 note_length: [1.0e-2, 30.]
 note_length_unit: 'seconds'
 
+# oscillators, with phase optionally 'random'
+oscillators:
+  osc1: &osc_units
+    level_unit: 'relative amplitude'
+    detune_unit: 'percent'
+    phase_unit: 'cycles'
+  osc2: *osc_units
+  osc3: *osc_units
+
 # define the note volume envelope applied to the samples
 # A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
 volume_envelope:

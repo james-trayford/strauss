@@ -329,8 +329,6 @@ class Source:
         mapped values of evolving parameters rather than replacing
         them with interpolation functions. Set by
         :meth:`apply_mapping_functions`.
-      names (:obj:`list(str)`): name of each source, used to look up
-        its table. Defaults to `source_0` to `source_N`.
       table_angle_unit (:obj:`str`): units to report spatial angles
         in, rather than as the mapped fractions the sonification works
         in. Defaults to degrees where unset.

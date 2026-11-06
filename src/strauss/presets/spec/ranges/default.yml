@@ -45,11 +45,6 @@ theta_unit: 'half-cycles'
 pitch_shift: [0., 24.]
 pitch_shift_unit: 'semitones'
 
-# Do we apply a filter, and if so specify the cutoff and filter type
-filter: "off"
-filter_type: "LPF1"
-cutoff: 1.
-
 # define the note volume envelope applied to the samples
 # A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
 volume_envelope:

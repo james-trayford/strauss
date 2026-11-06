@@ -80,6 +80,7 @@ cython_debug/
 #.idea/~
 
 docs/_build/
+docs/tables.md
 
 # Ignore WAV files, with explicit exceptions ('unignore') for packaged samples...
 *.wav

@@ -66,7 +66,7 @@ plt.close()
 
 # **Set up some universal sonification parameters and classes for the examples below**
 # 
-# For all examples we use the `Synthesizer` generator to create a 30 second, mono sonification.
+# For all examples we use the `Spectralizer` generator to create a 30 second, mono sonification.
 
 # In[75]:
 

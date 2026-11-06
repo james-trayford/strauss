@@ -15,6 +15,10 @@ import sys
 from pathlib import Path
 sys.path.insert(0, os.path.abspath(Path('..')))
 sys.path.insert(0, os.path.abspath(Path('..','..','src','strauss','presets')))
+sys.path.insert(0, os.path.abspath('.'))
+
+import strauss
+from yamls_to_tables import write_tables
 
 # -- Project information -----------------------------------------------------
 
@@ -23,7 +27,7 @@ copyright = '2023, Dr. James Trayford'
 author = 'Dr. James Trayford'
 
 # The full version, including alpha/beta/rc tags
-release = '1.0.0'
+release = strauss.__version__
 
 
 # -- General configuration ---------------------------------------------------
@@ -43,15 +47,13 @@ html_js_files = [
     'js/custom.js'
 ]
 
-print(extensions)
-
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'tables.md']
 
 todo_include_todos = True
 
@@ -75,3 +77,11 @@ myst_footnote_transition = False
 # html_theme_options = {
 #     'page_width': '1200px'
 # }
+
+# -- Generated pages ---------------------------------------------------------
+
+def generate_tables(app):
+    write_tables(Path(app.srcdir, 'tables.md'))
+
+def setup(app):
+    app.connect('builder-inited', generate_tables)

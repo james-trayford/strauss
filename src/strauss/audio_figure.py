@@ -724,8 +724,8 @@ class AudioFigure:
             sonification(s). Otherwise, animate all.
           fname (`optional`, :obj:`str`): the video filename to write. 
             Else the animation data is returned.
-          fps, dpi, highlight, preview_fps, max_panels, ffmpeg_output,
-            waveform: as for
+          fps, dpi, highlight, preview_fps, max_panels, ffmpeg_output, waveform:
+            as for
             :meth:`strauss.sonification.Sonification.animate_mapping`.
             `max_panels` applies to each column, and each column gets
             its own sonification's waveform

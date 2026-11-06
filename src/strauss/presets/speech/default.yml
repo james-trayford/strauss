@@ -87,7 +87,8 @@ pitch_shift: 0.
 
 _meta:
   _doc: >-
-    The `Sampler` generator type can be used to modify and play audio samples (sound recordings) .
+    The `Speech` generator type speaks text phrases, rendered with text-to-speech and played as
+    samples. It is provisional.
   name: Preset name
   description: Full description of the parameters selected for this preset, e.g. looping, volume and pitch envelopes, filters, etc.
   note_length: >-

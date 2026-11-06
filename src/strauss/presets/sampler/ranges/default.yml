@@ -4,6 +4,11 @@
 note_length: [1.0e-2, 30.]
 note_length_unit: 'seconds'
 
+# looping points and cross-fade
+loop_start_unit: 'seconds'
+loop_end_unit: 'seconds'
+loop_xfade_unit: 'seconds'
+
 # define the note volume envelope applied to the samples
 # A,D,S & R correspond to 'attack', 'decay', 'sustain' and 'release'
 volume_envelope:
