@@ -1,6 +1,6 @@
 name: "windy"
 
-description: ""
+description: "Textural mapping of low-pass filter cutoff over time, using white noise for a wind effect."
 
 sources: "objects"
 

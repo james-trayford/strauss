@@ -1,6 +1,6 @@
 name: 'Flute Section'
 
-description: ''
+description: 'Tonal mapping of low-pass filter cutoff over time, using five flute voices to hold a musical chord.'
 
 generator:
   type: 'sampler'

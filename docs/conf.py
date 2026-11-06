@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(Path('..','..','src','strauss','presets')))
 sys.path.insert(0, os.path.abspath('.'))
 
 import strauss
-from yamls_to_tables import write_tables
+from yamls_to_tables import write_style_tables, write_tables
 
 # -- Project information -----------------------------------------------------
 
@@ -53,7 +53,9 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'tables.md']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'tables.md',
+                    'builtin_styles.md', 'behaviour_options.md',
+                    'style_tables.md']
 
 todo_include_todos = True
 
@@ -82,6 +84,9 @@ myst_footnote_transition = False
 
 def generate_tables(app):
     write_tables(Path(app.srcdir, 'tables.md'))
+    write_style_tables(Path(app.srcdir, 'builtin_styles.md'),
+                       Path(app.srcdir, 'behaviour_options.md'),
+                       Path(app.srcdir, 'style_tables.md'))
 
 def setup(app):
     app.connect('builder-inited', generate_tables)

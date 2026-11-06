@@ -21,6 +21,8 @@ Strauss is packaged with a variety of :doc:`example scripts <./examples>`. These
 
    motivation
    start
+   quickstart
+   styles
    elements
    params
    detailed

@@ -119,11 +119,11 @@ class Mapping(MonitoredBaseModel):
         default=None,
         title='Fixed Value',
         description=(
-            'The value to hold this parameter at for the duration of the sonification.'
+            'The value to hold this parameter at for the duration of the sonification. '
             'Some parameters are "evolvable" but we might want to fix them at certain values. '
             'For example, we might want to hard pan a source to the left for the duration of the sonification. '
             'We can achieve this by specifying "output": "pan" and "fixed": 0. '
-            'If using a fixed value, any input specified will be ignored, as the fixed value takes precedence.'
+            'If using a fixed value, any input specified will be ignored, as the fixed value takes precedence. '
             'The fixed value specified needs to be within the limits of the output parameter specified.'
         ),
         examples=[0, 1, 0.5, 0.3, 0.9]
@@ -566,8 +566,8 @@ class Style(MonitoredBaseModel):
     pitch_binning: Literal['adaptive', 'uniform'] = Field(
         default='adaptive',
         title='Pitch Binning Mode',
-        description='The method used to determine how the data is binned into discrete pitches (if using pitch as a parameter).'
-                    'choose from "adaptive", where sources are binned by the pitch mapping such that each '
+        description='The method used to determine how the data is binned into discrete pitches (if using pitch as a parameter). '
+                    'Choose from "adaptive", where sources are binned by the pitch mapping such that each '
                     'interval is represented the same fraction of the time, and "uniform" where the pitch binning '
                     'is based on uniform size bins in the mapped pitch parameter.',
         examples=['adaptive', 'uniform']

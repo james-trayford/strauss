@@ -1,6 +1,6 @@
 name: "default"
 
-description: ""
+description: "Continuous pitch mapping over time, using a simple triangle tone and a two-octave range."
 
 sources: "objects"
 

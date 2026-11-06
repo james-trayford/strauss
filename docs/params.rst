@@ -21,11 +21,11 @@ The mapping limits, ``map_lims``, are the minimum and maximum allowed values of 
 
 .. warning::
 
-   Units differ depending on how a parameters are set, these conventions should be made clear by version 2.0, but currently arexs summarised here:
+   Units differ depending on how parameters are set. These conventions should be made clear by version 2.0, but are currently summarised here:
 
    * **Spatial angles:** input values for ``azimuth`` and ``polar`` are in ``angle_unit`` (cycles), whatever the tables below list. ``polar`` folds over a full turn, so ``0``, ``0.25`` and ``0.5`` give the zenith, horizon and nadir, with ``0.75`` and ``1`` folding back. The ``half-cycles`` unit and ``0 to 1`` limits listed for ``polar`` describe the value after folding. Giving ``map_lims`` for an angle skips the folding, and scales the data linearly between zenith and nadir instead. Angles cannot take ``param_lims``.
-   * **Fixed values:** ``fix_*`` keywords to ``AudioFigure.sonify`` are fractions of the parameter's range, not its listed units, and are clipped to that range. For example, ``fix_pitch_lfo/freq`` of ``2`` gives 12 Hz, not 2 Hz. Spatial angles are the exception, and use ``angle_unit`` as above.
-   * **Mapped values:** ``param_lims``, and ``output_range`` in a style, use the parameter's own units.
+   * **Fixed values:** ``fix_*`` keywords to ``AudioFigure.sonify``, and ``fixed`` in a style, use the parameter's own units. ``fix_*`` values are clipped to the parameter's range, and ``fixed`` values outside it are rejected. The exception is a sonification with a single source, such as the one note of the ``default`` style, where the value is read as a fraction of the range: ``fix_pitch_lfo/freq`` of ``2`` gives 2 Hz with three notes, but 12 Hz with one note or event. Spatial angles use ``angle_unit`` as above.
+   * **Mapped values:** ``param_lims``, and ``output_range`` in a style, use the parameter's own units. A parameter with a single value is also read as a fraction of the range, ignoring ``map_lims``.
 
 .. _mappable-parameters:
 
