@@ -7,7 +7,7 @@ note_length_unit: 'seconds'
 # oscillators, with phase optionally 'random'
 oscillators:
   osc1: &osc_units
-    level_unit: 'relative amplitude'
+    level_unit: 'fractional amplitude'
     detune_unit: 'percent'
     phase_unit: 'cycles'
   osc2: *osc_units

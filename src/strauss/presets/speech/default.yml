@@ -87,8 +87,8 @@ pitch_shift: 0.
 
 _meta:
   _doc: >-
-    The `Speech` generator type speaks text phrases, rendered with text-to-speech and played as
-    samples. It is provisional.
+    The `Speech` generator type says text phrases, rendered via text-to-speech and played like
+    samples.
   name: Preset name
   description: Full description of the parameters selected for this preset, e.g. looping, volume and pitch envelopes, filters, etc.
   note_length: >-
