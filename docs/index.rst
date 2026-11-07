@@ -23,6 +23,8 @@ Strauss is packaged with a variety of :doc:`example scripts <./examples>`. These
    start
    quickstart
    styles
+   audio_figure
+   inspecting
    elements
    params
    detailed
