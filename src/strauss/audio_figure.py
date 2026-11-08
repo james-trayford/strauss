@@ -79,6 +79,8 @@ _kw_defaults = {
     'caption': None,
     'name': None,
     'level': 1,
+    # notes to play, overriding the style's own notes where given
+    'notes': None,
 }
 
 _exclude_keys = ['name', 'level']
@@ -185,6 +187,8 @@ class AudioFigure:
         if not sonpars['style']:
             sonpars['style'] = 'default'
         style = styles.Style(**load_style(sonpars['style']))
+        if sonpars['notes'] is not None:
+            style.notes = sonpars['notes']
 
         # an entry is a data mapping or a fixed value by what it holds, not by
         # where it sits in the map. Data mappings take the input data in the
