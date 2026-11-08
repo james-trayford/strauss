@@ -3,6 +3,9 @@
 Quickstart
 ##########
 
+.. versionadded:: 1.5
+   The high-level ``strauss.sonify`` interface, with styles and audio figures.
+
 Here, we demonstrate how you can make your first sonifications in just a few lines using the high-level ``strauss.sonify`` interface! First, you'll need ``strauss`` installed. See :doc:`start` for instructions.
 
 Your first sonification

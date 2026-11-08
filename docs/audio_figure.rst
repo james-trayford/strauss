@@ -3,6 +3,9 @@
 Audio Figures
 #############
 
+.. versionadded:: 1.5
+   Audio figures, combining several sonifications in one mix.
+
 An *audio figure* allows multiple sonifications to be combined for richer sonic representations of data. The audio figure has (in-development) audio display features, such as axis ticks, spoken captions or an audio legend. Each sonification is added to an *audio figure* as a named component with its own level or "track", which is mixed together as a single piece of audio.
 
 A useful analogy could be a plotting library like `matplotlib <https://matplotlib.org/>`_, where a figure can contain multiple plots, each with its own data and plotting styles.

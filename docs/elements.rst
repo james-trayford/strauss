@@ -63,6 +63,9 @@ Generator Class
 
 The :code:`Generator` class takes instruction from the two prior classes and generates audio for each individual source. This can be achieved using the :code:`Sampler`, :code:`Synthesizer` or :code:`Spectralizer` child classes, detailed below, with some applied examples.
 
+.. versionadded:: 1.5
+   The :code:`Speech` generator, and sample aliases for the :code:`Sampler`. See :doc:`aliases`.
+
 `Sampler`
 '''''''''
 

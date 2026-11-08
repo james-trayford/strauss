@@ -3,6 +3,9 @@
 Representing Sonifications
 ##########################
 
+.. versionadded:: 1.5
+   Tables and mapping plots of a sonification, and provisional animation.
+
 Tables and plots can be generated to illustrate how each sonification in an audio figure communicates its input data, showing the values each sound parameter takes to represent each source across its duration. As elsewhere, let's first make a simple audio figure:
 
 .. code-block:: python

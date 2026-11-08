@@ -3,6 +3,9 @@
 Styles
 ######
 
+.. versionadded:: 1.5
+   Styles, for use with ``strauss.sonify``.
+
 A style specifies how data gets represented as sound for a given sonification. This includes: the sound to use (i.e. the "generator"), the representation of input data (either as transient events or continuous objects), which expressive properties of sound the data is mapped to, and any set of musical notes to stick to. 
 
 Styles are completely specified by their YAML file, and so this is all you need to share, write or modify your own styles. 

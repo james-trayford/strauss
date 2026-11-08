@@ -16,6 +16,15 @@ Strauss is packaged with a variety of :doc:`example scripts <./examples>`. These
 .. note::
    Strauss and its documentation is in continuous development, with more features in the pipeline. Follow the `GitHub repository <https://github.com/james-trayford/strauss>`_ for the cutting-edge release.
 
+What's new in 1.5
+-----------------
+
+* :doc:`quickstart`: sonify data in a line with ``strauss.sonify``, using built-in or your own :doc:`styles`.
+* :doc:`audio_figure`: combine sonifications in one mix, with their own levels.
+* :doc:`inspecting`: tables and plots of how data became sound.
+* :doc:`aliases`: call samples by name, and speak phrases with the ``Speech`` generator.
+* :doc:`output`: pairwise surround panning, one ``save`` for every audio system, and ticks.
+
 .. toctree::
    :maxdepth: 2
 
@@ -25,6 +34,8 @@ Strauss is packaged with a variety of :doc:`example scripts <./examples>`. These
    styles
    audio_figure
    inspecting
+   aliases
+   output
    elements
    params
    detailed
