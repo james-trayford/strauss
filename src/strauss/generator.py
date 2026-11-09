@@ -48,6 +48,13 @@ from .tts_caption import render_caption, get_ttsMode, TTSIsNotSupported
 # ignore wavfile read warning that complains due to WAV file metadata
 warnings.filterwarnings("ignore", message=r"Chunk \(non-data\) not understood, skipping it\.")
 
+# soundfont samples loaded by any Sampler, keyed by file, modification time,
+# requested preset and sample rate, so samplers on the same soundfont share
+# them rather than each loading their own copy
+_soundfont_cache = {}
+_SOUNDFONT_ATTRS = ('sf2', 'sf_preset', 'sf_preset_name', 'sampdict', 'samples',
+                    'samplens', 'aliases', 'sampranges', 'samporder')
+
 # TO DO:
 # - Ultimately have Synth and Sampler classes that own their own stream (stream.py) object
 #   allowing ADSR volume and filter enveloping, LFO implementation etc.
@@ -710,69 +717,87 @@ class Sampler(Generator):
             sampfiles = str(sampfiles)
             if sampfiles[-4:] == '.sf2':
                 self.sampsource = 'soundfont'
-                # if a soundfont (.sf2) file, use read routines
-                with open(sampfiles, 'rb') as sf2_file:
-                    self.sf2 = Sf2File(sf2_file)
-                    # number of presets (excluding EOS entry)
-                    npres = len(self.sf2.raw.pdta['Phdr'][:-1])
-                    if npres == 1:
-                        # if there's only one preset, choose it
-                        sf_preset = 1
-                    if not (isinstance(sf_preset, int) and (sf_preset >= 1) and (sf_preset <= npres)):
-                        # if there's more than one, and no valid number specified, ask for one.
-                        print("valid 'sf_preset' not provided for soundfont file, available presets are:")
-                        print('\n'+''.join(['-']*40))
-                        choose_name = ''
-                        for i in range(npres):
-                            hdr = self.sf2.raw.pdta['Phdr'][i]
-                            name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
-                            print(f"{i+1}. {name}")
-                            if not choose_name:
-                                choose_name = name
-                        print(''.join(['-']*40)+'\n')
-                        # TODO: zero index, but would 1 index be more user friendly?
-                        print(f"By default choosing preset 1 ({choose_name}).\n\n"
-                              "Re-run 'Sampler' with the 'sf_preset' keyword argument to select a specific\n"
-                              f"preset, ie. 'Sampler(\"{sampfiles}\",sf_preset=N)',\n"
-                              f"where N is an integer from 1-{i+1}.\n")
-                        sf_preset = 1
-                        
-                    # TODO: isolate the warning suppression better?
-                    logger = logging.getLogger()
-
-                    pres = self.sf2.build_presets()
-                    logger.disabled = True
-                    sf_data = self.get_sfpreset_samples(pres[sf_preset-1])
-                    self.sampdict = self.reconstruct_samples(sf_data)
-                    logger.disabled = False
-
-                    self.sf_preset = sf_preset
-                    hdr = self.sf2.raw.pdta['Phdr'][sf_preset-1]
-                    self.sf_preset_name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
-                self.load_samples()
+                # samplers on the same soundfont share its samples, read
+                # only, rather than each holding hundreds of MB of its own
+                key = (os.path.realpath(sampfiles), os.path.getmtime(sampfiles),
+                       sf_preset, self.samprate)
+                if key not in _soundfont_cache:
+                    self._load_soundfont(sampfiles, sf_preset)
+                    _soundfont_cache[key] = {a: getattr(self, a) for a in _SOUNDFONT_ATTRS}
+                for a, val in _soundfont_cache[key].items():
+                    # copy the containers, so per-sampler changes (e.g.
+                    # aliases) stay with that sampler
+                    setattr(self, a, copy.copy(val) if isinstance(val, (dict, list)) else val)
             else:
-                self.sampsource = 'directory'
-                wavs = sorted(Path(sampfiles).glob("*.[wW][aA][vV]"))
-                self.sampdict = {}
-                unassigned_wavs = []
-                for w in wavs:
-                    filename = Path(w).name
-                    note = filename.split('_')[-1].split('.')[0]
-                    if notes.valid_note(note):
-                        self.sampdict[note] = str(w)
-                    else:
-                        unassigned_wavs.append(str(w))
-                if len(unassigned_wavs) == 0:
-                    # All samples assigned to notes
-                    self.load_samples()
-                elif len(unassigned_wavs) == len(wavs):
-                    # All samples unassigned
-                    self.load_samples(unassigned_wavs=unassigned_wavs)
-                else:
-                    # A mix of assigned and unassigned samples
-                    warnings.warn("Mix of sample filenames with and without specified notes. \n"
-                                  "Assigning unspecified samples to remaining notes.")
-                    self.load_samples(unassigned_wavs=unassigned_wavs)
+                self._load_directory(sampfiles)
+
+    def _load_soundfont(self, sampfiles, sf_preset):
+        """Read and load the samples of one preset of a soundfont file."""
+        # if a soundfont (.sf2) file, use read routines
+        with open(sampfiles, 'rb') as sf2_file:
+            self.sf2 = Sf2File(sf2_file)
+            # number of presets (excluding EOS entry)
+            npres = len(self.sf2.raw.pdta['Phdr'][:-1])
+            if npres == 1:
+                # if there's only one preset, choose it
+                sf_preset = 1
+            if not (isinstance(sf_preset, int) and (sf_preset >= 1) and (sf_preset <= npres)):
+                # if there's more than one, and no valid number specified, ask for one.
+                print("valid 'sf_preset' not provided for soundfont file, available presets are:")
+                print('\n'+''.join(['-']*40))
+                choose_name = ''
+                for i in range(npres):
+                    hdr = self.sf2.raw.pdta['Phdr'][i]
+                    name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
+                    print(f"{i+1}. {name}")
+                    if not choose_name:
+                        choose_name = name
+                print(''.join(['-']*40)+'\n')
+                # TODO: zero index, but would 1 index be more user friendly?
+                print(f"By default choosing preset 1 ({choose_name}).\n\n"
+                      "Re-run 'Sampler' with the 'sf_preset' keyword argument to select a specific\n"
+                      f"preset, ie. 'Sampler(\"{sampfiles}\",sf_preset=N)',\n"
+                      f"where N is an integer from 1-{i+1}.\n")
+                sf_preset = 1
+                
+            # TODO: isolate the warning suppression better?
+            logger = logging.getLogger()
+
+            pres = self.sf2.build_presets()
+            logger.disabled = True
+            sf_data = self.get_sfpreset_samples(pres[sf_preset-1])
+            self.sampdict = self.reconstruct_samples(sf_data)
+            logger.disabled = False
+
+            self.sf_preset = sf_preset
+            hdr = self.sf2.raw.pdta['Phdr'][sf_preset-1]
+            self.sf_preset_name = json.dumps(hdr.name.decode('utf-8')).replace(r'\u0000', '')
+        self.load_samples()
+
+    def _load_directory(self, sampfiles):
+        """Load the WAV samples in a directory, assigning notes from their names."""
+        self.sampsource = 'directory'
+        wavs = sorted(Path(sampfiles).glob("*.[wW][aA][vV]"))
+        self.sampdict = {}
+        unassigned_wavs = []
+        for w in wavs:
+            filename = Path(w).name
+            note = filename.split('_')[-1].split('.')[0]
+            if notes.valid_note(note):
+                self.sampdict[note] = str(w)
+            else:
+                unassigned_wavs.append(str(w))
+        if len(unassigned_wavs) == 0:
+            # All samples assigned to notes
+            self.load_samples()
+        elif len(unassigned_wavs) == len(wavs):
+            # All samples unassigned
+            self.load_samples(unassigned_wavs=unassigned_wavs)
+        else:
+            # A mix of assigned and unassigned samples
+            warnings.warn("Mix of sample filenames with and without specified notes. \n"
+                          "Assigning unspecified samples to remaining notes.")
+            self.load_samples(unassigned_wavs=unassigned_wavs)
 
 
     def get_sfpreset_samples(self, sfpreset):
@@ -983,7 +1008,9 @@ class Sampler(Generator):
                 keylims[idx].append(this_note)
                 keylim = keys[neardx]
             if this_note != nearkey:
-                self.samples[this_note] = lambda x, s=sfac, k=nearkey: self.samples[k](x*s)  
+                # bound to the sample itself rather than looked up on this
+                # sampler, so it stays correct when shared with another
+                self.samples[this_note] = lambda x, s=sfac, f=self.samples[nearkey]: f(x*s)
                 # read `sfac` times faster, so lasts 1/`sfac` as long
                 self.samplens[this_note] = self.samplens[nearkey]/sfac
             if this_note[1] == '#':
