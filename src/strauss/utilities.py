@@ -773,6 +773,12 @@ class MinPixelLocator(Locator):
         # from the usual density up to as dense as could ever fit
         length = abs(np.diff(self.to_pixels([vmin, vmax]))[0])
         nbins = max(int(length / (1.5*self.min_pixels)), 4)
+        if self.axis is not None:
+            # no axis is longer than its figure, whatever `to_pixels`
+            # says - so a mismeasure can't ask for millions of ticks
+            # (`.figure.figure`: the root, as the axes may sit in a subfigure)
+            longest = 72.*max(self.axis.axes.figure.figure.get_size_inches())
+            nbins = min(nbins, max(int(longest / (1.5*self.min_pixels)), 4))
         return [MaxNLocator(nbins=nbins*k, steps=[1, 2, 2.5, 5, 10]).tick_values(vmin, vmax)
                 for k in (1, 2, 4, 8)]
 

@@ -414,17 +414,25 @@ def _secondary_axis(soni, ax, key, which, functions, data, min_pixels,
     def to_points(pixels):
         return pixels*72./ax.figure.dpi
 
+    def to_display(xy):
+        # the axes' limits follow their data only once asked for, so a
+        # locator called before a draw (as setting tick labels does)
+        # would measure against the default (0, 1) - for a wide input,
+        # an axis millions of points long, and millions of ticks
+        ax.get_xlim()
+        return ax.transData.transform(xy)
+
     if which == 'x':
         secondary = ax.secondary_xaxis('top', functions=functions)
         secondary.set_xlabel(label)
         axis = secondary.xaxis
-        to_pixels = lambda ticks: to_points(ax.transData.transform(
+        to_pixels = lambda ticks: to_points(to_display(
             np.column_stack([inverse(ticks), np.zeros(np.size(ticks))]))[:, 0])
     else:
         secondary = ax.secondary_yaxis('right', functions=functions)
         secondary.set_ylabel(label)
         axis = secondary.yaxis
-        to_pixels = lambda ticks: to_points(ax.transData.transform(
+        to_pixels = lambda ticks: to_points(to_display(
             np.column_stack([np.zeros(np.size(ticks)), inverse(ticks)]))[:, 1])
     secondary.tick_params(axis=which, direction='in')
 
@@ -1121,7 +1129,9 @@ def draw_mapping(soni, fig, spec, panel_size, group_gap, min_tick_points,
                 # panel, so label it once, at the top
                 if labelled_time:
                     secx.set_xlabel('')
-                    secx.set_xticklabels([])
+                    # hidden rather than emptied, which would make
+                    # the ticks now, and fix them in place
+                    secx.tick_params(axis='x', labeltop=False)
                 labelled_time = True
 
         # one label centred on the stack, on its middle panel
