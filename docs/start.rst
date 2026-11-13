@@ -51,29 +51,55 @@ throughout the documentation, I will refer to this as the **strauss repo** or **
 Text-to-speech
 **************
 
-Fot text-to-speech (TTS) functionality, there are a couple of options: _system_ and _AI_ text to speech.
+For text-to-speech (TTS) functionality, there are a couple of options: *system* and *AI* text to speech.
 
-If you would like to use system AI, you will need to install the (as of writing) cutting-edge `pyttsx3` dependency, with 
+If you would like to use system TTS, you will need to install the (as of writing) cutting-edge `pyttsx3` dependency, with 
 
 .. code-block:: bash
 
    pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple/ pyttsx3==2.99
 
-If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`AI-TTS` dependency:
+If you would like to use AI text-to-speech instead, you can instead install strauss requesting the optional :code:`speech` dependency (also available as :code:`TTS` or :code:`AI-TTS`), which installs the :code:`kokoro` engine (or :code:`kokoro-onnx` on Python 3.13). 
 
 .. code-block:: bash
 
-   pip install "strauss[AI-TTS]"
+   pip install "strauss[speech]"
 
 or, for an install from a local repository copy:
 
 .. code-block:: bash
 
-   pip install -e ".[AI-TTS]"
+   pip install -e ".[speech]"
 
 .. note::
-   The AI TTS is currently supported for python version :code:`<= 3.12`.
-   
+   This is an optional extra rather than a default as :code:`kokoro` pulls in :code:`torch`, which is
+   a few hundred MB; voice models download on first use.
+
+.. note::
+   :code:`kokoro` only supports Python<=3.12, so installs :code:`kokoro-onnx` (different pronunciation engine and  lacking Japanese and Mandarin voices). To use it on earlier versions, install
+   :code:`strauss[kokoro-onnx]`.
+
+   :code:`kokoro-onnx` doesn't yet allow Python 3.14 due to version limits, in this case you can try to force install with: 
+
+   .. code-block:: bash
+
+      pip install --ignore-requires-python kokoro-onnx==0.6.1
+
+Strauss uses our favoured engine, prioritising :code:`kokoro`, (or
+:code:`kokoro-onnx`) with :code:`pyttsx3` as a fall back option. To choose one explicitly, or list voices:
+
+.. code-block:: python
+
+   from strauss import tts_caption
+   tts_caption.set_engine('kokoro')
+   tts_caption.getVoices(info=True)
+
+A :code:`kokoro` voice is named :code:`<language><gender>_<name>`, so :code:`'af_heart'` is an
+American female voice and :code:`'bf_emma'` a British female one. See the voice list at:
+`hexgrad/Kokoro-82M VOICES.md <https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md>`_.
+A voice is chosen per caption with :code:`Sonification(ttsmodel='af_heart')`, and for spoken
+sources with :code:`Speech(voice='af_heart')`.
+
 Example jupyter notebooks/scripts
 *********************************
 

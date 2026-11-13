@@ -18,6 +18,7 @@ from pathlib import Path
 import subprocess as sp
 import tempfile
 import warnings
+from matplotlib.ticker import Locator, MaxNLocator
 
 
 # Some utility classes (these may graduate to somewhere else eventually)
@@ -355,41 +356,6 @@ def suppress_stdout_stderr():
         with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
             yield (err, out)
 
-def get_supported_coqui_voices():
-    """Show supported Coqui-AI TTS voices
-    
-    """
-    voices = []
-
-    jenny = {"id": Path('tts_models', 'en', 'jenny', 'jenny'),
-             "name": 'jenny',
-             "languages": ['en_GB'],
-             "age": None}
-    
-    voices.append(jenny)
-
-    vits = {"id": Path('tts_models', '{iso_code}', 'fairseq', 'vits'),
-            "name": 'fairseq-{iso_code}',
-            "languages": ['many (https://dl.fbaipublicfiles.com/mms/tts/all-tts-languages.html for iso codes)'],
-            "age": None}
-
-    voices.append(vits)
-
-    vits_ita = {"id": Path('tts_models', 'it', 'mai_female', 'glow-tts'),
-                "name": 'mai',
-                "languages": ['it_IT'],
-                "age": None}
-
-    voices.append(vits_ita)
-
-    thorsten = {"id": Path('tts_models', 'de', 'thorsten', 'vits'),
-                "name": 'thorsten',
-                "languages": ['de_DE'],
-                "age": None}
-
-    voices.append(thorsten)
-
-    return voices
 
 def merge_events_original(duration, max_rate, time, arglist):
     nevents = len(time)
@@ -750,3 +716,201 @@ def write_audio(fname, samprate, samples, layout=None, master_volume=1.):
             wavfile.write(fname, samprate, samples)
 
     print(f"Saved {fname}")
+
+
+class MinPixelLocator(Locator):
+    """Tick locator that thins ticks to a minimum separation on screen.
+
+    A secondary axis converted from a primary one by a function has
+    ticks placed evenly in its own values, which can land arbitrarily
+    close together on the page where the function is steep, or run past
+    the data it describes. 
+
+    Args:
+      base_locator (:obj:`matplotlib.ticker.Locator`): locator to take
+        candidate ticks from. If `None`, candidates are placed at round
+        values about twice as dense as `min_pixels` along the axis, so
+        that a stretch of the axis the function compresses keeps as
+        many ticks as will fit
+      to_pixels (:obj:`callable`): takes tick values to their position
+        along the axis in pixels
+      min_pixels (:obj:`float`): minimum separation of kept ticks
+      min_val (:obj:`float`, optional): lowest tick value to keep
+      max_val (:obj:`float`, optional): highest tick value to keep
+      log (:obj:`bool`, optional): place candidates by decade, as for
+        a frequency in Hz, rather than evenly
+      min_ticks (:obj:`int`, optional): fewest ticks to read a scale
+        by. Where the usual ticks fall short, denser candidates are
+        added wherever they fit, then even steps in place of decades,
+        then ticks closer than `min_pixels` - but never closer than
+        `0.6*min_pixels`, so fewer remain on an axis too short for them.
+        Not applied with a `base_locator`, whose ticks are its own
+    """
+    def __init__(self, base_locator, to_pixels, min_pixels=40,
+                 min_val=None, max_val=None, log=False, min_ticks=3):
+        self.base_locator = base_locator
+        self.to_pixels = to_pixels
+        self.min_pixels = min_pixels
+        self.min_val = min_val
+        self.max_val = max_val
+        self.log = log
+        self.min_ticks = min_ticks
+
+    def __call__(self):
+        vmin, vmax = self.axis.get_view_interval()
+        return self.tick_values(vmin, vmax)
+
+    def _candidates(self, vmin, vmax, log):
+        if self.base_locator is not None:
+            return [self.base_locator.tick_values(vmin, vmax)]
+        if log and vmax > 0:
+            # round numbers at each decade - then in 2s and 5s, then
+            # every step
+            from matplotlib.ticker import LogLocator
+            vmin = vmin if vmin > 0 else 1e-3*vmax
+            return [LogLocator(subs=subs, numticks=100).tick_values(vmin, vmax)
+                    for subs in ((1.,), (1., 2., 5.), tuple(range(1, 10)))]
+        # from the usual density up to as dense as could ever fit
+        length = abs(np.diff(self.to_pixels([vmin, vmax]))[0])
+        nbins = max(int(length / (1.5*self.min_pixels)), 4)
+        if self.axis is not None:
+            # no axis is longer than its figure, whatever `to_pixels`
+            # says - so a mismeasure can't ask for millions of ticks
+            # (`.figure.figure`: the root, as the axes may sit in a subfigure)
+            longest = 72.*max(self.axis.axes.figure.figure.get_size_inches())
+            nbins = min(nbins, max(int(longest / (1.5*self.min_pixels)), 4))
+        return [MaxNLocator(nbins=nbins*k, steps=[1, 2, 2.5, 5, 10]).tick_values(vmin, vmax)
+                for k in (1, 2, 4, 8)]
+
+    def tick_values(self, vmin, vmax):
+        # start from the usual ticks, then fill any stretch of the axis
+        # left with room from progressively denser sets - so an evenly
+        # spread axis keeps its round steps
+        if self.min_val is not None:
+            vmin = max(vmin, self.min_val)
+        if self.max_val is not None:
+            vmax = min(vmax, self.max_val)
+        sets = self._candidates(vmin, vmax, self.log)
+        base = np.asarray(sets[0], dtype=float)
+        kept = self._prune(base, self.min_pixels)
+        # only fill to the spacing the usual ticks would have had, were
+        # the axis evenly spread, so that one that is stays as it was
+        length = abs(np.diff(self.to_pixels([vmin, vmax]))[0])
+        nominal = length/max(base.size - 1, 1)
+        spacing = max(self.min_pixels, 0.6*nominal)
+        for candidates in sets[1:]:
+            kept = self._fill(kept, np.asarray(candidates, dtype=float), spacing, nominal)
+        if self.base_locator is not None or kept.size >= self.min_ticks:
+            return kept
+
+        # too few to read the scale by: take denser candidates wherever
+        # they fit, then even steps where decades leave too few (a
+        # frequency over less than a decade, say), then let them closer
+        tries = [kept]
+        for log, spacing in ((self.log, self.min_pixels),
+                             (False, self.min_pixels),
+                             (False, 0.6*self.min_pixels)):
+            ticks = self._dense(self._candidates(vmin, vmax, log), spacing)
+            if ticks.size >= self.min_ticks:
+                return ticks
+            tries.append(ticks)
+        return max(tries, key=np.size)
+
+    def _dense(self, sets, spacing):
+        """The ticks of `sets` in turn, each kept where it sits `spacing`
+        pixels clear of those already kept."""
+        kept = self._prune(np.asarray(sets[0], dtype=float), spacing)
+        pixels = list(np.asarray(self.to_pixels(kept), dtype=float))
+        kept = list(kept)
+        for candidates in sets[1:]:
+            candidates = self._in_range(np.asarray(candidates, dtype=float))
+            for tick, pixel in zip(candidates, np.asarray(self.to_pixels(candidates), dtype=float)):
+                if not pixels or np.min(np.abs(np.asarray(pixels) - pixel)) >= spacing:
+                    kept.append(tick)
+                    pixels.append(pixel)
+        return np.array(sorted(kept))
+
+    def _in_range(self, ticks):
+        if self.min_val is not None:
+            ticks = ticks[ticks >= self.min_val]
+        if self.max_val is not None:
+            ticks = ticks[ticks <= self.max_val]
+        return ticks
+
+    def _fill(self, kept, candidates, spacing, nominal):
+        """Add candidates that sit `spacing` pixels clear of every kept tick.
+
+        Only between kept ticks - a finer step beyond the last of them
+        reads as a change of step rather than a gap filled - and only
+        into gaps well wider than the `nominal` step of the usual ticks.
+        """
+        candidates = self._in_range(candidates)
+        if kept.size > 1:
+            candidates = candidates[(candidates > kept.min()) & (candidates < kept.max())]
+        if candidates.size == 0:
+            return kept
+        pixels = np.sort(np.asarray(self.to_pixels(kept), dtype=float))
+        # only gaps the function stretches well past the usual take
+        # finer ticks, so an evenly spread axis keeps its even steps
+        gaps = np.diff(pixels)
+        wide = gaps > 1.8*nominal
+        edges = [(pixels[i], pixels[i+1]) for i in np.flatnonzero(wide)]
+        pixels, kept = list(pixels), list(kept)
+        for tick, pixel in zip(candidates, np.asarray(self.to_pixels(candidates), dtype=float)):
+            if not any(lo < pixel < hi for lo, hi in edges):
+                continue
+            if np.min(np.abs(np.asarray(pixels) - pixel)) >= spacing:
+                kept.append(tick)
+                pixels.append(pixel)
+        return np.array(sorted(kept))
+
+    def _prune(self, ticks, spacing):
+        ticks = self._in_range(ticks)
+        if ticks.size < 2:
+            return ticks
+
+        # prune ticks that are too close in screen space
+        pixels = np.asarray(self.to_pixels(ticks), dtype=float)
+        kept = [ticks[0]]
+        last = pixels[0]
+        for tick, pixel in zip(ticks[1:], pixels[1:]):
+            if abs(pixel - last) >= spacing:
+                kept.append(tick)
+                last = pixel
+
+        return np.array(kept)
+
+
+class EdgePrunedLocator(Locator):
+    """Tick locator dropping ticks within a margin of the view's ends.
+
+    Panels stacked end to end put the top tick label of one against
+    the bottom label of the next. This wraps a locator, dropping any
+    tick landing within a fraction of the axis of the end(s) asked for.
+
+    Args:
+      base_locator (:obj:`matplotlib.ticker.Locator`): locator to take
+        ticks from
+      upper (:obj:`float`): fraction of the view interval from its top
+        within which ticks are dropped, 0 to keep them all
+      lower (:obj:`float`): the same from its bottom
+    """
+    def __init__(self, base_locator, upper=0.1, lower=0.):
+        self.base_locator = base_locator
+        self.upper = upper
+        self.lower = lower
+
+    def set_axis(self, axis):
+        super().set_axis(axis)
+        self.base_locator.set_axis(axis)
+
+    def __call__(self):
+        vmin, vmax = self.axis.get_view_interval()
+        return self.tick_values(vmin, vmax)
+
+    def tick_values(self, vmin, vmax):
+        ticks = np.asarray(self.base_locator.tick_values(vmin, vmax), dtype=float)
+        lo, hi = min(vmin, vmax), max(vmin, vmax)
+        span = hi - lo
+        keep = (ticks <= hi - self.upper*span) & (ticks >= lo + self.lower*span)
+        return ticks[keep]

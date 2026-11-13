@@ -9,17 +9,135 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `notes` keyword for `AudioFigure.sonify()`, overriding the style's notes for one call,
+  so a style can be reused at a different pitch (e.g. `notes=['C3']`).
 - Cross-fade looping for the `Sampler`: with `looping: "forward"`, `loop_xfade` (seconds)
   cross-fades the end of the loop into its start (equal-power), removing the click at
   each repeat. Defaults to `0`, a hard loop as before.
+- `Sampler` samples can be named in a `Score` by *alias* rather than note, e.g.
+  `Score([['kick', 'snare', 'hat']], 10)`, with `pitch` then binning sources onto
+  the named samples as for notes. Notes and aliases can be mixed: notes are
+  ordered low to high while aliases keep their position in the chord (e.g.
+  `['E3', 'snare', 'C3']` becomes `['C3', 'snare', 'E3']`).
+  Untagged sample files (e.g. `kick.wav`) are given consecutive home notes from `C3`
+  in filename order (`assign_notes='sequential'`, or `'detect'` to place them by
+  their strongest frequency), are aliased by their filename stem, listed
+  by `Sampler.info()`, and renamed with `Sampler.set_aliases({'kick': 'C1'})`;
+  `Sampler.resolve_alias()` gives the root note an alias refer to. Scores using
+  aliases the sampler lacks, or used with a non-`Sampler` generator, raise on
+  `Sonification` construction. `Generator.supports_aliases` marks which generators
+  can play aliases, groundwork for a `Speech` generator.
+- `event_table()` gains a `sample` column, and `object_table()` an `attrs['sample']`,
+  naming the sample each source sounds when using a `Sampler`.
+- `examples/Percussion.py` demonstrating alias-based sampling with synthesised drum hits.
 
-### Fixed
+- `plot_mapping()` methods introduced to plot mappped parameters for sonifications. This
+  applies to `Sonification` and `AudioFigure` objects, with `strauss.plot_mapping()` to
+  refer to the active `AudioFigure`. For a sonification, one panel is included per mapped
+  parameter (or per `Object` and mapped parameter if requested), and stacked vertically.  
+  A twin y axis is used to show the mapping, with the left showing the input data values, 
+  and the right the mapped parameters. Where a mapping is "non-monotonic", so cannot be 
+  shown solely a rescaling of the input axis, the parameter values are additionally 
+  plotted as a dashed line against its own axis. Similarly the lower and upper x axes 
+  show the `time` or `time_evo` mappings.
+- Plotted values are linked to the timing tables, so these correspond exactly. Each 
+  `Object` is coloured separately and named in a legend.
+- Mapping plots are drawn in the STRAUSS colours, via `theme='dark'` (default) or
+  `theme='light'`, or a dict giving the theme's own `bg`, `fg` and `series` colours
+  (`strauss.plotting.PLOT_THEMES`). Text is set in a sans serif, titles in bold italic and
+  tick numbers monospaced, using Lato and Sometype Mono where installed.
+- Mapping plot panels default to 6 x 3.5 inches (`strauss.plotting.PANEL_SIZE`), and every
+  axis with a scale keeps at least 3 ticks (`MIN_TICKS`) where they fit - a frequency over
+  less than a decade, say, is ticked in even steps rather than by a lone round decade.
+- Table `note` columns are ordered by pitch, and tracks a new `attrs['note_frequency']` 
+  to make this simple. 
+- `Sources.input_to_param(key)` stores the function converting input data to expressive
+  sound parameter.
+- Plotting uses new `utilities.MinPixelLocator` to decide on where to put ticks, useful
+  given axes can be significantly distorted. 
 
+- `Speech` generator, speaking a list of phrases, e.g.
+  `Speech(['a red giant', 'a white dwarf'])` with the phrases named in the `Score`
+  (`Score([['a red giant', 'a white dwarf']], '0m 10s')`), so `pitch` chooses which
+  phrase each source speaks. Phrases are rendered with text-to-speech up front and
+  cached under `~/.cache/strauss/speech` (`cache_dir` to change, `clear_cache()` to
+  drop), then played through the `Sampler` machinery it subclasses, so envelopes,
+  filters, LFOs and spatialisation all apply. Phrases are never bent by note - each
+  key plays the nearest phrase as rendered - though `pitch_shift` still works if a
+  deliberate shift is wanted. Pick the voice with `Speech(..., voice=...)`. Not yet
+  available via a `Style`.
+- `call`, a *categorical* source mapping: input specifies the sound each source
+  makes, e.g. `{'call': ['a red giant', 'a white dwarf', ...]}` for a `Speech`
+  generator or `{'call': ['kick', 'snare', ...]}` for a `Sampler`. Labels are
+ requested from the generator's sounds rather than rescaled, so the `Score`'s
+  chord is not read at all (a `pitch` mapping alongside is ignored, with a
+  warning), and a source with no label is silent. Reported in `event_table()`
+  and `object_table()` as the `Sound` column, with the label as typed under
+  `include_input=True`. Not yet supported from a file, by `AudioFigure`, or in
+  `plot_mapping()`.
+- `Speech()` can be constructed with no phrases: a sonification requests
+  whatever its sources and score want, via the new `Speech.make_aliases()`
+  and `Generator.make_aliases` flag and stored aribtrarily in scientific
+  note notation (e.g. C#4).
+- `Generator.sounds_have_pitch` flags generators for which a single 'pitch'
+  is meaningful (`Speech`), whose tables now leave out the `note` column and
+  `note_frequency`, both of which were meaningless there.
+- Point to where `kokoro` voice names documented (the model's own voice
+  list, with sample audio and quality grades, at
+  https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md) in the
+  `tts_caption` module docs, `getVoices()`, `Speech(voice=...)`, the README and
+  `docs/start.rst`.
+- `Speech` always trims the silence around each phrase, to improve source timing
+  (`kokoro` pads ~0.23s in front of every phrase). A phrase starts where it first
+  rises above -50 dBFS and ends where it last falls below it. Cached audio is kept as the engine rendered it and the trim applied on load.
+- `Speech` skips empty phrases rather than raising.
+- `kokoro` text-to-speech engine for captions, alongside `pyttsx3`. The best
+  installed engine is used (in that order), or pick one with `tts_caption.set_engine()`.
+  Engines load on first caption render rather than at import. `pip install strauss[speech]`
+  installs `kokoro`. `tts_caption.getVoices()` lists the current engine's voices.
+- `kokoro-onnx` text-to-speech engine, running the same model and voices as `kokoro`
+  without `torch`, preferred after `kokoro` and before `pyttsx3`. Its model files download
+  on first render. Japanese and Mandarin voices aren't available, and pronunciation can
+  differ slightly as it uses `espeak-ng`. Also available as `pip install strauss[kokoro-onnx]`.
+
+### Changed
+
+- The text-to-speech extra is now `pip install strauss[speech]`, with `[TTS]` and
+  `[AI-TTS]` kept as aliases installing exactly the same engines. On Python 3.13 they
+  install `kokoro-onnx` in place of `kokoro`, whose PyPI releases stop at 3.12. On 3.14 they
+  install no engine, as `kokoro-onnx` doesn't yet allow it; the README gives an override.
+- `Sonification(ttsmodel=...)` defaults to `None`, resolved to the current engine's default
+  voice at render time, so `set_engine()` after import takes effect. The default voice
+  for `kokoro` and `kokoro-onnx` is `bf_emma`.
+
+### Removed
+
+- The `coqui-tts` text-to-speech engine, its `[coqui]` extra and
+  `utilities.get_supported_coqui_voices()`. `kokoro` replaces it as the neural engine.
+
+### Fixes
+
+- filter `Speech` to avoid DC-term-like offsets on `kokoro-onnx`.`kokoro`-like audio is now high-pass filtered at 30 Hz, and `Speech` applies 5 ms fades at sample ends.
+- `Sonification.hear()` plays to a mono output device (e.g. 'Microsoft Teams Audio', the
+  default output during a Teams call) by mixing down, where it raised PortAudio's
+  `Invalid number of channels`. Other playback errors are reported rather than raised.
 - `pydantic` (used by styles) is now an install requirement, so `import strauss` works on a
   fresh install.
 - `loop_end` is now clipped to the end of the sample, as documented. 
 - Notes played by pitch-shifting the nearest sample had their `'sample'` note length
   inverted.
+- The `sci_fi` and `twinkle` styles now work, as they lacked a `time_evo` mapping and `notes`,
+  and naming samples that weren't registered. `Space Strings` and `Bright Mallets` are now
+  downloaded on first use from the Sonification Suite's `sound-assets-v1.0` release.
+- A style with no `notes` raises a clearer error from `AudioFigure.sonify()`.
+- `AudioFigure.sonify()` now accepts pandas `Series`.
+- `AudioFigure.sonify()` warns about unrecognised keywords rather than ignoring,
+  and only reads keywords *starting* with `fix_` as fixed values (so `prefix_volume` no
+  longer fixes `volume`!)
+- `strauss.animate_mapping()` added alongside `strauss.plot_mapping()`, for the active figure.
+- The `AudioFigure.sonify()` docstring described `style` as a dict, where it takes a built-in
+  style name or a path to a style file. Mapping function examples in `Style` schema used
+  names that failed validation (`log(x)`, `-x`) renamed (`log10` and `invert`).
 
 ## v1.5
 
