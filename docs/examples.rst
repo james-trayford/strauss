@@ -4,7 +4,16 @@
 Examples
 ^^^^^^^^
 
-Here, we explain some of the example sonfications included in the :code:`examples/` directory of the Strauss repo. These are all in both *Python Notebook* (:code:`.ipynb`) and *Python script* (:code:`.py`) format so you can choose which format you prefer to use.
+Here, we explain some of the example sonifications included in the :code:`examples/` directory of the Strauss repo. These are {will be} in both *Python Notebook* (:code:`.ipynb`) and *Python script* (:code:`.py`) format for accessibility reasons, so you can choose which format you prefer to use. Starting with new feature in v1.5:
+
+
+Style Sonification (:code:`StyleSonification.ipynb`)
+****************************************************
+.. versionadded:: 1.5
+
+The *Style Sonification* notebook demonstrates the new high-level :code:`strauss.sonify()` interface. We demonstrate how data can be sonified in various ways and in one line using built-in styles such as :code:`'windy'` and :code:`'flute_section'`, with keywords such as :code:`duration` and :code:`caption`, or even with a single input data series, assuming time is uniformly spaced. See :doc:`quickstart` and :doc:`styles`.
+
+The code is available as a `notebook on GitHub <https://github.com/james-trayford/strauss/blob/main/examples/StyleSonification.ipynb>`_.
 
 Audio Caption (:code:`AudioCaption.ipynb`)
 ******************************************
@@ -57,7 +66,7 @@ The *Planetary Orbits* example generates sonifications used in the "Audio Univer
 Two video/audio examples are available below
 
 #. `The eight planets orbiting the Sun (with graphics) <https://www.youtube.com/watch?v=WI-WPvXeAgk>`_.
-#. `Jupiter's orbit <https://www.youtube.com/watch?v=sWnH56i8mJEk>`_.
+#. `Jupiter's orbit <https://www.youtube.com/watch?v=sWnH56i8mJE>`_.
 
 The code is available in a `Google Colab notebook <https://githubtocolab.com/james-trayford/strauss/blob/main/examples/colab/PlanetaryOrbits.ipynb>`_.
 
